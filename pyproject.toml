@@ -1,5 +1,5 @@
 [project]
-name = "my-py-lib"
+name = "my-lib"
 version = "0.1.0"
 description = "Private utility library"
 authors = [
@@ -22,4 +22,4 @@ dev-dependencies = []
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/my_py_lib"]
+packages = ["src/my_lib"]
