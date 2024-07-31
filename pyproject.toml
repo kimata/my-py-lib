@@ -6,10 +6,9 @@ authors = [
     { name = "KIMATA Tetsuya", email = "kimata@green-rabbit.net" }
 ]
 dependencies = [
-    "coloredlogs>=15.0.1",
 ]
 readme = "README.md"
-requires-python = ">= 3.10"
+requires-python = ">= 3.11"
 
 [build-system]
 requires = ["hatchling"]
