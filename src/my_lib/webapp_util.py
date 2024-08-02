@@ -3,11 +3,11 @@ import datetime
 import os
 import tracemalloc
 
+import my_lib.flask_util
 import psutil
 import tzlocal
 import uptime
 from flask import Blueprint, jsonify
-from flask_util import support_jsonp
 from webapp_config import APP_URL_PREFIX, TIMEZONE
 
 blueprint = Blueprint("webapp-util", __name__, url_prefix=APP_URL_PREFIX)
@@ -16,14 +16,14 @@ snapshot_prev = None
 
 
 @blueprint.route("/api/memory", methods=["GET"])
-@support_jsonp
+@my_lib.flask_util.support_jsonp
 def print_memory():
     return {"memory": psutil.Process(os.getpid()).memory_info().rss}
 
 
 # NOTE: メモリリーク調査用
 @blueprint.route("/api/snapshot", methods=["GET"])
-@support_jsonp
+@my_lib.flask_util.support_jsonp
 def snap():
     global snapshot_prev  # noqa: PLW0603
 
@@ -41,7 +41,7 @@ def snap():
 
 
 @blueprint.route("/api/sysinfo", methods=["GET"])
-@support_jsonp
+@my_lib.flask_util.support_jsonp
 def api_sysinfo():
     return jsonify(
         {
