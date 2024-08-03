@@ -7,7 +7,7 @@ import yaml
 CONFIG_PATH = "config.yaml"
 
 
-def load_config(config_path=CONFIG_PATH):
+def load(config_path=CONFIG_PATH):
     config_path = pathlib.Path(config_path).resolve()
     logging.info("Load config: %s", config_path)
     with config_path.open(mode="r") as file:
@@ -19,4 +19,4 @@ if __name__ == "__main__":
 
     logger.init("test", level=logging.INFO)
 
-    load_config()
+    load()
