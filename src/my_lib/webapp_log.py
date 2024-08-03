@@ -10,9 +10,9 @@ from enum import IntEnum
 from multiprocessing import Queue
 from wsgiref.handlers import format_date_time
 
-import my_lib.flask_util
-import my_lib.notify_slack
-import my_lib.webapp_event
+import flask_util
+import notify_slack
+import webapp_event
 from flask import Blueprint, g, jsonify, request
 from webapp_config import APP_URL_PREFIX, LOG_DB_PATH, TIMEZONE, TIMEZONE_OFFSET
 
@@ -93,11 +93,11 @@ def app_log_impl(message, level):
         )
         sqlite.commit()
 
-        my_lib.webapp_event.notify_event(my_lib.webapp_event.EVENT_TYPE.LOG)
+        webapp_event.notify_event(webapp_event.EVENT_TYPE.LOG)
 
     if level == APP_LOG_LEVEL.ERROR:
         if "slack" in config:
-            my_lib.notify_slack.notify_slack.error(
+            notify_slack.error(
                 config["slack"]["bot_token"],
                 config["slack"]["error"]["channel"]["name"],
                 config["slack"]["from"],
@@ -167,7 +167,7 @@ def clear_log():
 
 
 @blueprint.route("/api/log_clear", methods=["GET"])
-@my_lib.flask_util.support_jsonp
+@flask_util.support_jsonp
 def api_log_clear():
     clear_log()
     app_log("🧹 ログがクリアされました。")
@@ -176,8 +176,8 @@ def api_log_clear():
 
 
 @blueprint.route("/api/log_view", methods=["GET"])
-@my_lib.flask_util.support_jsonp
-@my_lib.flask_util.gzipped
+@flask_util.support_jsonp
+@flask_util.gzipped
 def api_log_view():
     stop_day = request.args.get("stop_day", 0, type=int)
 
@@ -205,11 +205,11 @@ def api_log_view():
 
 
 if __name__ == "__main__":
-    import logger
-    from config import load_config
+    import my_lib.config
+    import my_lib.logger
 
-    logger.init("test", level=logging.INFO)
+    my_lib.logger.init("test", level=logging.INFO)
 
-    init(load_config())
+    init(my_lib.config.load())
 
     print(get_log(1))  # noqa: T201
