@@ -3,7 +3,7 @@ import my_lib.flask_util
 import my_lib.webapp.config
 from flask import Blueprint, redirect, send_from_directory
 
-blueprint = Blueprint("webapp-base", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
+blueprint = Blueprint("webapp-base", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 
 @blueprint.route("/", defaults={"filename": "index.html"})
