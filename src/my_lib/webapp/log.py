@@ -12,9 +12,9 @@ from wsgiref.handlers import format_date_time
 
 import my_lib.flask_util
 import my_lib.notify_slack
-import my_lib.webapp_event
+import my_lib.webapp.config
+import my_lib.webapp.event
 from flask import Blueprint, g, jsonify, request
-from webapp_config import APP_URL_PREFIX, LOG_DB_PATH, TIMEZONE, TIMEZONE_OFFSET
 
 
 class APP_LOG_LEVEL(IntEnum):  # noqa: N801
@@ -23,7 +23,7 @@ class APP_LOG_LEVEL(IntEnum):  # noqa: N801
     ERROR = 2
 
 
-blueprint = Blueprint("webapp-log", __name__, url_prefix=APP_URL_PREFIX)
+blueprint = Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
 
 sqlite = None
 log_thread = None
@@ -46,7 +46,7 @@ def init(config_):
     if sqlite is not None:
         raise ValueError("sqlite should be None")  # noqa: TRY003, EM101
 
-    sqlite = sqlite3.connect(LOG_DB_PATH, check_same_thread=False)
+    sqlite = sqlite3.connect(my_lib.webapp.LOG_DATA_PATH, check_same_thread=False)
     sqlite.execute(
         "CREATE TABLE IF NOT EXISTS log(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
@@ -85,11 +85,11 @@ def app_log_impl(message, level):
         # NOTE: SQLite に記録する時刻はローカルタイムにする
         sqlite.execute(
             'INSERT INTO log VALUES (NULL, DATETIME("now", ?), ?)',
-            [f"{TIMEZONE_OFFSET} hours", message],
+            [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours", message],
         )
         sqlite.execute(
             'DELETE FROM log WHERE date <= DATETIME("now", ?, "-60 days")',
-            [f"{TIMEZONE_OFFSET} hours"],
+            [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours"],
         )
         sqlite.commit()
 
@@ -153,7 +153,7 @@ def get_log(stop_day):
     cur.execute(
         'SELECT * FROM log WHERE date <= DATETIME("now", ?,?) ORDER BY id DESC LIMIT 500',
         # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにるす
-        [f"{TIMEZONE_OFFSET} hours", f"-{stop_day} days"],
+        [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours", f"-{stop_day} days"],
     )
     return cur.fetchall()
 
@@ -192,7 +192,7 @@ def api_log_view():
     else:
         last_time = (
             datetime.datetime.strptime(log[0]["date"], "%Y-%m-%d %H:%M:%S")
-            .replace(tzinfo=TIMEZONE)
+            .replace(tzinfo=my_lib.webapp.config.TIMEZONE)
             .timestamp()
         )
 

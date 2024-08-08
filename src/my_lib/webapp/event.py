@@ -6,10 +6,10 @@ import time
 import traceback
 from enum import Enum
 
+import my_lib.webapp.config
 from flask import Blueprint, Response, request, stream_with_context
-from webapp_config import APP_URL_PREFIX
 
-blueprint = Blueprint("webapp-event", __name__, url_prefix=APP_URL_PREFIX)
+blueprint = Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
 
 
 class EVENT_TYPE(Enum):  # noqa: N801

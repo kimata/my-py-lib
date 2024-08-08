@@ -4,13 +4,13 @@ import os
 import tracemalloc
 
 import my_lib.flask_util
+import my_lib.webapp.config
 import psutil
 import tzlocal
 import uptime
 from flask import Blueprint, jsonify
-from webapp_config import APP_URL_PREFIX, TIMEZONE
 
-blueprint = Blueprint("webapp-util", __name__, url_prefix=APP_URL_PREFIX)
+blueprint = Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
 
 snapshot_prev = None
 
@@ -45,7 +45,7 @@ def snap():
 def api_sysinfo():
     return jsonify(
         {
-            "date": datetime.datetime.now(TIMEZONE).isoformat(),
+            "date": datetime.datetime.now(my_lib.webapp.config.TIMEZONE).isoformat(),
             "timezone": str(tzlocal.get_localzone()),
             "image_build_date": os.environ.get("IMAGE_BUILD_DATE", ""),
             "uptime": uptime.boottime().isoformat(),
