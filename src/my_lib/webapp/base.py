@@ -10,7 +10,7 @@ blueprint = Blueprint("webapp-base", __name__, url_prefix=my_lib.webapp.config.U
 @blueprint.route("/<path:filename>")
 @my_lib.flask_util.gzipped
 def webapp(filename):
-    return send_from_directory(my_lib.webapp.config.STATIC_FILE_PATH, filename)
+    return send_from_directory(my_lib.webapp.config.STATIC_DIR_PATH, filename)
 
 
 blueprint_default = Blueprint("webapp-default", __name__)
