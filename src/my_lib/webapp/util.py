@@ -10,7 +10,7 @@ import tzlocal
 import uptime
 from flask import Blueprint, jsonify
 
-blueprint = Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
+blueprint = Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 snapshot_prev = None
 

@@ -9,7 +9,7 @@ from enum import Enum
 import my_lib.webapp.config
 from flask import Blueprint, Response, request, stream_with_context
 
-blueprint = Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
+blueprint = Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 
 class EVENT_TYPE(Enum):  # noqa: N801

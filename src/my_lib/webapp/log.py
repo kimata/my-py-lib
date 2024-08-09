@@ -23,7 +23,7 @@ class APP_LOG_LEVEL(IntEnum):  # noqa: N801
     ERROR = 2
 
 
-blueprint = Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.APP_URL_PREFIX)
+blueprint = Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 sqlite = None
 log_thread = None
