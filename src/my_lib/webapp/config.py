@@ -15,7 +15,8 @@ STATIC_DIR_PATH = None
 
 SCHEDULE_FILE_PATH = None
 LOG_DIR_PATH = None
-STAT_FILE_PATH = None
+STAT_DIR_PATH = None
+LIVENESS_FILE_PATH = None
 
 
 def init(config):  # noqa: C901
@@ -25,7 +26,8 @@ def init(config):  # noqa: C901
     global STATIC_DIR_PATH  # noqa: PLW0603
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
-    global STAT_FILE_PATH  # noqa: PLW0603
+    global STAT_DIR_PATH  # noqa: PLW0603
+    global LIVENESS_FILE_PATH  # noqa: PLW0603
 
     if "timezone" in config["webapp"]:
         if "offset" in config["webapp"]["timezone"]:
@@ -47,12 +49,15 @@ def init(config):  # noqa: C901
             SCHEDULE_FILE_PATH = pathlib.Path(config["webapp"]["data"]["schedule_file_path"]).resolve()
         if "log_file_path" in config["webapp"]["data"]:
             LOG_DIR_PATH = pathlib.Path(config["webapp"]["data"]["log_file_path"]).resolve()
+        if "stat_dir_path" in config["webapp"]["data"]:
+            STAT_DIR_PATH = pathlib.Path(config["webapp"]["data"]["stat_dir_path"]).resolve()
 
-    if "healthz" in config["webapp"]:  # noqa: SIM102
-        if "file_path" in config["webapp"]["healthz"]:
-            STAT_FILE_PATH = config["webapp"]["healthz"]["file_path"]
+    if "liveness" in config["webapp"]:  # noqa: SIM102
+        if "file_path" in config["webapp"]["liveness"]:
+            LIVENESS_FILE_PATH = config["webapp"]["liveness"]["file_path"]
 
     logging.info("STATIC_DIR_PATH = %s", STATIC_DIR_PATH)
     logging.info("SCHEDULE_FILE_PATH = %s", SCHEDULE_FILE_PATH)
     logging.info("LOG_DIR_PATH = %s", LOG_DIR_PATH)
-    logging.info("STAT_FILE_PATH = %s", STAT_FILE_PATH)
+    logging.info("STAT_DIR_PATH = %s", STAT_DIR_PATH)
+    logging.info("LIVENESS_FILE_PATH = %s", LIVENESS_FILE_PATH)
