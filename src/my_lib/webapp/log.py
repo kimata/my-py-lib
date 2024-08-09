@@ -46,7 +46,7 @@ def init(config_):
     if sqlite is not None:
         raise ValueError("sqlite should be None")  # noqa: TRY003, EM101
 
-    sqlite = sqlite3.connect(my_lib.webapp.LOG_DATA_PATH, check_same_thread=False)
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=False)
     sqlite.execute(
         "CREATE TABLE IF NOT EXISTS log(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
