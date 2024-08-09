@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import datetime
+import logging
 import pathlib
 
 import pytz
@@ -18,7 +19,6 @@ STAT_FILE_PATH = None
 
 
 def init(config):  # noqa: C901
-    global URL_PREFIX  # noqa: PLW0603
     global TIMEZONE_OFFSET  # noqa: PLW0603
     global TIMEZONE  # noqa: PLW0603
     global TIMEZONE_PYTZ  # noqa: PLW0603
@@ -26,9 +26,6 @@ def init(config):  # noqa: C901
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
     global STAT_FILE_PATH  # noqa: PLW0603
-
-    if "url_prefix" in config["webapp"]:
-        URL_PREFIX = config["webapp"]["url_prefix"]
 
     if "timezone" in config["webapp"]:
         if "offset" in config["webapp"]["timezone"]:
@@ -54,3 +51,8 @@ def init(config):  # noqa: C901
     if "healthz" in config["webapp"]:  # noqa: SIM102
         if "file_path" in config["webapp"]["healthz"]:
             STAT_FILE_PATH = config["webapp"]["healthz"]["file_path"]
+
+    logging.info("STATIC_DIR_PATH = %s", STATIC_DIR_PATH)
+    logging.info("SCHEDULE_FILE_PATH = %s", SCHEDULE_FILE_PATH)
+    logging.info("LOG_DIR_PATH = %s", LOG_DIR_PATH)
+    logging.info("STAT_FILE_PATH = %s", STAT_FILE_PATH)

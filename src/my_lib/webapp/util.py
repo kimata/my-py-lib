@@ -3,14 +3,14 @@ import datetime
 import os
 import tracemalloc
 
+import flask
 import my_lib.flask_util
 import my_lib.webapp.config
 import psutil
 import tzlocal
 import uptime
-from flask import Blueprint, jsonify
 
-blueprint = Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 snapshot_prev = None
 
@@ -37,13 +37,13 @@ def snap():
         top_stats = snapshot.compare_to(snapshot_prev, "lineno")
         snapshot_prev = snapshot
 
-        return jsonify([str(stat) for stat in top_stats[:10]])
+        return flask.jsonify([str(stat) for stat in top_stats[:10]])
 
 
 @blueprint.route("/api/sysinfo", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_sysinfo():
-    return jsonify(
+    return flask.jsonify(
         {
             "date": datetime.datetime.now(my_lib.webapp.config.TIMEZONE).isoformat(),
             "timezone": str(tzlocal.get_localzone()),

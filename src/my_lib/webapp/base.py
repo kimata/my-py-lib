@@ -19,4 +19,4 @@ blueprint_default = Blueprint("webapp-default", __name__)
 @blueprint_default.route("/")
 @my_lib.flask_util.gzipped
 def root():
-    return redirect(f"{my_lib.webapp.config.APP_URL_PREFIX}/")
+    return redirect(f"{my_lib.webapp.config.URL_PREFIX}/")

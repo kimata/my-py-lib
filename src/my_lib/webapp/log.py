@@ -10,11 +10,11 @@ from enum import IntEnum
 from multiprocessing import Queue
 from wsgiref.handlers import format_date_time
 
+import flask
 import my_lib.flask_util
 import my_lib.notify_slack
 import my_lib.webapp.config
 import my_lib.webapp.event
-from flask import Blueprint, g, jsonify, request
 
 
 class APP_LOG_LEVEL(IntEnum):  # noqa: N801
@@ -23,7 +23,7 @@ class APP_LOG_LEVEL(IntEnum):  # noqa: N801
     ERROR = 2
 
 
-blueprint = Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 sqlite = None
 log_thread = None
@@ -93,7 +93,7 @@ def app_log_impl(message, level):
         )
         sqlite.commit()
 
-        my_lib.webapp_event.notify_event(my_lib.webapp_event.EVENT_TYPE.LOG)
+        my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
     if level == APP_LOG_LEVEL.ERROR:
         if "slack" in config:
@@ -172,18 +172,18 @@ def api_log_clear():
     clear_log()
     app_log("🧹 ログがクリアされました。")
 
-    return jsonify({"result": "success"})
+    return flask.jsonify({"result": "success"})
 
 
 @blueprint.route("/api/log_view", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
 def api_log_view():
-    stop_day = request.args.get("stop_day", 0, type=int)
+    stop_day = flask.request.args.get("stop_day", 0, type=int)
 
     # NOTE: @gzipped をつけた場合，キャッシュ用のヘッダを付与しているので，
     # 無効化する．
-    g.disable_cache = True
+    flask.g.disable_cache = True
 
     log = get_log(stop_day)
 
@@ -196,10 +196,10 @@ def api_log_view():
             .timestamp()
         )
 
-    response = jsonify({"data": log, "last_time": last_time})
+    response = flask.jsonify({"data": log, "last_time": last_time})
 
     response.headers["Last-Modified"] = format_date_time(last_time)
-    response.make_conditional(request)
+    response.make_conditional(flask.request)
 
     return response
 

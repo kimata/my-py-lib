@@ -6,10 +6,10 @@ import time
 import traceback
 from enum import Enum
 
+import flask
 import my_lib.webapp.config
-from flask import Blueprint, Response, request, stream_with_context
 
-blueprint = Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 
 class EVENT_TYPE(Enum):  # noqa: N801
@@ -74,7 +74,7 @@ def notify_event(event_type):
 
 @blueprint.route("/api/event", methods=["GET"])
 def api_event():
-    count = request.args.get("count", 0, type=int)
+    count = flask.request.args.get("count", 0, type=int)
 
     def event_stream():
         global event_count
@@ -103,7 +103,7 @@ def api_event():
                 yield "data: dummy\n\n"
                 j = 0
 
-    res = Response(stream_with_context(event_stream()), mimetype="text/event-stream")
+    res = flask.Response(flask.stream_with_context(event_stream()), mimetype="text/event-stream")
     res.headers.add("Access-Control-Allow-Origin", "*")
     res.headers.add("Cache-Control", "no-cache")
     res.headers.add("X-Accel-Buffering", "no")
