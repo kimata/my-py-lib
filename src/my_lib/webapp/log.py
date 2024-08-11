@@ -17,7 +17,7 @@ import my_lib.webapp.config
 import my_lib.webapp.event
 
 
-class APP_LOG_LEVEL(IntEnum):  # noqa: N801
+class LOG_LEVEL(IntEnum):  # noqa: N801
     INFO = 0
     WARN = 1
     ERROR = 2
@@ -57,7 +57,7 @@ def init(config_):
 
     log_lock = threading.Lock()
     log_queue = Queue()
-    log_thread = threading.Thread(target=app_log_worker, args=(log_queue,))
+    log_thread = threading.Thread(target=worker, args=(log_queue,))
     log_thread.start()
 
 
@@ -77,7 +77,7 @@ def term():
     sqlite = None
 
 
-def app_log_impl(message, level):
+def log_impl(message, level):
     global config
     global sqlite
 
@@ -95,7 +95,7 @@ def app_log_impl(message, level):
 
         my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
-    if level == APP_LOG_LEVEL.ERROR:
+    if level == LOG_LEVEL.ERROR:
         if "slack" in config:
             my_lib.notify_slack.error(
                 config["slack"]["bot_token"],
@@ -112,7 +112,7 @@ def app_log_impl(message, level):
             os._exit(-1)
 
 
-def app_log_worker(log_queue):
+def worker(log_queue):
     global should_terminate
 
     sleep_sec = 0.1
@@ -124,7 +124,7 @@ def app_log_worker(log_queue):
         try:
             if not log_queue.empty():
                 log = log_queue.get()
-                app_log_impl(log["message"], log["level"])
+                log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際，freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
@@ -132,12 +132,12 @@ def app_log_worker(log_queue):
         time.sleep(sleep_sec)
 
 
-def app_log(message, level=APP_LOG_LEVEL.INFO):
+def log(message, level=LOG_LEVEL.INFO):
     global log_queue
 
-    if level == APP_LOG_LEVEL.ERROR:
+    if level == LOG_LEVEL.ERROR:
         logging.error(message)
-    elif level == APP_LOG_LEVEL.WARN:
+    elif level == LOG_LEVEL.WARN:
         logging.warning(message)
     else:
         logging.info(message)
@@ -170,7 +170,7 @@ def clear_log():
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
     clear_log()
-    app_log("🧹 ログがクリアされました。")
+    log("🧹 ログがクリアされました。")
 
     return flask.jsonify({"result": "success"})
 
