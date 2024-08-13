@@ -50,6 +50,7 @@ def init(config_):
     sqlite.execute(
         "CREATE TABLE IF NOT EXISTS log(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
+    sqlite.execute("PRAGMA journal_mode=WAL")
     sqlite.commit()
     sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
 
