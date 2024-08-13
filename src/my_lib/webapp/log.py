@@ -122,7 +122,7 @@ def worker(log_queue):
             break
 
         try:
-            if not log_queue.empty():
+            while not log_queue.empty():
                 log = log_queue.get()
                 log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
