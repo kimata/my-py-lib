@@ -1,0 +1,23 @@
+---
+webapp:
+  timezone:
+    offset: "+9"
+    name: JST
+    zone: Asia/Tokyo
+
+  static_dir_path: tests/data
+
+  data:
+    log_file_path: tests/data/log.db
+    stat_dir_path: tests/data
+
+slack:
+  bot_token: xoxb-000000000000-0000000000000-000000000000000000000000
+
+  from: Shutter
+
+  error:
+    channel:
+      name: "#error"
+      id: 00000000000
+    interval_min: 180
