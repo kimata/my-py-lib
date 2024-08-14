@@ -82,6 +82,8 @@ def log_impl(message, level):
     global config
     global sqlite
 
+    logging.debug("insert: [%s] %s", level.name, message)
+
     with log_lock:
         # NOTE: SQLite に記録する時刻はローカルタイムにする
         sqlite.execute(
@@ -124,6 +126,7 @@ def worker(log_queue):
 
         try:
             while not log_queue.empty():
+                logging.debug("Found % log message(s)", log_queue.qsize())
                 log = log_queue.get()
                 log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
