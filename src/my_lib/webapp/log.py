@@ -126,7 +126,7 @@ def worker(log_queue):
 
         try:
             while not log_queue.empty():
-                logging.debug("Found % log message(s)", log_queue.qsize())
+                logging.debug("Found %d log message(s)", log_queue.qsize())
                 log = log_queue.get()
                 log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
