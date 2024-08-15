@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 
-import os
 import re
 import time
 from unittest import mock
 
+import data.sample_webapp
 import my_lib.config
 import my_lib.notify_slack
 import my_lib.webapp.config
@@ -14,7 +14,6 @@ import pytest
 # from app import create_app
 
 CONFIG_FILE = "tests/data/config.example.yaml"
-WEBAPP_URL_PREFIX = "/test"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -43,7 +42,7 @@ def app():
     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
 
     with mock.patch.dict("os.environ", {"WERKZEUG_RUN_MAIN": "true"}):
-        app = create_app(my_lib.config.load(CONFIG_FILE))
+        app = data.sample_webapp.create_app(CONFIG_FILE)
 
         yield app
 
@@ -57,6 +56,7 @@ def client(app):
 
     time.sleep(1)
     app_log_clear(test_client)
+
     # app_log_check(test_client, [])
     # ctrl_log_clear(test_client)
 
@@ -177,99 +177,46 @@ def client(app):
 
 
 def app_log_clear(client):
-    response = client.get(WEBAPP_URL_PREFIX + "/api/log_clear")
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear")
     assert response.status_code == 200
 
+    # def ctrl_log_check(client, expect):
+    #     import logging
 
-# def ctrl_log_check(client, expect):
-#     import logging
+    #     response = client.get("/rasp-shutter/api/ctrl/log")
+    #     assert response.status_code == 200
+    #     assert response.json["result"] == "success"
 
-#     response = client.get("/rasp-shutter/api/ctrl/log")
-#     assert response.status_code == 200
-#     assert response.json["result"] == "success"
+    #     logging.debug(response.json["log"])
 
-#     logging.debug(response.json["log"])
+    #     assert response.json["log"] == expect
 
-#     assert response.json["log"] == expect
+    # def ctrl_stat_clear():
+    #     import my_lib.config
 
+    #     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
 
-# def ctrl_stat_clear():
-#     import my_lib.config
+    #     import my_lib.webapp.config
+    #     import rasp_shutter.config
+    #     import rasp_shutter.webapp_control
 
-#     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
+    #     rasp_shutter.webapp_control.clean_stat_exec(my_lib.config.load(CONFIG_FILE))
 
-#     import my_lib.webapp.config
-#     import rasp_shutter.config
-#     import rasp_shutter.webapp_control
+    #     rasp_shutter.config.STAT_AUTO_CLOSE.unlink(missing_ok=True)
 
-#     rasp_shutter.webapp_control.clean_stat_exec(my_lib.config.load(CONFIG_FILE))
+    # def check_notify_slack(message, index=-1):
+    #     import logging
 
-#     rasp_shutter.config.STAT_AUTO_CLOSE.unlink(missing_ok=True)
+    #     import my_lib.notify_slack
 
+    #     notify_hist = my_lib.notify_slack.hist_get()
+    #     logging.debug(notify_hist)
 
-# def check_notify_slack(message, index=-1):
-#     import logging
-
-#     import my_lib.notify_slack
-
-#     notify_hist = my_lib.notify_slack.hist_get()
-#     logging.debug(notify_hist)
-
-#     if message is None:
-#         assert notify_hist == [], "正常なはずなのに，エラー通知がされています。"
-#     else:
-#         assert len(notify_hist) != 0, "異常が発生したはずなのに，エラー通知がされていません。"
-#         assert notify_hist[index].find(message) != -1, f"「{message}」が Slack で通知されていません。"
-
-
-def create_app(config):
-    os.environ["DUMMY_MODE"] = "true"
-
-    import atexit
-    import logging
-
-    import flask
-    import flask_cors
-    import my_lib.webapp.config
-
-    my_lib.webapp.config.URL_PREFIX = WEBAPP_URL_PREFIX
-    my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
-
-    import my_lib.webapp.base
-    import my_lib.webapp.event
-    import my_lib.webapp.log
-    import my_lib.webapp.util
-
-    app = flask.Flask("rasp-shutter")
-
-    # NOTE: アクセスログは無効にする
-    logging.getLogger("werkzeug").setLevel(logging.ERROR)
-
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        my_lib.webapp.log.init(config)
-
-        def notify_terminate():  # pragma: no cover
-            my_lib.webapp.log.log("🏃 アプリを再起動します．")
-            my_lib.webapp.log.term()
-
-        atexit.register(notify_terminate)
-    else:  # pragma: no cover
-        pass
-
-    flask_cors.CORS(app)
-
-    app.config["CONFIG"] = config
-    app.config["DUMMY_MODE"] = True
-
-    app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
-
-    app.register_blueprint(my_lib.webapp.base.blueprint_default)
-    app.register_blueprint(my_lib.webapp.base.blueprint)
-    app.register_blueprint(my_lib.webapp.event.blueprint)
-    app.register_blueprint(my_lib.webapp.log.blueprint)
-    app.register_blueprint(my_lib.webapp.util.blueprint)
-
-    return app
+    #     if message is None:
+    #         assert notify_hist == [], "正常なはずなのに，エラー通知がされています。"
+    #     else:
+    #         assert len(notify_hist) != 0, "異常が発生したはずなのに，エラー通知がされていません。"
+    #         assert notify_hist[index].find(message) != -1, f"「{message}」が Slack で通知されていません。"
 
 
 ######################################################################
@@ -312,31 +259,124 @@ def create_app(config):
 #     assert idle_sec < 60
 
 
-def test_redirect(client):
+def test_webapp_config():
+    my_lib.webapp.config.init({"webapp": {}})
+    my_lib.webapp.config.init({"webapp": {"timezone": {"offset": "+9"}, "data": {"schedule_file_path": "/"}}})
+    my_lib.webapp.config.init({"webapp": {"timezone": {}}})
+
+
+def test_webapp_base(client, mocker):
     response = client.get("/")
 
     assert response.status_code == 302
-    assert re.search(rf"{WEBAPP_URL_PREFIX}/$", response.location)
+    assert re.search(rf"{data.sample_webapp.WEBAPP_URL_PREFIX}/$", response.location)
 
-
-def test_index(client):
-    response = client.get(WEBAPP_URL_PREFIX + "/")
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/")
     assert response.status_code == 200
     assert "Test Data" in response.data.decode("utf-8")
 
-    response = client.get(WEBAPP_URL_PREFIX + "/", headers={"Accept-Encoding": "gzip"})
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/", headers={"Accept-Encoding": "gzip"})
     assert response.status_code == 200
 
-
-def test_index_with_other_status(client, mocker):
     mocker.patch(
         "flask.wrappers.Response.status_code",
         return_value=301,
         new_callable=mocker.PropertyMock,
     )
 
-    response = client.get(WEBAPP_URL_PREFIX, headers={"Accept-Encoding": "gzip"})
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX, headers={"Accept-Encoding": "gzip"})
     assert response.status_code == 301
+
+
+def test_webapp_log(client):
+    response = client.get(
+        data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear",
+        query_string={
+            "log": False,
+        },
+    )
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
+    assert response.status_code == 200
+    log_list = response.json["data"]
+
+    assert len(log_list) == 0
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/log_write")
+    assert response.status_code == 200
+    time.sleep(1)
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
+    assert response.status_code == 200
+    log_list = response.json["data"]
+
+    assert log_list[0]["message"] == "TEST WARN"
+    assert log_list[1]["message"] == "TEST ERROR"
+
+
+def test_webapp_event(client):
+    import concurrent.futures
+    import multiprocessing
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
+    assert response.status_code == 200
+    assert response.data.decode()
+
+    # NOTE: event に先にアクセスさせておいてから，ログに書き込む
+    def log_write():
+        time.sleep(3)
+        client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/log_write")
+
+    my_lib.webapp.event.YEILD_TIMEOUT = 4
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(log_write)
+
+        response = client.get(
+            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"}
+        )
+        future.result()
+
+    queue = multiprocessing.Queue()
+    my_lib.webapp.event.notify_watch(queue)
+
+    queue.put(my_lib.webapp.event.EVENT_TYPE.SCHEDULE)
+    time.sleep(1)
+
+    my_lib.webapp.event.stop_watch()
+
+
+def test_webapp_util(client):
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/memory")
+    assert response.status_code == 200
+    assert "memory" in response.json
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
+    assert response.status_code == 200
+    assert response.json["msg"] == "taken snapshot"
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
+    assert response.status_code == 200
+    assert type(response.json) is list
+    assert len(response.json) != 0
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/sysinfo")
+    assert response.status_code == 200
+    assert "loadAverage" in response.json
+
+
+#     else:
+#         snapshot = tracemalloc.take_snapshot()
+#         top_stats = snapshot.compare_to(snapshot_prev, "lineno")
+#         snapshot_prev = snapshot
+
+#         return flask.jsonify([str(stat) for stat in top_stats[:10]])
+
+
+# @blueprint.route("/api/sysinfo", methods=["GET"])
+# @my_lib.flask_util.support_jsonp
+# def api_sysinfo():
+#     return flask.jsonify(
+#         {
 
 
 # def test_shutter_ctrl_read(client):

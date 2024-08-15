@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import datetime
+import json
 import logging
 import os
 import sqlite3
@@ -180,8 +181,11 @@ def clear():
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
+    log = flask.request.args.get("log", True, type=json.loads)
+
     clear()
-    info("🧹 ログがクリアされました。")
+    if log:
+        info("🧹 ログがクリアされました。")
 
     return flask.jsonify({"result": "success"})
 

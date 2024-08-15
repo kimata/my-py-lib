@@ -70,8 +70,8 @@ exclude_lines = [
   "if __name__ == .__main__.:",
 
   # 以下，未使用関数
-  # config.py
-  "def get_db_config",
+  # webapp/log.py
+  "if sqlite is not None:",
 
   # logger.py
   "class GZipRotator",
@@ -85,10 +85,10 @@ exclude_lines = [
   "def error_img",
   "def error_with_image",
 
-  # webapp_event.py
-  "def notify_watch_impl",
-  "def notify_watch",
-  "def stop_watch",
+  # # webapp_event.py
+  # "def notify_watch_impl",
+  # "def notify_watch",
+  # "def stop_watch",
 
   # webapp_log.py
   "elif level == APP_LOG_LEVEL.WARN:",

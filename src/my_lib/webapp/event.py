@@ -9,13 +9,16 @@ from enum import Enum
 import flask
 import my_lib.webapp.config
 
-blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+YEILD_TIMEOUT = 100
 
 
 class EVENT_TYPE(Enum):  # noqa: N801
     CONTROL = "control"
     SCHEDULE = "schedule"
     LOG = "log"
+
+
+blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 
 # NOTE: サイズは上の Enum の個数+1 にしておく
@@ -99,7 +102,7 @@ def api_event():
 
             # NOTE: クライアントが切断された時にソケットを解放するため，定期的に yield を呼ぶ
             j += 1
-            if j == 100:
+            if j == YEILD_TIMEOUT:
                 yield "data: dummy\n\n"
                 j = 0
 
