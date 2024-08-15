@@ -315,7 +315,7 @@ def create_app(config):
 def test_redirect(client):
     response = client.get("/")
     assert response.status_code == 302
-    assert re.search(r"/rasp-shutter/$", response.location)
+    assert re.search(r"{WEBAPP_URL_PREFIX}/$", response.location)
     time.sleep(1)
 
 
