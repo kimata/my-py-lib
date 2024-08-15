@@ -2,6 +2,7 @@
 # ruff: noqa: S101
 
 import os
+import re
 import time
 from unittest import mock
 
@@ -311,17 +312,11 @@ def create_app(config):
 #     assert idle_sec < 60
 
 
-# def test_redirect(client):
-#     ctrl_log_check(client, [])
-
-#     response = client.get("/")
-#     assert response.status_code == 302
-#     assert re.search(r"/rasp-shutter/$", response.location)
-#     time.sleep(1)
-
-#     ctrl_log_check(client, [])
-#     app_log_check(client, ["CLEAR"])
-#     check_notify_slack(None)
+def test_redirect(client):
+    response = client.get("/")
+    assert response.status_code == 302
+    assert re.search(r"/rasp-shutter/$", response.location)
+    time.sleep(1)
 
 
 def test_index(client):
