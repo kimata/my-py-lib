@@ -314,9 +314,9 @@ def create_app(config):
 
 def test_redirect(client):
     response = client.get("/")
+
     assert response.status_code == 302
-    assert re.search(r"{WEBAPP_URL_PREFIX}/$", response.location)
-    time.sleep(1)
+    assert re.search(rf"{WEBAPP_URL_PREFIX}/$", response.location)
 
 
 def test_index(client):
@@ -326,7 +326,6 @@ def test_index(client):
 
     response = client.get(WEBAPP_URL_PREFIX + "/", headers={"Accept-Encoding": "gzip"})
     assert response.status_code == 200
-    time.sleep(1)
 
 
 # def test_index_with_other_status(client, mocker):
