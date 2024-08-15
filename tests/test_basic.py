@@ -109,62 +109,6 @@ def client(app):
 #     }
 
 
-# def app_log_check(  # n_oqa: C901, PLR0912
-#     client,
-#     expect_list,
-#     is_strict=True,
-# ):
-#     import logging
-
-#     response = client.get("/rasp-shutter/api/log_view")
-
-#     log_list = response.json["data"]
-
-#     logging.debug(log_list)
-
-#     if is_strict:
-#         # NOTE: クリアする直前のログが残っている可能性があるので，+1 でも OK とする
-#         assert (len(log_list) == len(expect_list)) or (len(log_list) == (len(expect_list) + 1))
-
-#     for i, expect in enumerate(reversed(expect_list)):
-#         if expect == "OPEN_MANUAL":
-#             assert "手動で開けました" in log_list[i]["message"]
-#         elif expect == "OPEN_AUTO":
-#             assert "自動で開けました" in log_list[i]["message"]
-#         elif expect == "OPEN_FAIL":
-#             assert "開けるのに失敗しました" in log_list[i]["message"]
-
-#         elif expect == "CLOSE_MANUAL":
-#             assert "手動で閉めました" in log_list[i]["message"]
-#         elif expect == "CLOSE_AUTO":
-#             assert "自動で閉めました" in log_list[i]["message"]
-#         elif expect == "CLOSE_SCHEDULE":
-#             assert "スケジューラで閉めました" in log_list[i]["message"]
-#         elif expect == "CLOSE_DARK":
-#             assert "暗くなってきたので閉めます" in log_list[i]["message"]
-#         elif expect == "CLOSE_PENDING":
-#             assert "閉めるのを見合わせました" in log_list[i]["message"]
-#         elif expect == "OPEN_PENDING":
-#             assert "開けるのを見合わせました" in log_list[i]["message"]
-#         elif expect == "OPEN_BRIGHT":
-#             assert "明るくなってきたので開けます" in log_list[i]["message"]
-
-#         elif expect == "SCHEDULE":
-#             assert "スケジュールを更新" in log_list[i]["message"]
-#         elif expect == "INVALID":
-#             assert "スケジュールの指定が不正" in log_list[i]["message"]
-
-#         elif expect == "FAIL_SENSOR":
-#             assert "センサの値が不明" in log_list[i]["message"]
-#         elif expect == "FAIL_CONTROL":
-#             assert "制御に失敗しました" in log_list[i]["message"]
-
-#         elif expect == "CLEAR":
-#             assert "クリアされました" in log_list[i]["message"]
-#         else:
-#             raise AssertionError(f"テストコードのバグです．({expect})")  # n_oqa: EM102
-
-
 # def ctrl_log_clear(client):
 #     response = client.get(
 #         "/rasp-shutter/api/ctrl/log",
@@ -334,13 +278,29 @@ def test_webapp_event(client):
         response = client.get(
             data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"}
         )
+        assert response.data.decode().split("\n\n")[0] == "data: dummy"
+        assert response.data.decode().split("\n\n")[1] == "data: log"
         future.result()
 
     queue = multiprocessing.Queue()
     my_lib.webapp.event.notify_watch(queue)
 
-    queue.put(my_lib.webapp.event.EVENT_TYPE.SCHEDULE)
-    time.sleep(1)
+    def queue_put():
+        time.sleep(3)
+        queue.put(my_lib.webapp.event.EVENT_TYPE.SCHEDULE)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(queue_put)
+
+        response = client.get(
+            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"}
+        )
+        assert response.data.decode().split("\n\n")[0] == "data: dummy"
+        assert (
+            response.data.decode().split("\n\n")[1]
+            == f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}"
+        )
+        future.result()
 
     my_lib.webapp.event.stop_watch()
 
