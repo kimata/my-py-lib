@@ -328,15 +328,15 @@ def test_index(client):
     assert response.status_code == 200
 
 
-# def test_index_with_other_status(client, mocker):
-#     mocker.patch(
-#         "flask.wrappers.Response.status_code",
-#         return_value=301,
-#         new_callable=mocker.PropertyMock,
-#     )
+def test_index_with_other_status(client, mocker):
+    mocker.patch(
+        "flask.wrappers.Response.status_code",
+        return_value=301,
+        new_callable=mocker.PropertyMock,
+    )
 
-#     response = client.get("/rasp-shutter/", headers={"Accept-Encoding": "gzip"})
-#     assert response.status_code == 301
+    response = client.get(WEBAPP_URL_PREFIX, headers={"Accept-Encoding": "gzip"})
+    assert response.status_code == 301
 
 
 # def test_shutter_ctrl_read(client):
