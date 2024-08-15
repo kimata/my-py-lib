@@ -136,21 +136,28 @@ def worker(log_queue):
         time.sleep(sleep_sec)
 
 
-def log(message, level=LOG_LEVEL.INFO):
-    global log_queue
-
-    if level == LOG_LEVEL.ERROR:
-        logging.error(message)
-    elif level == LOG_LEVEL.WARN:
-        logging.warning(message)
-    else:
-        logging.info(message)
+def error(message):
+    logging.error(message)
 
     # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
-    log_queue.put({"message": message, "level": level})
+    log_queue.put({"message": message, "level": LOG_LEVEL.ERROR})
 
 
-def get_log(stop_day):
+def warning(message):
+    logging.warning(message)
+
+    # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
+    log_queue.put({"message": message, "level": LOG_LEVEL.WARN})
+
+
+def info(message):
+    logging.info(message)
+
+    # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
+    log_queue.put({"message": message, "level": LOG_LEVEL.INFO})
+
+
+def get(stop_day):
     global sqlite
 
     cur = sqlite.cursor()
@@ -162,7 +169,7 @@ def get_log(stop_day):
     return cur.fetchall()
 
 
-def clear_log():
+def clear():
     global sqlite
 
     with log_lock:
@@ -173,8 +180,8 @@ def clear_log():
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
-    clear_log()
-    log("🧹 ログがクリアされました。")
+    clear()
+    info("🧹 ログがクリアされました。")
 
     return flask.jsonify({"result": "success"})
 
@@ -189,7 +196,7 @@ def api_log_view():
     # 無効化する．
     flask.g.disable_cache = True
 
-    log = get_log(stop_day)
+    log = get(stop_day)
 
     if len(log) == 0:
         last_time = time.time()
@@ -206,14 +213,3 @@ def api_log_view():
     response.make_conditional(flask.request)
 
     return response
-
-
-if __name__ == "__main__":
-    import my_lib.config
-    import my_lib.logger
-
-    my_lib.logger.init("test", level=logging.INFO)
-
-    init(my_lib.config.load())
-
-    print(get_log(1))  # noqa: T201
