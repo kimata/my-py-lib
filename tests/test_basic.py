@@ -55,152 +55,17 @@ def client(app):
     time.sleep(1)
     app_log_clear(test_client)
 
-    # app_log_check(test_client, [])
-    # ctrl_log_clear(test_client)
-
     yield test_client
 
     test_client.delete()
-
-
-# def time_morning(offset_min=0):
-#     return datetime.datetime.now(my_lib.webapp.config.TIMEZONE).replace(
-#         hour=7, minute=0 + offset_min, second=0
-#     )
-
-
-# def time_evening(offset_min=0):
-#     return datetime.datetime.now(my_lib.webapp.config.TIMEZONE).replace(
-#         hour=17, minute=0 + offset_min, second=0
-#     )
-
-
-# def time_str(time):
-#     return (time - datetime.timedelta(hours=int(my_lib.webapp.config.TIMEZONE_OFFSET))).strftime("%H:%M")
-
-
-# def move_to(freezer, target_time):
-#     freezer.move_to(target_time)
-
-
-# SENSOR_DATA_DARK = {
-#     "lux": {"valid": True, "value": 10},
-#     "solar_rad": {"valid": True, "value": 10},
-# }
-# SENSOR_DATA_BRIGHT = {
-#     "solar_rad": {"valid": True, "value": 200},
-#     "lux": {"valid": True, "value": 2000},
-# }
-
-
-# def gen_schedule_data():
-#     schedule_data = {
-#         "is_active": True,
-#         "solar_rad": 0,
-#         "lux": 0,
-#         "wday": [True] * 7,
-#     }
-
-#     return {
-#         "open": schedule_data | {"time": time_str(time_morning(1)), "solar_rad": 150, "lux": 1000},
-#         "close": schedule_data | {"time": time_str(time_evening(1)), "solar_rad": 80, "lux": 1200},
-#     }
-
-
-# def ctrl_log_clear(client):
-#     response = client.get(
-#         "/rasp-shutter/api/ctrl/log",
-#         query_string={
-#             "cmd": "clear",
-#         },
-#     )
-#     assert response.status_code == 200
-#     assert response.json["result"] == "success"
 
 
 def app_log_clear(client):
     response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear")
     assert response.status_code == 200
 
-    # def ctrl_log_check(client, expect):
-    #     import logging
-
-    #     response = client.get("/rasp-shutter/api/ctrl/log")
-    #     assert response.status_code == 200
-    #     assert response.json["result"] == "success"
-
-    #     logging.debug(response.json["log"])
-
-    #     assert response.json["log"] == expect
-
-    # def ctrl_stat_clear():
-    #     import my_lib.config
-
-    #     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
-
-    #     import my_lib.webapp.config
-    #     import rasp_shutter.config
-    #     import rasp_shutter.webapp_control
-
-    #     rasp_shutter.webapp_control.clean_stat_exec(my_lib.config.load(CONFIG_FILE))
-
-    #     rasp_shutter.config.STAT_AUTO_CLOSE.unlink(missing_ok=True)
-
-    # def check_notify_slack(message, index=-1):
-    #     import logging
-
-    #     import my_lib.notify_slack
-
-    #     notify_hist = my_lib.notify_slack.hist_get()
-    #     logging.debug(notify_hist)
-
-    #     if message is None:
-    #         assert notify_hist == [], "正常なはずなのに，エラー通知がされています。"
-    #     else:
-    #         assert len(notify_hist) != 0, "異常が発生したはずなのに，エラー通知がされていません。"
-    #         assert notify_hist[index].find(message) != -1, f"「{message}」が Slack で通知されていません。"
-
 
 ######################################################################
-
-# def test_time(freezer, client):  # n_oqa:  ARG001
-#     import logging
-
-#     import schedule
-
-#     logging.debug("datetime.now()                 = %s", datetime.datetime.now())  # n_oqa: DTZ005
-#     logging.debug("datetime.now(JST)            = %s", datetime.datetime.now(my_lib.webapp.config.TIMEZONE))
-#     logging.debug(
-#         "datetime.now().replace(...)    = %s",
-#         datetime.datetime.now().replace(hour=0, minute=0, second=0),  # n_oqa: DTZ005
-#     )
-#     logging.debug(
-#         "datetime.now(JST).replace(...) = %s",
-#         datetime.datetime.now(my_lib.webapp.config.TIMEZONE).replace(hour=0, minute=0, second=0),
-#     )
-
-#     logging.debug("Freeze time at %s", time_str(time_morning(0)))
-
-#     move_to(freezer, time_morning(0))
-
-#     logging.debug(
-#         "datetime.now()                 = %s",
-#         datetime.datetime.now(),  # n_oqa: DTZ005
-#     )
-#     logging.debug("datetime.now(JST)            = %s", datetime.datetime.now(my_lib.webapp.config.TIMEZONE))
-
-#     schedule.clear()
-#     job_time_str = time_str(time_morning(1))
-#     logging.debug("set schedule at %s", job_time_str)
-#     job = schedule.every().day.at(job_time_str, my_lib.webapp.config.TIMEZONE_PYTZ).do(lambda: True)
-
-#     idle_sec = schedule.idle_seconds()
-#     logging.error("Time to next jobs is %.1f sec", idle_sec)
-#     logging.debug("Next run is %s", job.next_run)
-
-#     assert idle_sec < 60
-
-
 def test_webapp_config():
     my_lib.webapp.config.init({"webapp": {}})
     my_lib.webapp.config.init({"webapp": {"timezone": {"offset": "+9"}, "data": {"schedule_file_path": "/"}}})
@@ -225,7 +90,7 @@ def test_webapp_log(client):
     response = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear",
         query_string={
-            "log": False,
+            "log": "false",
         },
     )
     response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
@@ -277,16 +142,20 @@ def test_webapp_event(client):
     def queue_put():
         time.sleep(3)
         queue.put(my_lib.webapp.event.EVENT_TYPE.SCHEDULE)
+        queue.put(my_lib.webapp.event.EVENT_TYPE.CONTROL)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(queue_put)
 
         response = client.get(
-            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"}
+            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "2"}
         )
         assert response.data.decode().split("\n\n")[0] == "data: dummy"
         assert (
-            response.data.decode().split("\n\n")[1]
+            response.data.decode().split("\n\n")[1] == f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}"
+        )
+        assert (
+            response.data.decode().split("\n\n")[2]
             == f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}"
         )
         future.result()
@@ -313,7 +182,7 @@ def test_webapp_util(client):
     assert "loadAverage" in response.json
 
 
-def test_flask_util(client):
+def test_flask_util(client, mocker):
     response = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/gzipped/through",
         headers={"Accept-Encoding": "gzip"},
@@ -348,6 +217,12 @@ def test_flask_util(client):
     assert response.status_code == 200
     assert response.data.decode("utf-8") == "localhost, Unknown"
 
+    mocker.patch("socket.gethostbyaddr", side_effect=RuntimeError())
+
+    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/remote_host")
+    assert response.status_code == 200
+    assert response.data.decode("utf-8") == "127.0.0.1, Unknown"
+
 
 def test_footprint():
     import my_lib.footprint
@@ -367,6 +242,128 @@ def test_footprint():
     my_lib.footprint.clear(path)
     assert not my_lib.footprint.exists(path)
     assert my_lib.footprint.elapsed(path) > 10000
+
+
+def test_rpi():
+    import my_lib.rpi
+
+    PIN_NUM = 10
+
+    my_lib.rpi.gpio.setwarnings(False)
+    my_lib.rpi.gpio.setmode(my_lib.rpi.gpio.BCM)
+    my_lib.rpi.gpio.setup(PIN_NUM, my_lib.rpi.gpio.OUT)
+
+    my_lib.rpi.gpio.output(PIN_NUM, 0)
+    assert my_lib.rpi.gpio.input(PIN_NUM) == 0
+
+    my_lib.rpi.gpio.output(PIN_NUM, 1)
+    assert my_lib.rpi.gpio.input(PIN_NUM) == 1
+
+    time.sleep(1)
+
+    my_lib.rpi.gpio.output(PIN_NUM, 0)
+    assert my_lib.rpi.gpio.input(PIN_NUM) == 0
+
+    assert my_lib.rpi.gpio.hist_get() == [
+        {"state": "close"},
+        {"state": "open"},
+        {"period": 1, "state": "close"},
+    ]
+
+    my_lib.rpi.gpio.hist_clear()
+
+    assert my_lib.rpi.gpio.hist_get() == []
+
+
+def test_notify_slack(mocker):
+    import PIL.Image
+    import slack_sdk
+
+    config = my_lib.config.load(CONFIG_FILE)
+
+    my_lib.notify_slack.hist_clear()
+    my_lib.notify_slack.interval_clear()
+
+    my_lib.notify_slack.info(
+        config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
+    )
+
+    assert my_lib.notify_slack.hist_get() == []
+
+    my_lib.notify_slack.error(
+        config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
+    )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test"]
+
+    my_lib.notify_slack.error(
+        config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
+    )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test"]
+
+    mocker.patch(
+        "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
+        retunr_value=True,
+    )
+
+    mocker.patch(
+        "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
+        side_effect=slack_sdk.errors.SlackClientError(),
+    )
+    my_lib.notify_slack.error(
+        config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
+    )
+
+    my_lib.notify_slack.hist_clear()
+    my_lib.notify_slack.interval_clear()
+
+    my_lib.notify_slack.error_with_image(
+        config["slack"]["bot_token"],
+        config["slack"]["error"]["channel"]["name"],
+        config["slack"]["error"]["channel"]["id"],
+        "Test",
+        "This is Test",
+        {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
+    )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test"]
+
+    my_lib.notify_slack.error_with_image(
+        config["slack"]["bot_token"],
+        config["slack"]["error"]["channel"]["name"],
+        config["slack"]["error"]["channel"]["id"],
+        "Test",
+        "This is Test",
+        {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
+    )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test"]
+    my_lib.notify_slack.interval_clear()
+
+    with pytest.raises(ValueError, match="ch_id is None"):
+        my_lib.notify_slack.error_with_image(
+            config["slack"]["bot_token"],
+            config["slack"]["error"]["channel"]["name"],
+            None,
+            "Test",
+            "This is Test",
+            {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
+        )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test", "This is Test"]
+    my_lib.notify_slack.interval_clear()
+
+    my_lib.notify_slack.error_with_image(
+        config["slack"]["bot_token"],
+        config["slack"]["error"]["channel"]["name"],
+        config["slack"]["error"]["channel"]["id"],
+        "Test",
+        "This is Test",
+        None,
+    )
+
+    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test", "This is Test", "This is Test"]
 
 
 def test_terminate():
