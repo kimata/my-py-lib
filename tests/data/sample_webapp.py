@@ -71,3 +71,28 @@ def exec_log_write():
     my_lib.webapp.log.warning("TEST WARN")
 
     return "OK"
+
+
+@blueprint.route("/exec/gzipped/through", methods=["GET"])
+@my_lib.flask_util.gzipped
+def gzipped_through():
+    return "GZIPPED", 302
+
+
+@blueprint.route("/exec/gzipped/disable_cache", methods=["GET"])
+@my_lib.flask_util.gzipped
+def gzipped_disable_cache():
+    flask.g.disable_cache = True
+    return "OK"
+
+
+@blueprint.route("/exec/support_jsonp", methods=["GET"])
+@my_lib.flask_util.support_jsonp
+def support_jsonp():
+    return flask.jsonify({"status": "OK"})
+
+
+@blueprint.route("/exec/remote_host", methods=["GET"])
+@my_lib.flask_util.support_jsonp
+def remote_host():
+    return f"{my_lib.flask_util.remote_host(flask.request)}, {my_lib.flask_util.auth_user(flask.request)}"
