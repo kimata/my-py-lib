@@ -1,13 +1,34 @@
 #!/usr/bin/env python3
 import logging
 import os
+import pathlib
 
 # NOTE: freezegun を使ったテスト時に，別スレッドのものも含めて time.time() を mock で
 # 置き換えたいので，別名にしておく．
 from time import time as gpio_time
 
-if (os.environ.get("DUMMY_MODE", "false") != "true") and (
-    os.environ.get("TEST", "false") != "true"
+
+def is_rasberry_pi():
+    try:
+        with pathlib.Path.open("/proc/cpuinfo") as f:
+            cpuinfo = f.read()
+
+            if "Raspberry Pi" in cpuinfo:
+                return True
+            else:
+                logging.warning(
+                    "Since it is not running on a Raspberry Pi, "
+                    "the GPIO library is replaced with dummy functions."
+                )
+                return False
+    except Exception:
+        logging.exception("Failed to judge running on Raspberry Pi")
+
+
+if (
+    (os.environ.get("DUMMY_MODE", "false") != "true")
+    and (os.environ.get("TEST", "false") != "true")
+    and is_rasberry_pi()
 ):  # pragma: no cover
     from RPi import GPIO as gpio  # noqa: N811
 else:
