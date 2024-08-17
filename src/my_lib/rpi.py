@@ -37,6 +37,8 @@ else:
 
     # NOTE: 本物の GPIO のように振る舞うダミーのライブラリ
     class gpio:  # noqa: N801
+        LOW = 0
+        HIGH = 1
         IS_DUMMY = True
         BCM = 0
         OUT = 0
