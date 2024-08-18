@@ -107,5 +107,9 @@ else:
         def setwarnings(warnings):  # noqa: ARG004
             return
 
+        @staticmethod
+        def cleanup(chanlist=None):  # noqa: ARG004
+            return
+
 
 gpio.level = enum.Enum("gpio.level", {"HIGH": 1, "LOW": 0})
