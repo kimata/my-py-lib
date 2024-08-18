@@ -79,12 +79,12 @@ else:
                     gpio.hist_add(
                         {
                             "pin_num": pin_num,
-                            "state": "low",
+                            "state": gpio.level.LOW.name,
                             "high_period": int(gpio_time() - gpio.time_start[pin_num]),
                         }
                     )
                 else:
-                    gpio.hist_add({"state": "low"})
+                    gpio.hist_add({"pin_num": pin_num, "state": gpio.level.LOW.name})
                 gpio.time_start[pin_num] = None
                 gpio.time_stop[pin_num] = gpio_time()
             else:
@@ -93,7 +93,7 @@ else:
                 gpio.hist_add(
                     {
                         "pin_num": pin_num,
-                        "state": "high",
+                        "state": gpio.level.HIGH.name,
                     }
                 )
 
@@ -108,4 +108,4 @@ else:
             return
 
 
-gpio.level = enum.IntEnum("level", {"HIGH": 1, "LOW": 0})
+gpio.level = enum.Enum("gpio.level", {"HIGH": 1, "LOW": 0})
