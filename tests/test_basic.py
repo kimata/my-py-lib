@@ -265,9 +265,9 @@ def test_rpi():
     assert my_lib.rpi.gpio.input(PIN_NUM) == 0
 
     assert my_lib.rpi.gpio.hist_get() == [
-        {"state": "close"},
-        {"state": "open"},
-        {"period": 1, "state": "close"},
+        {"state": "LOW"},
+        {"state": "HIHG"},
+        {"period": 1, "state": "LOW"},
     ]
 
     my_lib.rpi.gpio.hist_clear()
