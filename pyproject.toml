@@ -16,6 +16,7 @@ dependencies = [
     "pytz>=2024.1",
     "flask>=3.0.3",
     "flask-cors>=4.0.1",
+    "rpi-lgpio>=0.6",
     "psutil>=6.0.0",
     "tzlocal>=5.2",
     "uptime>=3.0.1",
