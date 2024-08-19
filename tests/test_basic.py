@@ -266,7 +266,7 @@ def test_rpi():
 
     assert my_lib.rpi.gpio.hist_get() == [
         {"pin_num": PIN_NUM, "state": "LOW"},
-        {"pin_num": PIN_NUM, "state": "HIHG"},
+        {"pin_num": PIN_NUM, "state": "HIGH"},
         {"pin_num": PIN_NUM, "high_period": 1, "state": "LOW"},
     ]
 
