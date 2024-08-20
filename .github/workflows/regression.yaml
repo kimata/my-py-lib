@@ -52,7 +52,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          CC=gcc rye sync
+          rye sync
+          sudo apt install --assume-yes smem
 
       - name: Run Tests
         run: rye run pytest --cov=src --cov-report=html tests/test_basic.py
