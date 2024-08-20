@@ -21,6 +21,7 @@ def env_mock():
         "os.environ",
         {
             "NO_COLORED_LOGS": "true",
+            "TEST": "true",
         },
     ) as fixture:
         yield fixture
@@ -244,7 +245,11 @@ def test_footprint():
     assert my_lib.footprint.elapsed(path) > 10000
 
 
-def test_rpi():
+def test_rpi(mocker):
+    import os
+
+    mocker.patch.dict(os.environ, {"TEST": None}, clear=False)
+
     import my_lib.rpi
 
     PIN_NUM = 10
