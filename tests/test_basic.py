@@ -245,11 +245,7 @@ def test_footprint():
     assert my_lib.footprint.elapsed(path) > 10000
 
 
-def test_rpi(mocker):
-    import os
-
-    mocker.patch.dict(os.environ, {"TEST": None}, clear=False)
-
+def test_rpi():
     import my_lib.rpi
 
     PIN_NUM = 10

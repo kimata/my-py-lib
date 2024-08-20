@@ -28,9 +28,9 @@ def is_rasberry_pi():
 
 
 if (
-    (os.environ.get("DUMMY_MODE", "false") != "true")
+    is_rasberry_pi()
+    and (os.environ.get("DUMMY_MODE", "false") != "true")
     and (os.environ.get("TEST", "false") != "true")
-    and is_rasberry_pi()
 ):  # pragma: no cover
     from RPi import GPIO as gpio  # noqa: N811
 else:
