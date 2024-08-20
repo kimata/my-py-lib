@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 
+import pathlib
 import re
 import time
-from unittest import mock
+import unittest
 
 import data.sample_webapp
 import my_lib.config
@@ -16,10 +17,9 @@ CONFIG_FILE = "tests/data/config.example.yaml"
 
 @pytest.fixture(scope="session", autouse=True)
 def env_mock():
-    with mock.patch.dict(
+    with unittest.mock.patch.dict(
         "os.environ",
         {
-            "TEST": "true",
             "NO_COLORED_LOGS": "true",
         },
     ) as fixture:
@@ -28,7 +28,7 @@ def env_mock():
 
 @pytest.fixture(scope="session", autouse=True)
 def slack_mock():
-    with mock.patch(
+    with unittest.mock.patch(
         "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
         retunr_value=True,
     ) as fixture:
@@ -39,13 +39,13 @@ def slack_mock():
 def app():
     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
 
-    with mock.patch.dict("os.environ", {"WERKZEUG_RUN_MAIN": "true"}):
+    with unittest.mock.patch.dict("os.environ", {"WERKZEUG_RUN_MAIN": "true"}):
         app = data.sample_webapp.create_app(CONFIG_FILE)
 
         yield app
 
-        # NOTE: 特定のテストのみ実行したときのため，ここでも呼ぶ
-        test_terminate()
+        # NOTE: ログをクリア
+        test_webapp_log_term()
 
 
 @pytest.fixture()
@@ -271,8 +271,11 @@ def test_rpi():
     ]
 
     my_lib.rpi.gpio.hist_clear()
-
     assert my_lib.rpi.gpio.hist_get() == []
+
+    my_lib.rpi.gpio.output(PIN_NUM, 0)
+
+    my_lib.rpi.gpio.cleanup()
 
 
 def test_notify_slack(mocker):
@@ -366,7 +369,139 @@ def test_notify_slack(mocker):
     assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test", "This is Test", "This is Test"]
 
 
-def test_terminate():
+def test_pil_util():
+    TEST_IMAGE_PATH = "tests/data/a.png"
+    import my_lib.pil_util
+    import PIL.Image
+
+    font = my_lib.pil_util.get_font(
+        {"path": "tests/data", "map": {"test": "migmix-1p-regular.ttf"}}, "test", 12
+    )
+
+    img = PIL.Image.new(
+        "RGBA",
+        (200, 200),
+        (255, 255, 255, 0),
+    )
+    my_lib.pil_util.draw_text(img, "Test", (0, 0), font)
+    my_lib.pil_util.draw_text(img, "Test", (0, 50), font, "right")
+    my_lib.pil_util.draw_text(img, "Test", (0, 100), font, "center")
+
+    img_gray = my_lib.pil_util.convert_to_gray(img)
+    img_gray.save(TEST_IMAGE_PATH)
+
+    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "scale": 1.2, "brightness": 1.1})
+    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "scale": 1.1})
+    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "brightness": 0.9})
+
+    my_lib.pil_util.alpha_paste(img, img_gray, (0, 0))
+
+
+def test_panel_util():
+    import my_lib.panel_util
+
+    config = my_lib.config.load(CONFIG_FILE)
+
+    my_lib.panel_util.create_error_image(
+        {"panel": {"width": 200, "height": 200}},
+        {
+            "path": "tests/data",
+            "map": {"en_medium": "migmix-1p-regular.ttf", "en_bold": "migmix-1p-regular.ttf"},
+        },
+        "Test",
+    )
+
+    my_lib.panel_util.notify_error({}, "Test")
+    my_lib.panel_util.notify_error(config, "Test")
+
+    def draw_panel_pass(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config):  # noqa: ARG001, PLR0913
+        return
+
+    def draw_panel_fail(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config):  # noqa: ARG001, PLR0913
+        raise Exception("Test")  # noqa: EM101, TRY002
+
+    my_lib.panel_util.draw_panel_patiently(draw_panel_pass, {}, {}, {}, False)
+    my_lib.panel_util.draw_panel_patiently(
+        draw_panel_fail,
+        {"panel": {"width": 100, "height": 100}},
+        {
+            "path": "tests/data",
+            "map": {"en_medium": "migmix-1p-regular.ttf", "en_bold": "migmix-1p-regular.ttf"},
+        },
+        {},
+        False,
+    )
+
+
+def test_selenium_util(mocker):
+    import os
+
+    import my_lib.selenium_util
+    import selenium.webdriver.common.by
+    import selenium.webdriver.support.wait
+
+    TEST_URL = "https://example.com/"
+    DUMP_PATH = pathlib.Path("tests/data/dump")
+
+    driver = my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 0.5)
+
+    my_lib.selenium_util.warmup(driver, "Yaoo.co.jp", "yahoo", 0.5)
+
+    driver.get(TEST_URL)
+
+    my_lib.selenium_util.click_xpath(driver, "//h1", wait)
+    my_lib.selenium_util.click_xpath(driver, "//h10")
+    my_lib.selenium_util.click_xpath(driver, "//h10", is_warn=False)
+
+    with my_lib.selenium_util.browser_tab(driver, TEST_URL):
+        my_lib.selenium_util.is_display(driver, "//h1")
+
+    my_lib.selenium_util.wait_patiently(
+        driver,
+        wait,
+        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+            (selenium.webdriver.common.by.By.XPATH, "//h1")
+        ),
+    )
+    with pytest.raises(selenium.common.exceptions.TimeoutException):
+        my_lib.selenium_util.wait_patiently(
+            driver,
+            wait,
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+                (selenium.webdriver.common.by.By.XPATH, "//h10")
+            ),
+        )
+
+    assert my_lib.selenium_util.get_text(driver, "//h1", "TEST") != "TEST"
+    assert my_lib.selenium_util.get_text(driver, "//h10", "TEST") == "TEST"
+
+    my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
+
+    dummy_file_path = DUMP_PATH / "dummy.file"
+    dummy_file_path.touch()
+    os.utime(dummy_file_path, (0, 0))
+
+    (DUMP_PATH / "dummy.dir").mkdir(parents=True, exist_ok=True)
+
+    my_lib.selenium_util.clear_cache(driver)
+
+    my_lib.selenium_util.clean_dump(DUMP_PATH)
+    my_lib.selenium_util.clean_dump(pathlib.Path("tests/not_exists"))
+
+    my_lib.selenium_util.log_memory_usage(driver)
+
+    my_lib.selenium_util.random_sleep(0.5)
+
+    driver.quit()
+
+    mocker.patch("my_lib.selenium_util.create_driver_impl", side_effect=RuntimeError())
+
+    with pytest.raises(RuntimeError):
+        my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
+
+
+def test_webapp_log_term():
     import my_lib.webapp.log
 
     my_lib.webapp.log.term()

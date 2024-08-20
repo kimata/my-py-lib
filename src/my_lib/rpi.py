@@ -42,9 +42,9 @@ else:
         IS_DUMMY = True
         BCM = 0
         OUT = 0
-        state = collections.defaultdict(lambda: None)
+        state = {}
         time_start = collections.defaultdict(lambda: None)
-        time_stop = collections.defaultdict(lambda: None)
+        time_stop = {}
         # NOTE: テスト用
         gpio_hist = []
 
@@ -62,9 +62,9 @@ else:
 
         @staticmethod
         def hist_clear():
-            gpio.state = collections.defaultdict(lambda: None)
+            gpio.state = {}
             gpio.time_start = collections.defaultdict(lambda: None)
-            gpio.time_stop = collections.defaultdict(lambda: None)
+            gpio.time_stop = {}
             gpio.gpio_hist = []
 
         @staticmethod

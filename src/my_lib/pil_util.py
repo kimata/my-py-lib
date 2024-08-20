@@ -10,7 +10,7 @@ import PIL.ImageFont
 def get_font(config, font_type, size):
     font_path = pathlib.Path(config["path"]).resolve() / config["map"][font_type]
 
-    logging.info("Load font: %s}", font_path)
+    logging.info("Load font: %s", font_path)
 
     return PIL.ImageFont.truetype(font_path, size)
 
@@ -75,7 +75,7 @@ def draw_text(  # noqa: PLR0913
 
 
 def load_image(img_config):
-    img = PIL.Image.open(pathlib.Path(__file__).parent / img_config["path"])
+    img = PIL.Image.open(pathlib.Path(img_config["path"]))
 
     if "scale" in img_config:
         img = img.resize(

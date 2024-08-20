@@ -6,7 +6,7 @@ import random
 import subprocess
 import time
 
-import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -218,19 +218,19 @@ def log_memory_usage(driver):
     )
 
 
-def warmup(driver, keyword, url_pattern):
+def warmup(driver, keyword, url_pattern, sleep_sec=3):
     # NOTE: ダミーアクセスを行って BOT ではないと思わせる．(効果なさそう...)
     driver.get("https://www.google.com/")
-    time.sleep(3)
+    time.sleep(sleep_sec)
 
     driver.find_element(By.XPATH, '//textarea[@name="q"]').send_keys(keyword)
     driver.find_element(By.XPATH, '//textarea[@name="q"]').send_keys(Keys.ENTER)
 
-    time.sleep(3)
+    time.sleep(sleep_sec)
 
     driver.find_element(By.XPATH, f'//a[contains(@href, "{url_pattern}")]').click()
 
-    time.sleep(3)
+    time.sleep(sleep_sec)
 
 
 class browser_tab:  # noqa: N801

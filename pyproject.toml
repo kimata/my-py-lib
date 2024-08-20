@@ -21,6 +21,7 @@ dependencies = [
     "tzlocal>=5.2",
     "uptime>=3.0.1",
     "pillow>=10.4.0",
+    "selenium>=4.23.1",
 ]
 
 [build-system]

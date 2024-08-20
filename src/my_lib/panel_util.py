@@ -2,6 +2,7 @@
 import logging
 import textwrap
 import time
+import traceback
 
 import my_lib.notify_slack
 import my_lib.pil_util
@@ -70,6 +71,7 @@ def draw_panel_patiently(  # noqa: PLR0913
                 time.perf_counter() - start,
             )
         except Exception:
+            error_message = traceback.format_exc()
             logging.exception("Failed to draw panel")
 
         logging.warning("retry")
