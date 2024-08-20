@@ -14,6 +14,7 @@ Options:
 import datetime
 import logging
 import os
+import time
 import traceback
 
 import influxdb_client
@@ -47,6 +48,7 @@ from(bucket: "{bucket}")
         identity: {{sum: 0.0, count: 0}},
     )
 """
+RETRY_COUNT = 2
 
 
 def fetch_data_impl(  # noqa: PLR0913
@@ -62,32 +64,36 @@ def fetch_data_impl(  # noqa: PLR0913
     create_empty,
     last=False,
 ):
-    try:
-        token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
+    token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
 
-        query = template.format(
-            bucket=db_config["bucket"],
-            measure=measure,
-            hostname=hostname,
-            field=field,
-            start=start,
-            stop=stop,
-            every=every,
-            window=window,
-            create_empty=str(create_empty).lower(),
-        )
-        if last:
-            query += " |> last()"
+    query = template.format(
+        bucket=db_config["bucket"],
+        measure=measure,
+        hostname=hostname,
+        field=field,
+        start=start,
+        stop=stop,
+        every=every,
+        window=window,
+        create_empty=str(create_empty).lower(),
+    )
+    if last:
+        query += " |> last()"
 
-        logging.debug("Flux query = %s", query)
-        client = influxdb_client.InfluxDBClient(url=db_config["url"], token=token, org=db_config["org"])
-        query_api = client.query_api()
+    for i in range(RETRY_COUNT):  # noqa: RET503
+        try:
+            logging.debug("Flux query = %s", query)
+            client = influxdb_client.InfluxDBClient(url=db_config["url"], token=token, org=db_config["org"])
+            query_api = client.query_api()
 
-        return query_api.query(query=query)
-    except Exception as e:
-        logging.warning(e)
-        logging.warning(traceback.format_exc())
-        raise
+            return query_api.query(query=query)
+        except Exception as e:  # noqa: PERF203
+            logging.warning(e)
+            logging.warning(traceback.format_exc())
+            time.sleep(1)
+
+            if i == (RETRY_COUNT - 1):
+                raise
 
 
 def fetch_data(  # noqa: PLR0913
@@ -133,6 +139,10 @@ def fetch_data(  # noqa: PLR0913
             create_empty,
             last,
         )
+    except Exception:
+        return {"value": [], "time": [], "valid": False}
+
+    try:
         data = []
         time = []
         localtime_offset = datetime.timedelta(hours=9)
@@ -157,12 +167,13 @@ def fetch_data(  # noqa: PLR0913
                 data = data[: (every_min - window_min)]
                 time = time[: (every_min - window_min)]
 
-        logging.debug("data count = %s", len(time))
+        logging.debug("data count = %d", len(time))
 
         return {"value": data, "time": time, "valid": len(time) != 0}
-    except Exception:
-        logging.warning(traceback.format_exc())
 
+    except Exception as e:
+        logging.warning(e)
+        logging.warning(traceback.format_exc())
         return {"value": [], "time": [], "valid": False}
 
 
