@@ -502,6 +502,23 @@ def test_selenium_util(mocker):
         my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
 
 
+def test_weather():
+    import my_lib.weather
+
+    my_lib.weather.get_weather_yahoo({"url": "https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html"})
+    my_lib.weather.get_clothing_yahoo({"url": "https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html"})
+    my_lib.weather.get_wbgt(
+        {
+            "data": {
+                "env_go": {
+                    "url": "https://www.wbgt.env.go.jp/graph_ref_td.php?region=03&prefecture=44&point=44132"
+                }
+            }
+        }
+    )
+    my_lib.weather.get_sunset_nao({"data": {"nao": {"pref": 13}}})
+
+
 def test_webapp_log_term():
     import my_lib.webapp.log
 
