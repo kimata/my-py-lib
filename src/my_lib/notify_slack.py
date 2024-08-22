@@ -11,7 +11,7 @@ import slack_sdk
 # NOTE: テスト用
 notify_hist = []
 
-ERROR_FOOTPRINT = pathlib.Path("/dev/shm/notify_slack/last_error")  # noqa: S108
+ERROR_NOTIFY_FOOTPRINT = pathlib.Path(__file__).parent.parent / "data" / "error_notify"
 
 SIMPLE_TMPL = """\
 [
@@ -74,11 +74,11 @@ def info(token, ch_name, name, message, formatter=format_simple):
 
 
 def interval_check(interval_min):
-    return my_lib.footprint.elapsed(ERROR_FOOTPRINT) > interval_min * 60
+    return my_lib.footprint.elapsed(ERROR_NOTIFY_FOOTPRINT) > interval_min * 60
 
 
 def interval_clear():
-    my_lib.footprint.clear(ERROR_FOOTPRINT)
+    my_lib.footprint.clear(ERROR_NOTIFY_FOOTPRINT)
 
 
 def error_img(token, ch_id, title, img, text):
@@ -113,7 +113,7 @@ def error(  # noqa: PLR0913
 
     split_send(token, ch_name, title, message, formatter)
 
-    my_lib.footprint.update(ERROR_FOOTPRINT)
+    my_lib.footprint.update(ERROR_NOTIFY_FOOTPRINT)
 
 
 def error_with_image(  # noqa: PLR0913
@@ -142,7 +142,7 @@ def error_with_image(  # noqa: PLR0913
 
         error_img(token, ch_id, title, attatch_img["data"], attatch_img["text"])
 
-    my_lib.footprint.update(ERROR_FOOTPRINT)
+    my_lib.footprint.update(ERROR_NOTIFY_FOOTPRINT)
 
 
 # NOTE: テスト用

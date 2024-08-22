@@ -28,9 +28,9 @@ def is_rasberry_pi():
 
 
 if (
-    is_rasberry_pi()
-    and (os.environ.get("DUMMY_MODE", "false") != "true")
+    (os.environ.get("DUMMY_MODE", "false") != "true")
     and (os.environ.get("TEST", "false") != "true")
+    and is_rasberry_pi()
 ):  # pragma: no cover
     from RPi import GPIO as gpio  # noqa: N811
 else:
@@ -42,9 +42,9 @@ else:
         IS_DUMMY = True
         BCM = 0
         OUT = 0
-        state = {}
+        state = collections.defaultdict(lambda: None)
         time_start = collections.defaultdict(lambda: None)
-        time_stop = {}
+        time_stop = collections.defaultdict(lambda: None)
         # NOTE: テスト用
         gpio_hist = []
 
@@ -62,9 +62,9 @@ else:
 
         @staticmethod
         def hist_clear():
-            gpio.state = {}
+            gpio.state = collections.defaultdict(lambda: None)
             gpio.time_start = collections.defaultdict(lambda: None)
-            gpio.time_stop = {}
+            gpio.time_stop = collections.defaultdict(lambda: None)
             gpio.gpio_hist = []
 
         @staticmethod
