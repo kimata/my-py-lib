@@ -8,7 +8,7 @@ import pytz
 URL_PREFIX = None
 
 TIMEZONE_OFFSET = 9
-TIMEZONE = datetime.timezone(datetime.timedelta(hours=int(TIMEZONE_OFFSET)), "JST")
+TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "JST")
 TIMEZONE_PYTZ = pytz.timezone("Asia/Tokyo")
 
 STATIC_DIR_PATH = None
@@ -32,7 +32,7 @@ def init(config):
             TIMEZONE_OFFSET = int(config["webapp"]["timezone"]["offset"])
             if "name" in config["webapp"]["timezone"]:
                 TIMEZONE = datetime.timezone(
-                    datetime.timedelta(TIMEZONE_OFFSET), config["webapp"]["timezone"]["name"]
+                    datetime.timedelta(hours=TIMEZONE_OFFSET), config["webapp"]["timezone"]["name"]
                 )
             else:
                 TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "UNKOWN")
