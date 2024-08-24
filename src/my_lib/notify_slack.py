@@ -11,7 +11,7 @@ import slack_sdk
 # NOTE: テスト用
 notify_hist = []
 
-ERROR_NOTIFY_FOOTPRINT = pathlib.Path(__file__).parent.parent / "data" / "error_notify"
+ERROR_NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/error")  # noqa: S108
 
 SIMPLE_TMPL = """\
 [
