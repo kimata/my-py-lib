@@ -245,6 +245,18 @@ def test_footprint():
     assert my_lib.footprint.elapsed(path) > 10000
 
 
+def test_healthz():
+    TEST_HEALTHZ_PATH = "tests/data/healthz"
+
+    import my_lib.healthz
+
+    my_lib.footprint.clear(TEST_HEALTHZ_PATH)
+    assert not my_lib.healthz.check_liveness("TEST", 5, TEST_HEALTHZ_PATH)
+
+    my_lib.footprint.update(TEST_HEALTHZ_PATH)
+    assert my_lib.healthz.check_liveness("TEST", 5, TEST_HEALTHZ_PATH)
+
+
 def test_rpi():
     import my_lib.rpi
 
