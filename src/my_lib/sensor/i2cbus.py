@@ -21,6 +21,16 @@ class I2CBUS:
         
         return data
 
+    def read_byte_data(self, dev_addr, register):
+        logging.debug("i2c read - dev:0x%02X reg:0x%02X length:1", dev_addr, register)
+
+        data = self.smbus.read_byte_data(dev_addr, register)
+
+        logging.debug("data: [%s]", f"0x{data:02X}")
+        
+        return data
+
+    
     def i2c_rdwr(self, *i2c_msgs):
         msg_desc = []
         for msg in i2c_msgs:
