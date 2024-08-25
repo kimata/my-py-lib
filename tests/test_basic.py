@@ -246,7 +246,7 @@ def test_footprint():
 
 
 def test_healthz():
-    TEST_HEALTHZ_PATH = "tests/data/healthz"
+    TEST_HEALTHZ_PATH = pathlib.Path("tests/data/healthz")
 
     import my_lib.healthz
 
