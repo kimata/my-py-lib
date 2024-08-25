@@ -23,7 +23,7 @@ class SHT35:
     DEV_ADDR = 0x44  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
-    def __init__(self, dev_addr=DEV_ADDR, bus_id=RASP_I2C_BUS):
+    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
@@ -48,8 +48,8 @@ class SHT35:
         return crc
 
     def ping(self):
+        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
         try:
-            logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
             self.i2cbus.write_byte_data(self.dev_addr, 0xF3, 0x2D)
             data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 3)
 
@@ -84,13 +84,12 @@ class SHT35:
 
 if __name__ == "__main__":
     # TEST Code
-    from docopt import docopt
-    import pathlib
+    import docopt
 
     import my_lib.logger
     import my_lib.sensor.sht35
     
-    args = docopt(__doc__)
+    args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
 
