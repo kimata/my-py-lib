@@ -18,6 +18,7 @@ dependencies = [
     "slack-sdk>=3.31.0",
     "tzlocal>=5.2",
     "uptime>=3.0.1",
+    "coloredlogs>=15.0.1",
 ]
 
 [build-system]
