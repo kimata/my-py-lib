@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import logging
-import time
 
+import my_lib.footprint
 import requests
 
 
@@ -10,7 +10,7 @@ def check_liveness(name, liveness_file, interval):
         logging.warning("%s is not executed.", name)
         return False
 
-    elapsed = time.time() - liveness_file.stat().st_mtime
+    elapsed = my_lib.footprint.elapsed(liveness_file)
     # NOTE: 少なくとも1分は様子を見る
     if elapsed > max(interval * 2, 60):
         logging.warning("Execution interval of %s is too long. %s sec)", name, f"{elapsed:,.1f}")
