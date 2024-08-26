@@ -256,6 +256,9 @@ def test_healthz():
     my_lib.footprint.update(TEST_HEALTHZ_PATH)
     assert my_lib.healthz.check_liveness("TEST", TEST_HEALTHZ_PATH, 5)
 
+    assert my_lib.healthz.check_port(80, "google.com")
+    assert not my_lib.healthz.check_port(9999, "google.com")
+
 
 def test_rpi():
     import my_lib.rpi
