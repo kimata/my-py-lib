@@ -15,9 +15,11 @@ RASP_I2C_BUS = {
 }
 
 def load(sensor_cand_list):
+    logging.info("Load drivers...")
+    
     sensor_list = []
     for sensor in sensor_cand_list:
-        logging.info("Load sensor {name}".format(name=sensor["name"]))
+        logging.info("Load {name} driver".format(name=sensor["name"]))
 
         if "i2c_bus" in sensor:
             bus = RASP_I2C_BUS[sensor["i2c_bus"]]
@@ -25,7 +27,7 @@ def load(sensor_cand_list):
             i2c_dev_file = pathlib.Path("/dev/i2c-{bus}".format(bus=bus))
             if not i2c_dev_file.exists():
                 logging.warning(
-                    "I2C bus {bus} ({dev_file}) does NOT exist. skipping...".format(
+                    "I2C bus {bus} ({dev_file}) does NOT exist. skipping.".format(
                         bus=bus, dev_file=str(i2c_dev_file)
                     )
                 )
@@ -39,6 +41,14 @@ def load(sensor_cand_list):
 
     return sensor_list
 
+        
+def sensor_info(sensor):
+    if sensor.TYPE == "I2C":
+        return f"{sensor.NAME} (I2C: 0x{sensor.dev_addr:02X})"
+    else:
+        return f"{sensor.NAME} ({sensor.TYPE})"
+
+    
 def ping(sensor_list):
     logging.info("Check sensor existences...")
 
@@ -48,8 +58,12 @@ def ping(sensor_list):
             logging.info("Sensor %s exists.", sensor.NAME)
             active_sensor_list.append(sensor)
         else:
-            logging.warning("Sensor %s dost NOT exists. Ignored...", sensor.NAME)
+            logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
 
+    logging.info(
+        "Active sensor list: %s",
+        ", ".join([sensor_info(sensor) for sensor in active_sensor_list])
+    )
     return active_sensor_list 
 
 

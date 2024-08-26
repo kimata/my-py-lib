@@ -15,6 +15,7 @@ import my_lib.sensor.i2cbus
 
 class APDS9250:
     NAME = "APDS9250"
+    TYPE = "I2C"
     DEV_ADDR = 0x52  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 

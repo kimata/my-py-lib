@@ -20,6 +20,7 @@ import my_lib.sensor.i2cbus
 
 class SHT35:
     NAME = "SHT-35"
+    TYPE = "I2C"
     DEV_ADDR = 0x44  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 

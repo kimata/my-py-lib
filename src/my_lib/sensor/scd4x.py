@@ -20,6 +20,7 @@ import my_lib.sensor.i2cbus
 
 class SCD4X:
     NAME = "SCD4X"
+    TYPE = "I2C"
     DEV_ADDR = 0x62  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
