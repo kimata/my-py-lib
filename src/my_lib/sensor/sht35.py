@@ -14,9 +14,11 @@ Options:
 # 「SHT35-D (Digital) Humidity & Temperature Sensor」．
 # https://www.tindie.com/products/closedcube/sht35-d-digital-humidity-temperature-sensor/
 
-import time
 import logging
+import time
+
 import my_lib.sensor.i2cbus
+
 
 class SHT35:
     NAME = "SHT-35"
@@ -24,7 +26,7 @@ class SHT35:
     DEV_ADDR = 0x44  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
-    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):
+    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
@@ -40,7 +42,7 @@ class SHT35:
         crc = 0xFF
         for s in data:
             crc ^= s
-            for i in range(8):
+            for _ in range(8):
                 if crc & 0x80:
                     crc <<= 1
                     crc ^= 0x131
@@ -55,7 +57,7 @@ class SHT35:
             data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 3)
 
             return self.crc(data[0:2]) == data[2]
-        except Exception as e:
+        except Exception:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
@@ -68,12 +70,10 @@ class SHT35:
         data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 6)
 
         if (self.crc(data[0:2]) != data[2]) or (self.crc(data[3:5]) != data[5]):
-            raise IOError("ERROR: CRC unmatch.")
+            raise ValueError("ERROR: CRC unmatch.")  # noqa: EM101, TRY003,
 
-        temp = -45 + (175 * int.from_bytes(data[0:2], byteorder="big")) / float(
-            2 ** 16 - 1
-        )
-        humi = 100 * int.from_bytes(data[3:5], byteorder="big") / float(2 ** 16 - 1)
+        temp = -45 + (175 * int.from_bytes(data[0:2], byteorder="big")) / float(2**16 - 1)
+        humi = 100 * int.from_bytes(data[3:5], byteorder="big") / float(2**16 - 1)
 
         return [round(temp, 2), round(humi, 2)]
 
@@ -86,10 +86,9 @@ class SHT35:
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
     import my_lib.sensor.sht35
-    
+
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
@@ -99,6 +98,6 @@ if __name__ == "__main__":
     sensor = my_lib.sensor.sht35(bus_id=bus_id, dev_addr=dev_addr)
 
     ping = sensor.ping()
-    logging.info("PING: {ping}".format(ping=ping))
+    logging.info("PING: %s", ping)
     if ping:
-        logging.info("VALUE: {value}".format(value=sensor.get_value_map()))
+        logging.info("VALUE: %s", sensor.get_value_map())

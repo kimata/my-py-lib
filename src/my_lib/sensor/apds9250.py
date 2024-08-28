@@ -11,7 +11,9 @@ Options:
 """
 
 import logging
+
 import my_lib.sensor.i2cbus
+
 
 class APDS9250:
     NAME = "APDS9250"
@@ -19,7 +21,7 @@ class APDS9250:
     DEV_ADDR = 0x52  # 7bit
     RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
-    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):
+    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
@@ -46,9 +48,9 @@ class APDS9250:
 
         data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x0A, 6)
 
-        ir = int.from_bytes(bytes(data[0:3]) + b"\x00", byteorder='little')
-        als = int.from_bytes(bytes(data[3:6]) + b"\x00", byteorder='little')
-        
+        ir = int.from_bytes(bytes(data[0:3]) + b"\x00", byteorder="little")
+        als = int.from_bytes(bytes(data[3:6]) + b"\x00", byteorder="little")
+
         if als > ir:
             return als * 46.0 / 400
         else:
@@ -59,14 +61,13 @@ class APDS9250:
 
         return {"lux": value}
 
-    
+
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
     import my_lib.sensor.scd4x
-    
+
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
@@ -76,6 +77,6 @@ if __name__ == "__main__":
     sensor = my_lib.sensor.apds9250(bus_id=bus_id, dev_addr=dev_addr)
 
     ping = sensor.ping()
-    logging.info("PING: {ping}".format(ping=ping))
+    logging.info("PING: %s", ping)
     if ping:
-        logging.info("VALUE: {value}".format(value=sensor.get_value_map()))
+        logging.info("VALUE: %s", sensor.get_value_map())

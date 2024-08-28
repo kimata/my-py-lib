@@ -1,22 +1,23 @@
-#!/usr/bin/env python3
-from .i2cbus import I2CBUS as i2cbus
-
-from .sht35 import SHT35 as sht35
-from .scd4x import SCD4X as scd4x
-from .apds9250 import APDS9250 as apds9250
-
-import importlib
 import logging
+
 import my_lib.sensor
+
+from .apds9250 import APDS9250 as apds9250  # noqa: N811
+from .i2cbus import I2CBUS as i2cbus  # noqa: N811
+from .scd4x import SCD4X as scd4x  # noqa: N811
+from .sht35 import SHT35 as sht35  # noqa: N811
+
+__all__ = ["apds9250", "i2cbus", "scd4x", "sht35"]
 
 RASP_I2C_BUS = {
     "arm": 0x1,  # Raspberry Pi のデフォルトの I2C バス番号
     "vc": 0x0,  # dtparam=i2c_vc=on で有効化される I2C のバス番号
 }
 
+
 def load(sensor_cand_list):
     logging.info("Load drivers...")
-    
+
     sensor_list = []
     for sensor in sensor_cand_list:
         logging.info("Load {name} driver".format(name=sensor["name"]))
@@ -41,14 +42,14 @@ def load(sensor_cand_list):
 
     return sensor_list
 
-        
+
 def sensor_info(sensor):
     if sensor.TYPE == "I2C":
         return f"{sensor.NAME} (I2C: 0x{sensor.dev_addr:02X})"
     else:
         return f"{sensor.NAME} ({sensor.TYPE})"
 
-    
+
 def ping(sensor_list):
     logging.info("Check sensor existences...")
 
@@ -60,11 +61,8 @@ def ping(sensor_list):
         else:
             logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
 
-    logging.info(
-        "Active sensor list: %s",
-        ", ".join([sensor_info(sensor) for sensor in active_sensor_list])
-    )
-    return active_sensor_list 
+    logging.info("Active sensor list: %s", ", ".join([sensor_info(sensor) for sensor in active_sensor_list]))
+    return active_sensor_list
 
 
 def sense(sensor_list):
@@ -81,4 +79,3 @@ def sense(sensor_list):
     logging.info("Measured results: %s", value_map)
 
     return value_map
-
