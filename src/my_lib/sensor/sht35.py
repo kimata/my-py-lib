@@ -71,7 +71,7 @@ class SHT35:
         data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 6)
 
         if (self.crc(data[0:2]) != data[2]) or (self.crc(data[3:5]) != data[5]):
-            raise ValueError("ERROR: CRC unmatch.")  # noqa: EM101, TRY003,
+            raise OSError("ERROR: CRC unmatch.")  # noqa: EM101, TRY003,
 
         temp = -45 + (175 * int.from_bytes(data[0:2], byteorder="big")) / float(2**16 - 1)
         humi = 100 * int.from_bytes(data[3:5], byteorder="big") / float(2**16 - 1)
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
 
-    my_lib.logger.init("sensors.sht35", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG)
 
     sensor = my_lib.sensor.sht35(bus_id=bus_id, dev_addr=dev_addr)
 

@@ -46,7 +46,7 @@ class I2CBUS:
             elif msg.flags == smbus2.smbus2.I2C_M_RD:  # NOTE: Read
                 msg_desc.append(f"[read dev:0x{msg.addr:02x}, length:{msg.len}]")
             else:
-                raise ValueError(f"Unknown flag: {msg.flags}")  # noqa: EM102, TRY003
+                raise OSError(f"Unknown flag: {msg.flags}")  # noqa: EM102, TRY003
 
         logging.debug("i2c read/write - %s", ", ".join(msg_desc))
 

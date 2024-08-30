@@ -55,7 +55,7 @@ if __name__ == "__main__":
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
 
-    my_lib.logger.init("sensors.ads1015", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG)
 
     sensor = my_lib.sensor.grove_tds(bus_id=bus_id, dev_addr=dev_addr)
 
