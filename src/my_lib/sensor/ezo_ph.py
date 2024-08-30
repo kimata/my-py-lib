@@ -17,7 +17,7 @@ import my_lib.sensor.i2cbus
 from my_lib.sensor.i2cbus import I2CBUS
 
 
-class EZO_PH:
+class EZO_PH:  # noqa: N801
     NAME = "EZO-pH"
     TYPE = "I2C"
     DEV_ADDR = 0x64  # 7bit
@@ -71,7 +71,6 @@ if __name__ == "__main__":
     import docopt
 
     import my_lib.logger
-    import my_lib.sensor.ezo_ph
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)

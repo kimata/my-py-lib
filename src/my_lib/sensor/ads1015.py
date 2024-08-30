@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 ADS-1015 を使って電圧を計測するライブラリです．
 
@@ -8,7 +7,7 @@ Usage:
 
 Options:
   -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4a]
+  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4A]
 """
 
 import logging
@@ -20,6 +19,7 @@ from my_lib.sensor.i2cbus import I2CBUS
 
 class ADS1015:
     NAME = "ADS1015"
+    TYPE = "I2C"
     DEV_ADDR = 0x4A  # 7bit
 
     REG_CONFIG = 0x01

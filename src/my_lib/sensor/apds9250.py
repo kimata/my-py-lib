@@ -32,10 +32,7 @@ class APDS9250:
 
         try:
             data = self.i2cbus.read_byte_data(self.dev_addr, 0x06)
-            if (data & 0xF0) == 0xB0:
-                return True
-            else:
-                return False
+            return (data & 0xF0) == 0xB0
         except Exception:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False

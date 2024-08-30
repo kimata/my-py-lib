@@ -11,14 +11,13 @@ Options:
 """
 
 import logging
-import struct
 import time
 
 import my_lib.sensor.i2cbus
 from my_lib.sensor.i2cbus import I2CBUS
 
 
-class EZO_RTD:
+class EZO_RTD:  # noqa: N801
     NAME = "EZO-RTD"
     TYPE = "I2C"
     DEV_ADDR = 0x66  # 7bit
@@ -67,7 +66,6 @@ if __name__ == "__main__":
     import docopt
 
     import my_lib.logger
-    import my_lib.sensor.ezo_rtd
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
