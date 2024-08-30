@@ -13,28 +13,30 @@ Options:
 import logging
 
 import my_lib.sensor.i2cbus
+from my_lib.sensor.i2cbus import I2CBUS
 
 
 class APDS9250:
     NAME = "APDS9250"
     TYPE = "I2C"
     DEV_ADDR = 0x52  # 7bit
-    RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
-    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):  # noqa: D107
+    def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
         self.is_init = False
 
     def ping(self):
+        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
+
         try:
             data = self.i2cbus.read_byte_data(self.dev_addr, 0x06)
             if (data & 0xF0) == 0xB0:
                 return True
             else:
                 return False
-        except:
+        except Exception:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
@@ -65,6 +67,7 @@ class APDS9250:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
     import my_lib.sensor.scd4x
 

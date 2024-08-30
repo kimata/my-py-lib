@@ -6,6 +6,9 @@ import smbus2
 
 # NOTE: デバッグ時にログ出力するために smbus2 をラッピング
 class I2CBUS:
+    ARM = 0x1  # Raspberry Pi のデフォルトの I2C バス番号
+    VC = 0x1  # dtparam=i2c_vc=on で有効化される I2C のバス番号
+
     def __init__(self, bus_id):  # noqa: D107
         self.bus_id = bus_id
         self.smbus = smbus2.SMBus(bus_id)
@@ -39,9 +42,9 @@ class I2CBUS:
                 p = ctypes.cast(msg.buf, ctypes.POINTER(ctypes.c_char))
                 data = ",".join([f"0x{p[i].hex().upper()}" for i in range(msg.len)])
 
-                msg_desc.append(f"[write dev:0x{msg.addr}, data:{data}]")
+                msg_desc.append(f"[write dev:0x{msg.addr:02x}, data:{data}]")
             elif msg.flags == smbus2.smbus2.I2C_M_RD:  # NOTE: Read
-                msg_desc.append(f"[read dev:0x{msg.addr}, length:{msg.len}]")
+                msg_desc.append(f"[read dev:0x{msg.addr:02x}, length:{msg.len}]")
             else:
                 raise ValueError(f"Unknown flag: {msg.flags}")  # noqa: EM102, TRY003
 

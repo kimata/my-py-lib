@@ -1,42 +1,46 @@
+# noqa: D104
 import logging
+import pathlib
 
 import my_lib.sensor
 
+from .ads1015 import ADS1015 as ads1015  # noqa: N811
 from .apds9250 import APDS9250 as apds9250  # noqa: N811
+from .ezo_ph import EZO_PH as ezo_ph  # noqa: N811
+from .ezo_rtd import EZO_RTD as ezo_rtd  # noqa: N811
 from .i2cbus import I2CBUS as i2cbus  # noqa: N811
 from .scd4x import SCD4X as scd4x  # noqa: N811
 from .sht35 import SHT35 as sht35  # noqa: N811
 
-__all__ = ["apds9250", "i2cbus", "scd4x", "sht35"]
+__all__ = [
+    "apds9250",
+    "ezo_ph",
+    "ezo_rtd",
+    "i2cbus",
+    "scd4x",
+    "sht35",
+    "ads1015",
+]
 
-RASP_I2C_BUS = {
-    "arm": 0x1,  # Raspberry Pi のデフォルトの I2C バス番号
-    "vc": 0x0,  # dtparam=i2c_vc=on で有効化される I2C のバス番号
-}
 
-
-def load(sensor_cand_list):
+def load(sensor_def_list):
     logging.info("Load drivers...")
 
     sensor_list = []
-    for sensor in sensor_cand_list:
-        logging.info("Load {name} driver".format(name=sensor["name"]))
+    for sensor_def in sensor_def_list:
+        logging.info("Load %s driver", sensor_def["name"])
 
-        if "i2c_bus" in sensor:
-            bus = RASP_I2C_BUS[sensor["i2c_bus"]]
+        if "i2c_bus" in sensor_def:
+            bus = getattr(i2cbus, sensor_def["i2c_bus"])
 
-            i2c_dev_file = pathlib.Path("/dev/i2c-{bus}".format(bus=bus))
+            i2c_dev_file = pathlib.Path(f"/dev/i2c-{bus}")
             if not i2c_dev_file.exists():
-                logging.warning(
-                    "I2C bus {bus} ({dev_file}) does NOT exist. skipping.".format(
-                        bus=bus, dev_file=str(i2c_dev_file)
-                    )
-                )
+                logging.warning("I2C bus %d (%s) does NOT exist. skipping.", bus, i2c_dev_file)
                 continue
 
-            sensor = getattr(my_lib.sensor, sensor["name"])(bus=bus)
+            sensor = getattr(my_lib.sensor, sensor_def["name"])(bus=bus)
         else:
-            sensor = getattr(my_lib.sensor, sensor["name"])()
+            sensor = getattr(my_lib.sensor, sensor_def["name"])()
 
         sensor_list.append(sensor)
 
@@ -73,7 +77,7 @@ def sense(sensor_list):
             val = sensor.get_value_map()
             logging.info(val)
             value_map.update(val)
-        except Exception:
+        except Exception:  # noqa: PERF203
             logging.exception("Failed to measure using %s", sensor.NAME)
 
     logging.info("Measured results: %s", value_map)

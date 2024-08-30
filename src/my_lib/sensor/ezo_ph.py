@@ -11,11 +11,10 @@ Options:
 """
 
 import logging
-import struct
 import time
 
 import my_lib.sensor.i2cbus
-from my_lib.sensor.i2cbus import I2CBUS as I2CBUS
+from my_lib.sensor.i2cbus import I2CBUS
 
 
 class EZO_PH:
@@ -23,29 +22,20 @@ class EZO_PH:
     TYPE = "I2C"
     DEV_ADDR = 0x64  # 7bit
 
-    RAM_CO2 = 0x08
-    RAM_FIRM = 0x62
-
-    WRITE_RAM = 0x1 << 4
-    READ_RAM = 0x2 << 4
-    WRITE_EE = 0x3 << 4
-    READ_EE = 0x4 << 4
-
-    RETRY_COUNT = 5
-
     def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
 
     def ping(self):
+        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
+
         try:
-            logging.info("DEV:%02x", self.dev_addr)
             value = self.exec_command("i")
 
             return value[1:].decode().split(",")[1] == "pH"
         except Exception:
-            logging.exeception("Failed to detect %s", self.NAME)
+            logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
     def get_value(self):
@@ -59,9 +49,7 @@ class EZO_PH:
     #         return float(value[1:].decode().rstrip('\x00'))
 
     def exec_command(self, cmd):
-        command = self.__compose_command(cmd.encode())
-
-        logging.info(command)
+        command = list(cmd.encode())
 
         self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, command))
 
@@ -71,9 +59,6 @@ class EZO_PH:
         self.i2cbus.i2c_rdwr(read)
 
         return bytes(read)
-
-    def __compose_command(self, text):
-        return list(struct.unpack("B" * len(text), text))
 
     def get_value_map(self):
         value = self.get_value()

@@ -18,15 +18,15 @@ import logging
 import time
 
 import my_lib.sensor.i2cbus
+from my_lib.sensor.i2cbus import I2CBUS
 
 
 class SHT35:
     NAME = "SHT-35"
     TYPE = "I2C"
     DEV_ADDR = 0x44  # 7bit
-    RASP_I2C_BUS = 0x1  # Raspberry Pi の I2C のバス番号
 
-    def __init__(self, bus_id=RASP_I2C_BUS, dev_addr=DEV_ADDR):  # noqa: D107
+    def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
@@ -52,6 +52,7 @@ class SHT35:
 
     def ping(self):
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
+
         try:
             self.i2cbus.write_byte_data(self.dev_addr, 0xF3, 0x2D)
             data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 3)
@@ -86,6 +87,7 @@ class SHT35:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
     import my_lib.sensor.sht35
 
