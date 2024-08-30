@@ -5,8 +5,9 @@ import pathlib
 import tempfile
 import threading
 
-import my_lib.footprint
 import slack_sdk
+
+import my_lib.footprint
 
 # NOTE: テスト用
 notify_hist = []

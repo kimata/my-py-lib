@@ -3,13 +3,12 @@
 
 import logging
 import pprint
-import struct
 import time
 
 import serial
 import spidev
 
-import my_lib.sensor.io_link as io_link
+from my_lib.sensor import io_link
 
 DEBUG = True
 
@@ -19,7 +18,7 @@ DATA_TYPE_UINT16 = 2
 
 
 def dump_byte_list(label, byte_list):
-    logging.debug("%s: %s", label, ", ".join("0x{v:02X}".format(v=v) for v in byte_list))
+    logging.debug("%s: %s", label, ", ".join(f"0x{v:02X}" for v in byte_list))
 
 
 def ltc2874_reg_read(spi, reg):
@@ -92,14 +91,15 @@ def com_status(spi):
 
 
 def com_start(spi):
+    BOOT_WAIT_SEC = 5
     if com_status(spi):
         logging.debug("IO-Link is already Powered-ON")
     else:
         # Power on, CQ OC Timeout = 480us
         logging.info("***** Power-On IO-Link ****")
         ltc2874_reg_write(spi, 0x0E, 0x11)
-        logging.info("Wait for device booting ({sleep_sec} sec)".format(sleep_sec=5))
-        time.sleep(5)
+        logging.info("Wait for device booting (%d sec)", BOOT_WAIT_SEC)
+        time.sleep(BOOT_WAIT_SEC)
 
     # Wakeup
     ltc2874_reg_write(spi, 0x0D, 0x10)
@@ -136,16 +136,16 @@ def com_write(spi, ser, byte_list):
 
     dump_byte_list("COM SEND", byte_list)
 
-    ser.write(struct.pack("{}B".format(len(byte_list)), *byte_list))
+    ser.write(bytes(byte_list))
     ser.flush()
 
     # Drive disable
     ltc2874_reg_write(spi, 0x0D, 0x00)
 
 
-def com_read(spi, ser, length):
+def com_read(spi, ser, length):  # noqa: ARG001
     recv = ser.read(length)
-    byte_list = struct.unpack("{}B".format(len(recv)), recv)
+    byte_list = list(recv)
 
     dump_byte_list("COM RECV", byte_list)
 
@@ -153,7 +153,7 @@ def com_read(spi, ser, length):
 
 
 def dir_param_read(spi, ser, addr):
-    logging.debug("***** CALL: dir_param_read(addr: 0x{:x}) ****".format(addr))
+    logging.debug("***** CALL: dir_param_read(addr: 0x%02X) ****", addr)
 
     msq = msq_build(io_link.MSQ_RW_READ, io_link.MSQ_CH_PAGE, addr, io_link.MSQ_TYPE_0, None)
     com_write(spi, ser, msq)
@@ -161,15 +161,15 @@ def dir_param_read(spi, ser, addr):
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise OSError("response is too short")
-    elif data[1] != msq_checksum([data[0]]):
-        raise OSError("checksum unmatch")
+        raise OSError("response is too short")  # noqa: EM101, TRY003
+    elif data[1] != msq_checksum([data[0]]):  # noqa:RET506
+        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
 
     return data[0]
 
 
 def dir_param_write(spi, ser, addr, value):
-    logging.debug("***** CALL: dir_param_write(addr: 0x{:x}, value: 0x{:x}) ****".format(addr, value))
+    logging.debug("***** CALL: dir_param_write(addr: 0x%02X, value: 0x%02X) ****", addr, value)
 
     msq = msq_build(io_link.MSQ_RW_WRITE, io_link.MSQ_CH_PAGE, addr, io_link.MSQ_TYPE_0, [value])
     com_write(spi, ser, msq)
@@ -177,9 +177,9 @@ def dir_param_write(spi, ser, addr, value):
     data = com_read(spi, ser, 4)[3:]
 
     if len(data) < 1:
-        raise OSError("response is too short")
-    elif data[0] != msq_checksum([]):
-        raise OSError("checksum unmatch")
+        raise OSError("response is too short")  # noqa: EM101, TRY003
+    elif data[0] != msq_checksum([]):  # noqa: RET506
+        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
 
 
 def isdu_req_build(index, length):
@@ -213,8 +213,8 @@ def isdu_res_read(spi, ser, flow):
     return data[0]
 
 
-def isdu_read(spi, ser, index, data_type):
-    logging.debug("***** CALL: isdu_read(index: 0x{:x}) ****".format(index))
+def isdu_read(spi, ser, index, data_type):  # noqa: PLR0912, C901
+    logging.debug("***** CALL: isdu_read(index: 0x%02X) ****", (index))
     length = 3
 
     isdu_req = isdu_req_build(index, length)
@@ -238,15 +238,15 @@ def isdu_read(spi, ser, index, data_type):
             else:
                 remain = (header & 0x0F) - 1
             break
-        elif header == 0x01:
+        elif header == 0x01:  # noqa:RET508
             logging.warning("WAIT response")
             continue
         elif (header >> 4) == 0x0C:
-            raise OSError("ERROR reponse")
+            raise OSError("ERROR reponse")  # noqa: EM101, TRY003
         else:
-            raise OSError(f"INVALID response: {pprint.pformat(header)}")
+            raise OSError(f"INVALID response: {pprint.pformat(header)}")  # noqa: EM102, TRY003
 
-    for x in range(remain - 1):
+    for _ in range(remain - 1):
         data = isdu_res_read(spi, ser, flow & 0xF)
         data_list.append(data)
         flow += 1
@@ -255,11 +255,11 @@ def isdu_read(spi, ser, index, data_type):
     chk ^= isdu_res_read(spi, ser, flow)
 
     if chk != 0x00:
-        raise OSError("ISDU checksum unmatch")
+        raise OSError("ISDU checksum unmatch")  # noqa: EM101, TRY003
 
     if data_type == DATA_TYPE_STRING:
-        return struct.pack("{}B".format(len(data_list)), *data_list).decode("utf-8")
+        return bytes(data_list).decode("utf-8")
     elif data_type == DATA_TYPE_UINT16:
-        return struct.unpack(">H", bytes(data_list))[0]
+        return int.from_bytes(data_list, byteorder="big")
     else:
         return data_list

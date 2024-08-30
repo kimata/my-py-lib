@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-KEYENCE のクランプオン式流量センサ FD-Q10C と IO-LINK で通信を行なって
-流量を取得するスクリプトです．
+KEYENCE のクランプオン式流量センサ FD-Q10C と IO-LINK で通信を行なって流量を取得するスクリプトです．
 
 Usage:
   fd_q10c.py [-l LOCK] [-t TIMEOUT]
@@ -14,21 +13,19 @@ Options:
 import fcntl
 import logging
 import os
-import pathlib
-import sys
 import time
 import traceback
 
 import my_lib.sensor.ltc2874 as driver
 
 
-class FD_Q10C:
+class FD_Q10C:  # noqa: N801
     NAME = "FD_Q10C"
     TYPE = "IO_LINK"
-    LOCK_FILE = "/dev/shm/fd_q10c.lock"
+    LOCK_FILE = "/dev/shm/fd_q10c.lock"  # noqa: S108
     TIMEOUT = 5
 
-    def __init__(self, lock_file=LOCK_FILE, timeout=TIMEOUT):
+    def __init__(self, lock_file=LOCK_FILE, timeout=TIMEOUT):  # noqa:D107
         self.dev_addr = None
         self.lock_file = lock_file
         self.lock_fd = None
@@ -45,23 +42,24 @@ class FD_Q10C:
                 return None
             else:
                 return round(raw * 0.01, 2)
-        except:
+        except Exception:
             try:
                 self.stop()
-            except:
-                pass
+            except Exception:
+                logging.debug("Failed to stop")
+
             logging.warning(traceback.format_exc())
             return None
 
     def get_state(self):
         if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")
+            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
 
         try:
             spi = driver.com_open()
             # NOTE: 電源 ON なら True
             return driver.com_status(spi)
-        except:
+        except Exception:
             return False
         finally:
             driver.com_close(spi)
@@ -69,7 +67,7 @@ class FD_Q10C:
 
     def read_param(self, index, data_type, force_power_on=True):
         if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")
+            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
 
         try:
             spi = driver.com_open()
@@ -90,7 +88,7 @@ class FD_Q10C:
 
     def stop(self):
         if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")
+            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
 
         spi = None
         try:
@@ -98,7 +96,7 @@ class FD_Q10C:
 
             driver.com_stop(spi, is_power_off=True)
             driver.com_close(spi, is_reset=True)
-        except:
+        except Exception:
             if spi is not None:
                 driver.com_close(spi, is_reset=True)
                 raise
@@ -112,7 +110,7 @@ class FD_Q10C:
         while time.time() < time_start + self.timeout:
             try:
                 fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except (IOError, OSError):
+            except OSError:
                 pass
             else:
                 return True
@@ -124,7 +122,8 @@ class FD_Q10C:
         return False
 
     def _release(self):
-        assert self.lock_fd is not None
+        if self.lock_fd is None:
+            raise RuntimeError("Not Locked")  # noqa: EM101, TRY003
 
         fcntl.flock(self.lock_fd, fcntl.LOCK_UN)
         os.close(self.lock_fd)
