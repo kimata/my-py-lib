@@ -137,8 +137,8 @@ def fetch_data(  # noqa: PLR0913
         )
         time_fetched = time.time()
 
-        data = []
-        time = []
+        data_list = []
+        time_list = []
         localtime_offset = datetime.timedelta(hours=9)
 
         if len(table_list) != 0:
@@ -149,8 +149,8 @@ def fetch_data(  # noqa: PLR0913
                     logging.debug("DELETE %s", record.get_time() + localtime_offset)
                     continue
 
-                data.append(record.get_value())
-                time.append(record.get_time() + localtime_offset)
+                data_list.append(record.get_value())
+                time_list.append(record.get_time() + localtime_offset)
 
         if create_empty and not last:
             # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと，
@@ -158,8 +158,8 @@ def fetch_data(  # noqa: PLR0913
             every_min = int(every_min)
             window_min = int(window_min)
             if window_min > every_min:
-                data = data[: (every_min - window_min)]
-                time = time[: (every_min - window_min)]
+                data_list = data_list[: (every_min - window_min)]
+                time_list = time_list[: (every_min - window_min)]
 
         logging.debug("data count = %s", len(time))
 
@@ -171,7 +171,7 @@ def fetch_data(  # noqa: PLR0913
                 time_finish - time_fetched,
             )
 
-        return {"value": data, "time": time, "valid": len(time) != 0}
+        return {"value": data_list, "time": time_list, "valid": len(time) != 0}
     except Exception:
         logging.warning(traceback.format_exc())
 
