@@ -164,7 +164,7 @@ def fetch_data(  # noqa: PLR0913
         logging.debug("data count = %s", len(time_list))
 
         time_finish = time.time()
-        if ((time_fetched - time_start) > 2) or ((time_finish - time_fetched) > 2):
+        if ((time_fetched - time_start) > 3) or ((time_finish - time_fetched) > 0.5):
             logging.warning(
                 "It's taking too long to retrieve the data. (fetch: %.1f sec, modify: %.1f sec)",
                 time_fetched - time_start,
