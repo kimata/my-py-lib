@@ -171,7 +171,7 @@ def fetch_data(  # noqa: PLR0913
                 time_finish - time_fetched,
             )
 
-        return {"value": data_list, "time": time_list, "valid": len(time) != 0}
+        return {"value": data_list, "time": time_list, "valid": len(time_list) != 0}
     except Exception:
         logging.warning(traceback.format_exc())
 
