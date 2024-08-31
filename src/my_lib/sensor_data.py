@@ -14,6 +14,7 @@ Options:
 import datetime
 import logging
 import os
+import time
 import traceback
 
 import influxdb_client
@@ -102,6 +103,7 @@ def fetch_data(  # noqa: PLR0913
     create_empty=True,
     last=False,
 ):
+    time_start = time.time()
     logging.debug(
         (
             "Fetch data (measure: %s, host: %s, field: %s, "
@@ -133,6 +135,8 @@ def fetch_data(  # noqa: PLR0913
             create_empty,
             last,
         )
+        time_fetched = time.time()
+
         data = []
         time = []
         localtime_offset = datetime.timedelta(hours=9)
@@ -158,6 +162,14 @@ def fetch_data(  # noqa: PLR0913
                 time = time[: (every_min - window_min)]
 
         logging.debug("data count = %s", len(time))
+
+        time_finish = time.time()
+        if ((time_fetched - time_start) > 4) or ((time_finish - time_fetched) > 4):
+            logging.warning(
+                "It's taking too long to retrieve the data. (fetch: %.1f sec, modify: %.1f sec)",
+                time_fetched - time_start,
+                time_finish - time_fetched,
+            )
 
         return {"value": data, "time": time, "valid": len(time) != 0}
     except Exception:
