@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import pathlib
+import tempfile
 import time
 
 
@@ -12,8 +13,12 @@ def update(path):
     logging.debug("update: %s", path)
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with pathlib.Path(path).open(mode="w") as f:
-        f.write(str(time.time()))
+
+    with tempfile.NamedTemporaryFile("w", delete=False, dir=pathlib.Path(path).parent) as tmp_file:
+        tmp_file.write(str(time.time()))
+        temp_file_path = pathlib.Path(tmp_file.name)
+
+    temp_file_path.rename(path)
 
 
 def elapsed(path):
