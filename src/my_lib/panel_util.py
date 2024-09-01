@@ -4,11 +4,10 @@ import textwrap
 import time
 import traceback
 
-import PIL.Image
-import PIL.ImageDraw
-
 import my_lib.notify_slack
 import my_lib.pil_util
+import PIL.Image
+import PIL.ImageDraw
 
 
 def notify_error(config, message):
@@ -75,7 +74,7 @@ def draw_panel_patiently(  # noqa: PLR0913
             error_message = traceback.format_exc()
             logging.exception("Failed to draw panel")
 
-        logging.warning("retry")
+        logging.warning("Retry %d time(s)", i)
         time.sleep(2)
 
     return (
