@@ -10,9 +10,14 @@ import PIL.ImageFont
 def get_font(config, font_type, size):
     font_path = pathlib.Path(config["path"]).resolve() / config["map"][font_type]
 
-    logging.info("Load font: %s", font_path)
+    if font_path not in get_font.loaded:
+        logging.info("Load font: %s", font_path)
+        get_font.loaded[font_path] = True
 
     return PIL.ImageFont.truetype(font_path, size)
+
+
+get_font.loaded = {}
 
 
 def text_size(img, font, text):
