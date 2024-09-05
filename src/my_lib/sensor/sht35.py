@@ -30,13 +30,6 @@ class SHT35:
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
-        self.is_init = False
-
-    def init(self):
-        # periodic, 1mps, repeatability high
-        self.i2cbus.write_byte_data(self.dev_addr, 0x21, 0x30)
-        self.is_init = True
-        time.sleep(0.01)
 
     def crc(self, data):
         crc = 0xFF
@@ -63,12 +56,14 @@ class SHT35:
             return False
 
     def get_value(self):
-        if not self.is_init:
-            self.init()
+        self.i2cbus.write_byte_data(self.dev_addr, 0x24, 0x16)
 
-        self.i2cbus.write_byte_data(self.dev_addr, 0xE0, 0x00)
+        time.sleep(0.1)
 
-        data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 6)
+        read = self.i2cbus.msg.read(self.dev_addr, 6)
+        self.i2cbus.i2c_rdwr(read)
+
+        data = bytes(read)
 
         if (self.crc(data[0:2]) != data[2]) or (self.crc(data[3:5]) != data[5]):
             raise OSError("ERROR: CRC unmatch.")  # noqa: EM101, TRY003,
@@ -87,7 +82,6 @@ class SHT35:
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
