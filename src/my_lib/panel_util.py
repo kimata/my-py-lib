@@ -74,7 +74,7 @@ def draw_panel_patiently(  # noqa: PLR0913
             error_message = traceback.format_exc()
             logging.exception("Failed to draw panel")
 
-        logging.warning("Retry %d time(s)", i)
+        logging.warning("Retry %d time(s)", i + 1)
         time.sleep(2)
 
     return (
