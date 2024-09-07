@@ -38,6 +38,7 @@ def load(config_path=CONFIG_PATH, schema_path=None):
                 jsonschema.validate(instance=yaml_data, schema=schema)
             except jsonschema.exceptions.ValidationError:
                 logging.exception("設定ファイルのフォーマットに問題があります．")
+                raise
 
     return yaml_data
 
@@ -48,7 +49,7 @@ def generate_schema(config_path):
         builder = genson.SchemaBuilder()
         builder.add_object(yaml.load(file, Loader=yaml.SafeLoader))
 
-        print(json.dumps(builder.to_schema(), indent=4))
+        print(json.dumps(builder.to_schema(), indent=4))  # noqa: T201
 
 
 if __name__ == "__main__":
@@ -68,4 +69,4 @@ if __name__ == "__main__":
     if schema_mode:
         generate_schema(config_file)
     else:
-        pprint.pprint(load(config_file))
+        pprint.pprint(load(config_file))  # noqa: T203
