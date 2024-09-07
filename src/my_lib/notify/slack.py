@@ -3,16 +3,15 @@ import json
 import logging
 import pathlib
 import tempfile
-import threading
-
-import slack_sdk
 
 import my_lib.footprint
+import slack_sdk
 
 # NOTE: テスト用
 notify_hist = []
 
-ERROR_NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/error")  # noqa: S108
+NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
+INTERVAL_MIN = 60
 
 SIMPLE_TMPL = """\
 [
@@ -33,7 +32,6 @@ SIMPLE_TMPL = """\
     }}
 ]
 """
-interval_check_lock = threading.Lock()
 
 
 def format_simple(title, message):
@@ -74,14 +72,6 @@ def info(token, ch_name, name, message, formatter=format_simple):
     split_send(token, ch_name, title, message, formatter)
 
 
-def interval_check(interval_min):
-    return my_lib.footprint.elapsed(ERROR_NOTIFY_FOOTPRINT) > interval_min * 60
-
-
-def interval_clear():
-    my_lib.footprint.clear(ERROR_NOTIFY_FOOTPRINT)
-
-
 def error_img(token, ch_id, title, img, text):
     client = slack_sdk.WebClient(token=token)
 
@@ -101,20 +91,20 @@ def error(  # noqa: PLR0913
     ch_name,
     name,
     message,
-    interval_min=60,
+    interval_min=INTERVAL_MIN,
     formatter=format_simple,
 ):
     title = "Error: " + name
 
     hist_add(message)
 
-    if not interval_check(interval_min):
+    if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return
 
     split_send(token, ch_name, title, message, formatter)
 
-    my_lib.footprint.update(ERROR_NOTIFY_FOOTPRINT)
+    my_lib.footprint.update(NOTIFY_FOOTPRINT)
 
 
 def error_with_image(  # noqa: PLR0913
@@ -124,14 +114,14 @@ def error_with_image(  # noqa: PLR0913
     name,
     message,
     attatch_img,
-    interval_min=10,
+    interval_min=INTERVAL_MIN,
     formatter=format_simple,
 ):  # def error_with_image
     title = "Error: " + name
 
     hist_add(message)
 
-    if not interval_check(interval_min):
+    if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return
 
@@ -143,7 +133,12 @@ def error_with_image(  # noqa: PLR0913
 
         error_img(token, ch_id, title, attatch_img["data"], attatch_img["text"])
 
-    my_lib.footprint.update(ERROR_NOTIFY_FOOTPRINT)
+    my_lib.footprint.update(NOTIFY_FOOTPRINT)
+
+
+# NOTE: テスト用
+def interval_clear():
+    my_lib.footprint.clear(NOTIFY_FOOTPRINT)
 
 
 # NOTE: テスト用

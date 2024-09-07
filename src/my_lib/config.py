@@ -3,7 +3,7 @@
 YAML 型式で定義された設定ファイルを読み込みます．
 
 Usage:
-  rasp-aqua.py [-c CONFIG] [-S] [-d]
+  config.py [-c CONFIG] [-S] [-d]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
