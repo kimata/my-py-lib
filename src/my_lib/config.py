@@ -37,7 +37,7 @@ def load(config_path=CONFIG_PATH, schema_path=None):
             try:
                 jsonschema.validate(instance=yaml_data, schema=schema)
             except jsonschema.exceptions.ValidationError:
-                logging.exception("設定ファイルのフォーマットに問題があります．")
+                logging.error("設定ファイルのフォーマットに問題があります．")  # noqa: TRY400
                 raise
 
     return yaml_data
