@@ -8,7 +8,7 @@ import unittest
 
 import data.sample_webapp
 import my_lib.config
-import my_lib.notify_slack
+import my_lib.notify.slack
 import my_lib.webapp.config
 import pytest
 
@@ -30,7 +30,7 @@ def env_mock():
 @pytest.fixture(scope="session", autouse=True)
 def slack_mock():
     with unittest.mock.patch(
-        "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
+        "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
         retunr_value=True,
     ) as fixture:
         yield fixture
@@ -300,44 +300,44 @@ def test_notify_slack(mocker):
 
     config = my_lib.config.load(CONFIG_FILE)
 
-    my_lib.notify_slack.hist_clear()
-    my_lib.notify_slack.interval_clear()
+    my_lib.notify.slack.hist_clear()
+    my_lib.notify.slack.interval_clear()
 
-    my_lib.notify_slack.info(
+    my_lib.notify.slack.info(
         config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
     )
 
-    assert my_lib.notify_slack.hist_get() == []
+    assert my_lib.notify.slack.hist_get() == []
 
-    my_lib.notify_slack.error(
+    my_lib.notify.slack.error(
         config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
     )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test"]
+    assert my_lib.notify.slack.hist_get() == ["This is Test"]
 
-    my_lib.notify_slack.error(
+    my_lib.notify.slack.error(
         config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
     )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test"]
+    assert my_lib.notify.slack.hist_get() == ["This is Test", "This is Test"]
 
     mocker.patch(
-        "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
+        "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
         retunr_value=True,
     )
 
     mocker.patch(
-        "my_lib.notify_slack.slack_sdk.web.client.WebClient.chat_postMessage",
+        "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
         side_effect=slack_sdk.errors.SlackClientError(),
     )
-    my_lib.notify_slack.error(
+    my_lib.notify.slack.error(
         config["slack"]["bot_token"], config["slack"]["error"]["channel"]["name"], "Test", "This is Test"
     )
 
-    my_lib.notify_slack.hist_clear()
-    my_lib.notify_slack.interval_clear()
+    my_lib.notify.slack.hist_clear()
+    my_lib.notify.slack.interval_clear()
 
-    my_lib.notify_slack.error_with_image(
+    my_lib.notify.slack.error_with_image(
         config["slack"]["bot_token"],
         config["slack"]["error"]["channel"]["name"],
         config["slack"]["error"]["channel"]["id"],
@@ -346,9 +346,9 @@ def test_notify_slack(mocker):
         {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
     )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test"]
+    assert my_lib.notify.slack.hist_get() == ["This is Test"]
 
-    my_lib.notify_slack.error_with_image(
+    my_lib.notify.slack.error_with_image(
         config["slack"]["bot_token"],
         config["slack"]["error"]["channel"]["name"],
         config["slack"]["error"]["channel"]["id"],
@@ -357,11 +357,11 @@ def test_notify_slack(mocker):
         {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
     )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test"]
-    my_lib.notify_slack.interval_clear()
+    assert my_lib.notify.slack.hist_get() == ["This is Test", "This is Test"]
+    my_lib.notify.slack.interval_clear()
 
     with pytest.raises(ValueError, match="ch_id is None"):
-        my_lib.notify_slack.error_with_image(
+        my_lib.notify.slack.error_with_image(
             config["slack"]["bot_token"],
             config["slack"]["error"]["channel"]["name"],
             None,
@@ -370,10 +370,10 @@ def test_notify_slack(mocker):
             {"data": PIL.Image.new("RGB", (512, 512)), "text": "dumny"},
         )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test", "This is Test"]
-    my_lib.notify_slack.interval_clear()
+    assert my_lib.notify.slack.hist_get() == ["This is Test", "This is Test", "This is Test"]
+    my_lib.notify.slack.interval_clear()
 
-    my_lib.notify_slack.error_with_image(
+    my_lib.notify.slack.error_with_image(
         config["slack"]["bot_token"],
         config["slack"]["error"]["channel"]["name"],
         config["slack"]["error"]["channel"]["id"],
@@ -382,7 +382,7 @@ def test_notify_slack(mocker):
         None,
     )
 
-    assert my_lib.notify_slack.hist_get() == ["This is Test", "This is Test", "This is Test", "This is Test"]
+    assert my_lib.notify.slack.hist_get() == ["This is Test", "This is Test", "This is Test", "This is Test"]
 
 
 def test_pil_util():

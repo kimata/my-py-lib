@@ -4,7 +4,7 @@ import textwrap
 import time
 import traceback
 
-import my_lib.notify_slack
+import my_lib.notify.slack
 import my_lib.pil_util
 import PIL.Image
 import PIL.ImageDraw
@@ -16,7 +16,7 @@ def notify_error(config, message):
     if "slack" not in config:
         return
 
-    my_lib.notify_slack.error(
+    my_lib.notify.slack.error(
         config["slack"]["bot_token"],
         config["slack"]["error"]["channel"]["name"],
         config["slack"]["from"],

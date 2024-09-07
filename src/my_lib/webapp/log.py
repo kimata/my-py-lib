@@ -13,7 +13,7 @@ from wsgiref.handlers import format_date_time
 
 import flask
 import my_lib.flask_util
-import my_lib.notify_slack
+import my_lib.notify.slack
 import my_lib.webapp.config
 import my_lib.webapp.event
 
@@ -101,7 +101,7 @@ def log_impl(message, level):
 
     if level == LOG_LEVEL.ERROR:
         if "slack" in config:
-            my_lib.notify_slack.error(
+            my_lib.notify.slack.error(
                 config["slack"]["bot_token"],
                 config["slack"]["error"]["channel"]["name"],
                 config["slack"]["from"],
