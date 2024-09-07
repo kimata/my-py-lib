@@ -16,18 +16,30 @@ import logging
 import pathlib
 
 import genson
+import jsonschema
 import yaml
 
 CONFIG_PATH = "config.yaml"
 
 
-def load(config_path=CONFIG_PATH):
+def load(config_path=CONFIG_PATH, schema_path=None):
     config_path = pathlib.Path(config_path).resolve()
 
     logging.info("Load config: %s", config_path)
 
-    with config_path.open(mode="r") as file:
-        return yaml.load(file, Loader=yaml.SafeLoader)
+    with config_path.open() as file:
+        yaml_data = yaml.load(file, Loader=yaml.SafeLoader)
+
+    if schema_path is not None:
+        with schema_path.open() as file:
+            schema = json.load(file)
+
+            try:
+                jsonschema.validate(instance=yaml_data, schema=schema)
+            except jsonschema.exceptions.ValidationError:
+                logging.exception("設定ファイルのフォーマットに問題があります．")
+
+    return yaml_data
 
 
 # NOTE: スキーマの雛形を生成
