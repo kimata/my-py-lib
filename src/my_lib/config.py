@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YAML 型式で定義された設定ファイルを読み込みます．
+YAML 型式で定義された設定ファイルを読み込むライブラリです．
 
 Usage:
   config.py [-c CONFIG] [-S] [-d]
