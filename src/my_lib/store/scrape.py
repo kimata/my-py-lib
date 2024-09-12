@@ -11,7 +11,6 @@ Options:n
 """
 
 import logging
-import os
 import pathlib
 import random
 import re
@@ -19,8 +18,8 @@ import string
 import time
 import urllib
 
-# import my_lib.captcha
 import my_lib.selenium_util
+import my_lib.store.captcha
 import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
@@ -52,22 +51,22 @@ def process_action(driver, wait, item, action_list, name="action"):  # noqa:C901
             driver.find_element(
                 selenium.webdriver.common.by.By.XPATH, resolve_template(action["xpath"], item)
             ).click()
-        # elif action["type"] == "recaptcha":
-        #     my_lib.captcha.resolve_mp3(driver, wait)
-        # elif action["type"] == "captcha":
-        #     input_xpath = '//input[@id="captchacharacters"]'
-        #     if not my_lib.selenium_util.xpath_exists(driver, input_xpath):
-        #         logging.debug("Element not found.")
-        #         continue
-        #     domain = urllib.parse.urlparse(driver.current_url).netloc
+        elif action["type"] == "recaptcha":
+            my_lib.store.captcha.resolve_mp3(driver, wait)
+        elif action["type"] == "captcha":
+            input_xpath = '//input[@id="captchacharacters"]'
+            if not my_lib.selenium_util.xpath_exists(driver, input_xpath):
+                logging.debug("Element not found.")
+                continue
+            domain = urllib.parse.urlparse(driver.current_url).netloc
 
-        #     logging.warning("Resolve captche is needed at %s.", domain)
+            logging.warning("Resolve captche is needed at %s.", domain)
 
-        #     my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
-        #     code = input(f"{domain} captcha: ")
+            my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
+            code = input(f"{domain} captcha: ")
 
-        #     driver.find_element(selenium.webdriver.common.by.By.XPATH, input_xpath).send_keys(code)
-        #     driver.find_element(selenium.webdriver.common.by.By.XPATH, '//button[@type="submit"]').click()
+            driver.find_element(selenium.webdriver.common.by.By.XPATH, input_xpath).send_keys(code)
+            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//button[@type="submit"]').click()
         elif action["type"] == "sixdigit":
             # NOTE: これは今のところ Ubiquiti Store USA 専用
             digit_code = input(f"{urllib.parse.urlparse(driver.current_url).netloc} app code: ")
@@ -76,7 +75,7 @@ def process_action(driver, wait, item, action_list, name="action"):  # noqa:C901
                     selenium.webdriver.common.by.By.XPATH, '//input[@data-id="' + str(i) + '"]'
                 ).send_keys(code)
         else:
-            raise ValueError("Unknown action")
+            raise ValueError("Unknown action")  # noqa: EM101, TRY003
 
         time.sleep(4)
 

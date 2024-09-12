@@ -43,6 +43,7 @@ dev-dependencies = [
     "flaky>=3.8.1",
     "flask-cors>=4.0.1",
     "flask>=3.0.3",
+    "openpyxl>=3.1.5",
     "pillow>=10.4.0",
     "playwright>=1.45.1",
     "pytest-cov>=5.0.0",
