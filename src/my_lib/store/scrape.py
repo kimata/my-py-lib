@@ -26,8 +26,6 @@ import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 TIMEOUT_SEC = 4
-DATA_PATH = pathlib.Path(os.path.dirname(__file__)).parent / "data"  # noqa: PTH120
-DUMP_PATH = str(DATA_PATH / "debug")
 
 
 def resolve_template(template, item):
@@ -99,7 +97,7 @@ def process_preload(driver, wait, item, loop):
     process_action(driver, wait, item, item["preload"]["action"], "preload action")
 
 
-def check_impl(driver, item, loop):  # noqa: PLR0912, C901
+def fetch_price_impl(driver, item, dump_path, loop):  # noqa: PLR0912, C901
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, TIMEOUT_SEC)
 
     process_preload(driver, wait, item, loop)
@@ -118,7 +116,8 @@ def check_impl(driver, item, loop):  # noqa: PLR0912, C901
     if not my_lib.selenium_util.xpath_exists(driver, item["price_xpath"]):
         logging.warning("%s: price not found.", item["name"])
         item["stock"] = 0
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
+        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+
         return False
 
     if "unavailable_xpath" in item:
@@ -133,6 +132,7 @@ def check_impl(driver, item, loop):  # noqa: PLR0912, C901
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", price_text)
         item["price"] = int(m.group(1).replace(",", ""))
+        logging.info("%s%s", f"""{item["price"] :,}""", item["price_unit"])
     except Exception:
         if item["stock"] == 0:
             # NOTE: 在庫がない場合は，価格が取得できなくてもエラーにしない
@@ -168,11 +168,11 @@ def check_impl(driver, item, loop):  # noqa: PLR0912, C901
     return item
 
 
-def fetch_price(driver, item, loop):
+def fetch_price(driver, item, dump_path, loop=0):
     try:
-        logging.warning("Check %s", item["name"])
+        logging.info("Check %s", item["name"])
 
-        return check_impl(driver, item, loop)
+        return fetch_price_impl(driver, item, dump_path, loop)
     except:
         logging.exception("Failed to check %s", driver.current_url)
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
