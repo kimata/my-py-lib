@@ -10,7 +10,6 @@ import slack_sdk
 
 # NOTE: テスト用
 thread_local = threading.local()
-thread_local.notify_hist = []
 
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
@@ -145,20 +144,19 @@ def interval_clear():
 
 # NOTE: テスト用
 def hist_clear():
-    global thread_local
-
-    thread_local.notify_hist = []
+    hist_get().clear()
 
 
 # NOTE: テスト用
 def hist_add(message):
-    global thread_local
-
-    thread_local.notify_hist.append(message)
+    hist_get().append(message)
 
 
 # NOTE: テスト用
 def hist_get():
     global thread_local
+
+    if not hasattr(thread_local, "notify_hist"):
+        thread_local.notify_hist = []
 
     return thread_local.notify_hist
