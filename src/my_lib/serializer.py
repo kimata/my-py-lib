@@ -10,6 +10,7 @@ def store(file_path_str, data):
     logging.debug("Store %s", file_path_str)
 
     file_path = pathlib.Path(file_path_str)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         f = tempfile.NamedTemporaryFile(dir=str(file_path.parent), delete=False)
         pickle.dump(data, f)
