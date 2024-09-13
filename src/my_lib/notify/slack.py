@@ -3,12 +3,14 @@ import json
 import logging
 import pathlib
 import tempfile
+import threading
 
 import my_lib.footprint
 import slack_sdk
 
 # NOTE: テスト用
-notify_hist = []
+thread_local = threading.local()
+thread_local.notify_hist = []
 
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
@@ -143,20 +145,20 @@ def interval_clear():
 
 # NOTE: テスト用
 def hist_clear():
-    global notify_hist  # noqa: PLW0603
+    global thread_local
 
-    notify_hist = []
+    thread_local.notify_hist = []
 
 
 # NOTE: テスト用
 def hist_add(message):
-    global notify_hist
+    global thread_local
 
-    notify_hist.append(message)
+    thread_local.notify_hist.append(message)
 
 
 # NOTE: テスト用
 def hist_get():
-    global notify_hist
+    global thread_local
 
-    return notify_hist
+    return thread_local.notify_hist
