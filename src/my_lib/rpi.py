@@ -80,7 +80,7 @@ else:
                         {
                             "pin_num": pin_num,
                             "state": gpio.level.LOW.name,
-                            "high_period": int(gpio_time() - gpio.time_start[pin_num]),
+                            "high_period": max(int(gpio_time() - gpio.time_start[pin_num]), 1),
                         }
                     )
                 else:
