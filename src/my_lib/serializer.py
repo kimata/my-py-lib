@@ -33,9 +33,13 @@ def load(file_path, init_value=None):
 
     try:
         with pathlib.Path(file_path).open("rb") as f:
-            data = init_value.copy()
-            data.update(pickle.load(f))  # noqa: S301
-            return data
+            if isinstance(init_value, dict):
+                # NOTE: dict の場合は，プログラムの更新でキーが追加された場合にも自動的に追従させる
+                data = init_value.copy()
+                data.update(pickle.load(f))  # noqa: S301
+                return data
+            else:
+                return pickle.load(f)  # noqa: S301
     except Exception:
         logging.exception("Failed to load data")
 
