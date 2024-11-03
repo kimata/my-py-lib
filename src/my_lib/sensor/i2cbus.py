@@ -7,7 +7,7 @@ import smbus2
 # NOTE: デバッグ時にログ出力するために smbus2 をラッピング
 class I2CBUS:
     ARM = 0x1  # Raspberry Pi のデフォルトの I2C バス番号
-    VC = 0x1  # dtparam=i2c_vc=on で有効化される I2C のバス番号
+    VC = 0x0  # dtparam=i2c_vc=on で有効化される I2C のバス番号
 
     def __init__(self, bus_id):  # noqa: D107
         self.bus_id = bus_id
