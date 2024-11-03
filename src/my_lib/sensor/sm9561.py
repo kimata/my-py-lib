@@ -46,14 +46,6 @@ class SM9561:
     REG_DLL = 0x00 << 3
     REG_DLH = 0x01 << 3
 
-    # REG_VALUE = 0x00
-
-    # REG_CONFIG_FSR_0256 = 5
-    # REG_CONFIG_FSR_2048 = 2
-
-    # REG_CONFIG_MUX_01 = 0
-    # REG_CONFIG_MUX_0G = 4
-
     def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
