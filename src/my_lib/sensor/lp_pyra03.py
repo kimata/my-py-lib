@@ -32,7 +32,7 @@ class LP_PYRA03:
     def get_value(self):
         mvolt = self.adc.get_value()[0]
 
-        return [int(1000 * mvolt / self.SENSITIVITY)]
+        return [round(1000 * mvolt / self.SENSITIVITY, 2)]
 
     def get_value_map(self):
         value = self.get_value()
