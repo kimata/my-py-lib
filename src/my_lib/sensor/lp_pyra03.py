@@ -24,6 +24,7 @@ class LP_PYRA03:
 
     def __init__(self, bus_id=ads1115.I2CBUS.ARM, dev_addr=ads1115.ADS1115.DEV_ADDR):  # noqa: D107
         self.adc = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+        self.dev_addr = self.adc.dev_addr
 
     def ping(self):
         return self.adc.ping()
