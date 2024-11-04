@@ -12,13 +12,12 @@ from .ezo_rtd import EZO_RTD as ezo_rtd  # noqa: N811
 from .fd_q10c import FD_Q10C as fd_q10c  # noqa: N811
 from .grove_tds import GROVE_TDS as grove_tds  # noqa: N811
 from .i2cbus import I2CBUS as i2cbus  # noqa: N811
+from .lp_pyra03 import LP_PYRA03 as lp_pyra03  # noqa: N811
 from .scd4x import SCD4X as scd4x  # noqa: N811
 from .sht35 import SHT35 as sht35  # noqa: N811
 from .sm9561 import SM9561 as sm9561  # noqa: N811
 
 iolink = importlib.import_module(".io_link", __package__)
-
-__all__ = []
 
 __all__ = [
     "ads1015",
@@ -28,6 +27,7 @@ __all__ = [
     "grove_tds",
     "i2cbus",
     "scd4x",
+    "lp_pyra03",
     "sht35",
     "sm9561",
     "fd_q10c",

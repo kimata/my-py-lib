@@ -3,11 +3,11 @@
 ADS-1015 を使って電圧を計測するライブラリです．
 
 Usage:
-  ads1015.py [-b BUS] [-d DEV_ADDR]
+  ads1115.py [-b BUS] [-d DEV_ADDR]
 
 Options:
   -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4A]
+  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x48]
 """
 
 import logging
@@ -17,10 +17,10 @@ import my_lib.sensor.i2cbus
 from my_lib.sensor.i2cbus import I2CBUS
 
 
-class ADS1015:
-    NAME = "ADS1015"
+class ADS1115:
+    NAME = "ADS1115"
     TYPE = "I2C"
-    DEV_ADDR = 0x4A  # 7bit
+    DEV_ADDR = 0x48  # 7bit
 
     REG_CONFIG = 0x01
     REG_VALUE = 0x00
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # TEST Code
     import docopt
     import my_lib.logger
-    import my_lib.sensor.ads1015
+    import my_lib.sensor.ads1115
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
