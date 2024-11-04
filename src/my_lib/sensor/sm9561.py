@@ -55,7 +55,6 @@ class SM9561:
         self.reset()
         self.set_link()
         self.set_baudrate(9600)
-        self.set_fifo_enable(True)
 
     def ping(self):
         try:
@@ -116,7 +115,7 @@ class SM9561:
         logging.debug("set LCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_LCR, data)
 
-    def set_fifo_enable(self, is_enable):
+    def clear_fifo(self, is_enable=True):
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_FCR)
         if is_enable:
             data |= 0x01
@@ -161,18 +160,11 @@ class SM9561:
     def write_bytes(self, data_list):
         self.set_rts(True)
 
-        while self.i2cbus.read_byte_data(self.dev_addr, self.REG_TXLVL) < len(data_list):
-            logging.debug("Wait for TX FIFO space available")
-            time.sleep(0.01)
-
-        while (self.i2cbus.read_byte_data(self.dev_addr, self.REG_LSR) & 0x20) == 0x00:
-            logging.debug("Wait for RX FIFO empty")
-            time.sleep(0.01)
-
         for data in data_list:
             self.i2cbus.write_byte_data(self.dev_addr, self.REG_THR, data)
 
-        while (self.i2cbus.read_byte_data(self.dev_addr, self.REG_LSR) & 0x20) != 0x00:
+        while (self.i2cbus.read_byte_data(self.dev_addr, self.REG_LSR) & 0x20) != 0x20:
+            logging.debug("Wait for TX FIFO empty")
             time.sleep(0.005)
         time.sleep(0.005)
 
@@ -192,6 +184,8 @@ class SM9561:
         return data_list
 
     def modbus_rtu_func3(self, dev_addr, start_addr, length):
+        self.clear_fifo()
+
         self.write_bytes(
             self.append_crc([dev_addr, 0x03, start_addr >> 8, start_addr & 0xFF, length >> 8, length & 0xFF])
         )
