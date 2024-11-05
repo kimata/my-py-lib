@@ -30,7 +30,7 @@ class LP_PYRA03:
         return self.adc.ping()
 
     def get_value(self):
-        mvolt = self.adc.get_value()[0]
+        mvolt = max(self.adc.get_value()[0], 0)
 
         return [round(1000 * mvolt / self.SENSITIVITY, 2)]
 
