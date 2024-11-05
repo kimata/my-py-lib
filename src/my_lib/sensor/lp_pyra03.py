@@ -14,10 +14,10 @@ Options:
 
 import logging
 
-import my_lib.sensor.ads1115 as ads1115
+from my_lib.sensor import ads1115
 
 
-class LP_PYRA03:
+class LP_PYRA03:  # noqa: N801
     NAME = "LP_PYRA03"
     TYPE = "I2C"
     SENSITIVITY = 6.94  # mV/(kW/m^2)
@@ -30,7 +30,7 @@ class LP_PYRA03:
         return self.adc.ping()
 
     def get_value(self):
-        mvolt = max(self.adc.get_value()[0], 0)
+        mvolt = abs(max(self.adc.get_value()[0], 0))
 
         return [round(1000 * mvolt / self.SENSITIVITY, 2)]
 
