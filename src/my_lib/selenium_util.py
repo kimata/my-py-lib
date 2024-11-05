@@ -18,7 +18,7 @@ from selenium.webdriver.common.keys import Keys
 WAIT_RETRY_COUNT = 1
 AGENT_NAME = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 )
 
 
@@ -66,9 +66,9 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):
             "platform": "macOS",
             "userAgentMetadata": {
                 "brands": [
-                    {"brand": "Google Chrome", "version": "123"},
-                    {"brand": "Not:A-Brand", "version": "8"},
-                    {"brand": "Chromium", "version": "123"},
+                    {"brand": "Google Chrome", "version": "128"},
+                    {"brand": "Not:A-Brand", "version": "24"},
+                    {"brand": "Chromium", "version": "128"},
                 ],
                 "platform": "macOS",
                 "platformVersion": "15.0.0",
