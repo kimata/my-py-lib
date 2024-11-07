@@ -42,9 +42,10 @@ def load(sensor_def_list):
     for sensor_def in sensor_def_list:
         logging.info("Load %s driver", sensor_def["name"])
 
+        param = {}
         if "i2c_bus" in sensor_def:
-            bus_id = getattr(i2cbus, sensor_def["i2c_bus"])
-            i2c_dev_file = pathlib.Path(f"/dev/i2c-{bus_id}")
+            param["bus_id"] = getattr(i2cbus, sensor_def["i2c_bus"])
+            i2c_dev_file = pathlib.Path(f"/dev/i2c-{param["bus_id"]}")
             if not i2c_dev_file.exists():
                 logging.warning(
                     "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], i2c_dev_file
@@ -52,10 +53,10 @@ def load(sensor_def_list):
                 continue
 
         if "dev_addr" in sensor_def:
-            dev_addr = sensor_def["dev_addr"]
+            param["dev_addr"] = sensor_def["dev_addr"]
 
         sensor = getattr(my_lib.sensor, sensor_def["name"])(
-            **{k: v for k, v in locals().items() if k in ["bus_id", "dev_addr"]}
+            **{k: v for k, v in param.items() if k in ["bus_id", "dev_addr"]}
         )
 
         sensor_list.append(sensor)
