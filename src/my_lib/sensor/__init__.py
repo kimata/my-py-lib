@@ -45,7 +45,7 @@ def load(sensor_def_list):
         param = {}
         if "i2c_bus" in sensor_def:
             param["bus_id"] = getattr(i2cbus, sensor_def["i2c_bus"])
-            i2c_dev_file = pathlib.Path(f"/dev/i2c-{param["bus_id"]}")
+            i2c_dev_file = pathlib.Path(f'/dev/i2c-{param["bus_id"]}')
             if not i2c_dev_file.exists():
                 logging.warning(
                     "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], i2c_dev_file
