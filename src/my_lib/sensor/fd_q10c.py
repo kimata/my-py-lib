@@ -32,7 +32,10 @@ class FD_Q10C:  # noqa: N801
         self.timeout = timeout
 
     def ping(self):
-        return self.read_param(0x12, driver.DATA_TYPE_STRING)[0:4] == "FD-Q"
+        try:
+            return self.read_param(0x12, driver.DATA_TYPE_STRING)[0:4] == "FD-Q"
+        except Exception:
+            return False
 
     def get_value(self, force_power_on=True):
         try:
@@ -139,7 +142,6 @@ class FD_Q10C:  # noqa: N801
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
