@@ -3,13 +3,15 @@
 EZO-pH を使って pH を取得するライブラリです．
 
 Usage:
-  ezo_ph.py [-b BUS] [-d DEV_ADDR]
+  ezo_ph.py [-b BUS] [-d DEV_ADDR] [-C DEV_ADDR]
 
 Options:
   -b BUS        : I2C バス番号．[default: 0x01]
   -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x64]
+  -C DEV_ADDR   : デバイスアドレスを変更します．
 """
 
+import contextlib
 import logging
 import time
 
@@ -65,16 +67,23 @@ class EZO_PH:  # noqa: N801
 
         return {"ph": value}
 
+    def change_devaddr(self, dev_addr_new):
+        # NOTE: アドレスを変更したときは NACK が帰ってくるっぽいので，エラーは無視する
+        with contextlib.suppress(OSError):
+            self.exec_command(f"I2C,{dev_addr_new}")
+
 
 if __name__ == "__main__":
     # TEST Code
-    import docopt
+    import logging
 
+    import docopt
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    dev_addr_new = args["-C"]
 
     my_lib.logger.init("test", level=logging.DEBUG)
 
@@ -82,5 +91,11 @@ if __name__ == "__main__":
 
     ping = sensor.ping()
     logging.info("PING: %s", ping)
+
     if ping:
-        logging.info("VALUE: %s", sensor.get_value_map())
+        if dev_addr_new is not None:
+            dev_addr_new = int(dev_addr_new)
+            logging.info("Change dev addr 0x%02X to 0x%02X", dev_addr, dev_addr_new)
+            sensor.change_devaddr(dev_addr_new)
+        else:
+            logging.info("VALUE: %s", sensor.get_value_map())
