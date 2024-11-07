@@ -52,7 +52,7 @@ def load(sensor_def_list):
                 continue
 
         if "dev_addr" in sensor_def:
-            dev_addr = int(sensor_def["dev_addr"], 16)
+            dev_addr = sensor_def["dev_addr"]
 
         sensor = getattr(my_lib.sensor, sensor_def["name"])(
             **{k: v for k, v in locals().items() if k in ["bus_id", "dev_addr"]}
