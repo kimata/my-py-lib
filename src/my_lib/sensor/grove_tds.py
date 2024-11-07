@@ -12,16 +12,14 @@ Options:
 
 import logging
 
-import my_lib.sensor.ads1015
-from my_lib.sensor.i2cbus import I2CBUS
+from my_lib.sensor import ads1115
 
 
 class GROVE_TDS:  # noqa: N801
     NAME = "GROVE-TDS"
     TYPE = "I2C"
-    DEV_ADDR = 0x4A  # 7bit
 
-    def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
+    def __init__(self, bus_id=ads1115.I2CBUS.ARM, dev_addr=ads1115.ADS1115.DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.adc = my_lib.sensor.ads1015(bus_id, dev_addr)
