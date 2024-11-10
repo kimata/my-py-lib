@@ -34,6 +34,15 @@ from(bucket: "{bucket}")
     |> timedMovingAverage(every: {every}m, period: {window}m)
 """
 
+FLUX_QUERY_WITHOUT_AGGREGATION = """
+from(bucket: "{bucket}")
+|> range(start: {start}, stop: {stop})
+    |> filter(fn:(r) => r._measurement == "{measure}")
+    |> filter(fn: (r) => r.hostname == "{hostname}")
+    |> filter(fn: (r) => r["_field"] == "{field}")
+    |> fill(usePrevious: true)
+"""
+
 FLUX_SUM_QUERY = """
 from(bucket: "{bucket}")
     |> range(start: {start}, stop: {stop})
@@ -122,9 +131,11 @@ def fetch_data(  # noqa: PLR0913
     )
 
     try:
+        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min is None else FLUX_QUERY
+
         table_list = fetch_data_impl(
             db_config,
-            FLUX_QUERY,
+            template,
             measure,
             hostname,
             field,
