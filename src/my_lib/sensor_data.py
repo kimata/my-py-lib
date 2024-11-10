@@ -58,19 +58,22 @@ from(bucket: "{bucket}")
     )
 """
 
+FLUX_EVENT_QUERY = """
+from(bucket: "{bucket}")
+    |> range(start: {start})
+    |> filter(fn: (r) => r._measurement == "{measure}")
+    |> filter(fn: (r) => r.hostname == "{hostname}")
+    |> filter(fn: (r) => r["_field"] == "{field}")
+    |> map(fn: (r) => ({{ r with _value: if r._value then 1 else 0 }}))
+    |> difference()
+    |> filter(fn: (r) => r._value == 1)
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: 1)
+"""
+
 
 def fetch_data_impl(  # noqa: PLR0913
-    db_config,
-    template,
-    measure,
-    hostname,
-    field,
-    start,
-    stop,
-    every,
-    window,
-    create_empty,
-    last=False,
+    db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
 ):
     try:
         token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
@@ -393,6 +396,23 @@ def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  
             return 0
         else:
             return value_list[0][1]
+    except Exception:
+        logging.warning(traceback.format_exc())
+        return 0
+
+
+def get_last_event(config, measure, hostname, field, start="-7d"):
+    try:
+        table_list = fetch_data_impl(
+            config, FLUX_EVENT_QUERY, measure, hostname, field, start, None, None, None, None
+        )
+
+        value_list = table_list.to_values(columns=["_time"])
+
+        if len(value_list) == 0:
+            return None
+        else:
+            return value_list[0][0]
     except Exception:
         logging.warning(traceback.format_exc())
         return 0
