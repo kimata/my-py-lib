@@ -134,7 +134,7 @@ def fetch_data(  # noqa: PLR0913
     )
 
     try:
-        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min is None else FLUX_QUERY
+        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
 
         table_list = fetch_data_impl(
             db_config,
@@ -378,16 +378,7 @@ def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  
             stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
 
         table_list = fetch_data_impl(
-            config,
-            FLUX_SUM_QUERY,
-            measure,
-            hostname,
-            field,
-            start,
-            stop,
-            every_min,
-            window_min,
-            True,
+            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
         )
 
         value_list = table_list.to_values(columns=["count", "sum"])
@@ -404,7 +395,7 @@ def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  
 def get_last_event(config, measure, hostname, field, start="-7d"):
     try:
         table_list = fetch_data_impl(
-            config, FLUX_EVENT_QUERY, measure, hostname, field, start, None, None, None, None
+            config, FLUX_EVENT_QUERY, measure, hostname, field, start, "now()", 0, 0, False
         )
 
         value_list = table_list.to_values(columns=["_time"])
