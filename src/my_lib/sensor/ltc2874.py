@@ -7,7 +7,6 @@ import time
 
 import serial
 import spidev
-
 from my_lib.sensor import io_link
 
 DEBUG = True

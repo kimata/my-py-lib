@@ -120,7 +120,6 @@ class SCD4X:
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
 
     args = docopt.docopt(__doc__)

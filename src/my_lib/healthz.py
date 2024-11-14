@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import logging
 
-import requests
-
 import my_lib.footprint
+import requests
 
 
 def check_liveness(name, liveness_file, interval):

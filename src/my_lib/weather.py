@@ -12,14 +12,13 @@ Options:
 import datetime
 import logging
 import re
+import ssl
+import urllib.request
 
 from lxml import html
 
 
 def fetch_page(url, encoding="UTF-8"):
-    import ssl
-    import urllib.request
-
     logging.info("fetch %s", url)
 
     # NOTE: 環境省のページはこれをしないとエラーになる

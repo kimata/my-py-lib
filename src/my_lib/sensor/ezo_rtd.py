@@ -64,7 +64,6 @@ class EZO_RTD:  # noqa: N801
 if __name__ == "__main__":
     # TEST Code
     import docopt
-
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
