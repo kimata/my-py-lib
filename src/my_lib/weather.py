@@ -23,27 +23,27 @@ def fetch_page(url, encoding="UTF-8"):
         return html.fromstring(data.read())
 
 
-def parse_weather(content):
+def parse_weather_yahoo(content):
     return {
         "text": content.text_content().strip(),
         "icon_url": content.xpath("img/@src")[0].replace("_g.", "."),
     }
 
 
-def parse_wind(content):
+def parse_wind_yahoo(content):
     direction, speed = content.text_content().split()
 
     return {"dir": direction, "speed": int(speed)}
 
 
-def parse_date(content, index):
+def parse_date_yahoo(content, index):
     date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
-    date_text = re.sub(r"\(.\)", "", date_text)
+    date_text = re.search(r"\d{1,2}月\d{1,2}日", date_text).group(0)
 
-    return datetime.datetime.strptime(date_text, "- %m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
+    return datetime.datetime.strptime(date_text, "%m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
 
 
-def parse_table(content, index):
+def parse_table_yahoo(content, index):
     ROW_LIST = ["hour", "weather", "temp", "humi", "precip", "wind"]
 
     day_info_by_type = {}
@@ -57,11 +57,11 @@ def parse_table(content, index):
                     int(c.text_content().replace("時", "").strip()) for c in td_content_list
                 ]
             case 1:
-                day_info_by_type[label] = [parse_weather(c) for c in td_content_list]
+                day_info_by_type[label] = [parse_weather_yahoo(c) for c in td_content_list]
             case 2 | 3 | 4:
                 day_info_by_type[label] = [float(c.text_content().strip()) for c in td_content_list]
             case 5:
-                day_info_by_type[label] = [parse_wind(c) for c in td_content_list]
+                day_info_by_type[label] = [parse_wind_yahoo(c) for c in td_content_list]
             case _:  # pragma: no cover
                 pass
 
@@ -75,7 +75,7 @@ def parse_table(content, index):
     return day_data_list
 
 
-def parse_clothing(content, index):
+def parse_clothing_yahoo(content, index):
     table_xpath = (
         '(//dl[contains(@class, "indexList_item-clothing")])[{index}]' + "//dd/p[1]/@class"
     ).format(index=index)
@@ -87,8 +87,8 @@ def get_weather_yahoo(yahoo_config):
     content = fetch_page(yahoo_config["url"])
 
     return {
-        "today": {"date": parse_date(content, 1), "data": parse_table(content, 1)},
-        "tomorrow": {"date": parse_date(content, 2), "data": parse_table(content, 2)},
+        "today": {"date": parse_date_yahoo(content, 1), "data": parse_table_yahoo(content, 1)},
+        "tomorrow": {"date": parse_date_yahoo(content, 2), "data": parse_table_yahoo(content, 2)},
     }
 
 
@@ -96,8 +96,8 @@ def get_clothing_yahoo(yahoo_config):
     content = fetch_page(yahoo_config["url"])
 
     return {
-        "today": {"date": parse_date(content, 1), "data": parse_clothing(content, 1)},
-        "tomorrow": {"date": parse_date(content, 1), "data": parse_clothing(content, 2)},
+        "today": {"date": parse_date_yahoo(content, 1), "data": parse_clothing_yahoo(content, 1)},
+        "tomorrow": {"date": parse_date_yahoo(content, 1), "data": parse_clothing_yahoo(content, 2)},
     }
 
 
@@ -230,4 +230,54 @@ def get_sunset_nao(sunset_config):
     return {
         "today": get_sunset_date_nao(sunset_config, now),
         "tomorrow": get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
+    }
+
+
+def parse_table_tenki(content, index):
+    ROW_LIST = [
+        {"label": "temp", "index": 6, "type": "float"},
+        {"label": "precip", "index": 9, "type": "int"},
+        {"label": "humi", "index": 10, "type": "int"},
+    ]
+
+    day_info_by_type = {}
+    table_xpath = f'(//table[@class="forecast-point-1h"])[{index}]'
+    for row_info in ROW_LIST:
+        td_content_list = content.xpath(table_xpath + f'//tr[{row_info["index"]}]/td')
+
+        match row_info["type"]:
+            case "int":
+                day_info_by_type[row_info["label"]] = [int(c.text_content()) for c in td_content_list]
+            case "float":
+                day_info_by_type[row_info["label"]] = [float(c.text_content()) for c in td_content_list]
+            case _:  # pragma: no cover
+                pass
+
+    day_data_list = []
+    for i in range(24):
+        day_info = {}
+        for row_info in ROW_LIST:
+            day_info[row_info["label"]] = day_info_by_type[row_info["label"]][i]
+        day_data_list.append(day_info)
+
+    return day_data_list
+
+
+def parse_date_tenki(content, index):
+    date_text = (
+        content.xpath(f'(((//table[@class="forecast-point-1h"])[{index}]/tr)[1]/td)[1]')[0]
+        .text_content()
+        .strip()
+    )
+    date_text = re.search(r"\d{4}年\d{1,2}月\d{1,2}日", date_text).group(0)
+
+    return datetime.datetime.strptime(date_text, "%Y年%m月%d日")  # noqa: DTZ007
+
+
+def get_precip_by_hour_tenki(tenki_config):
+    content = fetch_page(tenki_config["url"])
+
+    return {
+        "today": {"date": parse_date_tenki(content, 1), "data": parse_table_tenki(content, 1)},
+        "tomorrow": {"date": parse_date_tenki(content, 2), "data": parse_table_tenki(content, 2)},
     }
