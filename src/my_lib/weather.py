@@ -38,8 +38,9 @@ def parse_wind(content):
 
 def parse_date(content, index):
     date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
+    date_text = re.sub(r"\(.\)", "", date_text)
 
-    return datetime.strptime(date_text, "%m月%d日")
+    return datetime.datetime.strptime(date_text, "- %m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
 
 
 def parse_table(content, index):
