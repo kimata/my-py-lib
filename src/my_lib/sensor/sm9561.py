@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 SM9561 を使って照度を計測するライブラリです．
-http://www.sonbest.com/english/products/SM9561.html
 
 Usage:
   sm9561.py [-b BUS] [-d DEV_ADDR]
@@ -10,6 +9,8 @@ Options:
   -b BUS        : I2C バス番号．[default: 0x01]
   -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4D]
 """
+
+# SM9561: http://www.sonbest.com/english/products/SM9561.html
 
 # RS485 通信は，下記の基板を使って I2C 経由で行うことを想定しています．
 # I2C-RS422/485変換基板

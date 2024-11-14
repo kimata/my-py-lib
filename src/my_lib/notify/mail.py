@@ -30,7 +30,7 @@ def send_impl(config, to, message, subject, png_data=None):
     smtp.login(config["mail"]["user"], config["mail"]["pass"])
 
     if subject is None:
-        subject = config["mail"]["subject"] if "subject" in config["mail"] else "Notify"
+        subject = config["mail"].get("subject", "Notify")
 
     msg = email.mime.multipart.MIMEMultipart()
     msg["Subject"] = subject
@@ -54,7 +54,7 @@ def send_impl(config, to, message, subject, png_data=None):
     smtp.quit()
 
 
-def send(config, message, subject=None, png_data=None, is_log_message=True, interval_min=INTERVAL_MIN):
+def send(config, message, subject=None, png_data=None, is_log_message=True, interval_min=INTERVAL_MIN):  # noqa: PLR0913
     if is_log_message:
         logging.info("notify: %s", message)
 
