@@ -36,11 +36,14 @@ def parse_wind(content):
     return {"dir": direction, "speed": int(speed)}
 
 
+def parse_date(content, index):
+    date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
+
+    return datetime.strptime(date_text, "%m月%d日")
+
+
 def parse_table(content, index):
     ROW_LIST = ["hour", "weather", "temp", "humi", "precip", "wind"]
-
-    date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
-    date = datetime.strptime(date_text, "%m月%d日")
 
     day_info_by_type = {}
     table_xpath = f'(//table[@class="yjw_table2"])[{index}]'
@@ -68,7 +71,7 @@ def parse_table(content, index):
             day_info[label] = day_info_by_type[label][i]
         day_data_list.append(day_info)
 
-    return {"date": date, "data": day_data_list}
+    return day_data_list
 
 
 def parse_clothing(content, index):
@@ -83,8 +86,8 @@ def get_weather_yahoo(yahoo_config):
     content = fetch_page(yahoo_config["url"])
 
     return {
-        "today": parse_table(content, 1),
-        "tomorrow": parse_table(content, 2),
+        "today": {"date": parse_date(content, 1), "data": parse_table(content, 1)},
+        "tomorrow": {"date": parse_date(content, 2), "data": parse_table(content, 2)},
     }
 
 
@@ -92,8 +95,8 @@ def get_clothing_yahoo(yahoo_config):
     content = fetch_page(yahoo_config["url"])
 
     return {
-        "today": parse_clothing(content, 1),
-        "tomorrow": parse_clothing(content, 2),
+        "today": {"date": parse_date(content, 1), "data": parse_clothing(content, 1)},
+        "tomorrow": {"date": parse_date(content, 1), "data": parse_clothing(content, 2)},
     }
 
 
