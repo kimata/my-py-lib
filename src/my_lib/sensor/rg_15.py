@@ -16,7 +16,7 @@ import time
 import serial
 
 
-class RG_15:
+class RG_15:  # noqa: N801
     NAME = "RG_15"
     TYPE = "UART"
     DEV = "/dev/ttyAMA0"
@@ -45,7 +45,7 @@ class RG_15:
             if (not self.event["fall_stop"]) and (
                 (time.time() - self.event["fall_time_last"]) > self.RAIN_STOP_INTERVAL_SEC
             ):
-                self.ser.write("O\r\n".encode(encoding="utf-8"))
+                self.ser.write("O\r\n")
                 self.ser.flush()
 
                 self.event["fall_stop"] = True
@@ -74,16 +74,13 @@ class RG_15:
                 self.event["fall_time_stop"] = None
 
         # NOTE: 直前の1分間降水量を返す
-        if (minute - 1) in self.sum_by_minute:
-            rain = self.sum_by_minute[minute - 1]
-        else:
-            rain = 0.0
+        rain = self.sum_by_minute.get(minute - 1, 0.0)
 
         return [rain, self.event["fall_start"]]
 
     def ping(self):
         try:
-            self.ser.write("P\r\n".encode(encoding="utf-8"))
+            self.ser.write("P\r\n")
             self.ser.flush()
 
             res = self.ser.read(1).decode(encoding="utf-8")
@@ -93,7 +90,7 @@ class RG_15:
             return False
 
     def get_value(self):
-        self.ser.write("R\r\n".encode(encoding="utf-8"))
+        self.ser.write("R\r\n")
         self.ser.flush()
 
         res = self.ser.read(100).decode(encoding="utf-8").strip()
