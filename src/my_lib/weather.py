@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""
-天気情報を取得します．
-
-Usage:
-  weather_data.py [-c CONFIG]
-
-Options:
-  -c CONFIG    : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-"""
-
 import datetime
 import logging
 import re
@@ -47,9 +37,12 @@ def parse_wind(content):
 
 
 def parse_table(content, index):
-    day_info_by_type = {}
     ROW_LIST = ["hour", "weather", "temp", "humi", "precip", "wind"]
 
+    date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
+    date = datetime.strptime(date_text, "%m月%d日")
+
+    day_info_by_type = {}
     table_xpath = f'(//table[@class="yjw_table2"])[{index}]'
     for row, label in enumerate(ROW_LIST):
         td_content_list = content.xpath(table_xpath + f"//tr[{row+1}]/td")
@@ -68,14 +61,14 @@ def parse_table(content, index):
             case _:  # pragma: no cover
                 pass
 
-    day_info_list = []
+    day_data_list = []
     for i in range(len(day_info_by_type[ROW_LIST[0]])):
         day_info = {}
         for label in ROW_LIST:
             day_info[label] = day_info_by_type[label][i]
-        day_info_list.append(day_info)
+        day_data_list.append(day_info)
 
-    return day_info_list
+    return {"date": date, "data": day_data_list}
 
 
 def parse_clothing(content, index):
