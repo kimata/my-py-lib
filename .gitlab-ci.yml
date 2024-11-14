@@ -1,58 +1,58 @@
 image: registry.green-rabbit.net:5000/kimata/local_ubuntu:240831A
 
 stages:
-  - pre-test
-  - test
-  - renovate
+    - pre-test
+    - test
+    - renovate
 
 test-prepare:
-  stage: pre-test
+    stage: pre-test
 
-  script:
-    - rye sync
+    script:
+        - rye sync
 
-  artifacts:
-    paths:
-      - .venv
-      - /root/.cache
+    artifacts:
+        paths:
+            - .venv
+            - /root/.cache
 
-  cache:
-    key: "${CI_JOB_NAME}"
-    paths:
-      - .venv
-      - /root/.cache
+    cache:
+        key: "${CI_JOB_NAME}"
+        paths:
+            - .venv
+            - /root/.cache
 
 test-walk-through:
-  stage: test
+    stage: test
 
-  needs:
-    - test-prepare
+    needs:
+        - test-prepare
 
-  script:
-    - apt install --assume-yes smem
-    - rye run pytest --cov=flask --cov-report=html tests/test_basic.py
+    script:
+        - apt install --assume-yes smem
+        - rye run pytest --cov=flask --cov-report=html tests/test_basic.py
 
-  cache:
-    key: "${CI_JOB_NAME}"
-    paths:
-      - .venv
+    cache:
+        key: "${CI_JOB_NAME}"
+        paths:
+            - .venv
 
-  artifacts:
-    when: always
-    paths:
-      - tests/evidence/**
+    artifacts:
+        when: always
+        paths:
+            - tests/evidence/**
 
 renovate:
-  stage: renovate
-  image:
-    name: registry.green-rabbit.net:5000/kimata/local_renovate:38
+    stage: renovate
+    image:
+        name: registry.green-rabbit.net:5000/kimata/local_renovate:38
 
-    entrypoint: [""]
-  script:
-    - renovate --platform gitlab --token ${RENOVATE_TOKEN} --endpoint ${CI_SERVER_URL}/api/v4 ${CI_PROJECT_PATH}
-  rules:
-    - if: '$CI_COMMIT_BRANCH != "master"'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - changes:
-        - renovate.json
+        entrypoint: [""]
+    script:
+        - renovate --platform gitlab --token ${RENOVATE_TOKEN} --endpoint ${CI_SERVER_URL}/api/v4 ${CI_PROJECT_PATH}
+    rules:
+        - if: '$CI_COMMIT_BRANCH != "master"'
+          when: never
+        - if: '$CI_PIPELINE_SOURCE == "schedule"'
+        - changes:
+            - renovate.json
