@@ -279,5 +279,5 @@ def get_precip_by_hour_tenki(tenki_config):
 
     return {
         "today": {"date": parse_date_tenki(content, 1), "data": parse_table_tenki(content, 1)},
-        "tomorrow": {"date": parse_date_tenki(content, 2), "data": parse_table_tenki(content, 2)},
+        "tommorow": {"date": parse_date_tenki(content, 2), "data": parse_table_tenki(content, 2)},
     }
