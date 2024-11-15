@@ -23,7 +23,7 @@ class RG_15:  # noqa: N801
     BAUDRATE = 9600
 
     RAIN_START_INTERVAL_SEC = 30
-    RAIN_START_ACC_SUM = 0.05
+    RAIN_START_ACC_SUM = 0.04
     RAIN_STOP_INTERVAL_SEC = 120
 
     def __init__(self, dev=DEV):  # noqa: D107
@@ -67,7 +67,7 @@ class RG_15:  # noqa: N801
             if (
                 (not self.event["fall_start"])
                 and ((time.time() - self.event["fall_time_start"]) > self.RAIN_START_INTERVAL_SEC)
-                and (self.event["fall_sum"] > self.RAIN_START_ACC_SUM)
+                and (self.event["fall_sum"] >= self.RAIN_START_ACC_SUM)
             ):
                 self.event["fall_start"] = True
                 self.event["fall_stop"] = False
