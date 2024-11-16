@@ -65,5 +65,5 @@ if __name__ == "__main__":
     config = my_lib.config.load(config_file)
 
     wav_data = synthesize(config, message, speaker_id)
-    with pathlib.Path.open(out_file, "wb") as f:
+    with pathlib.Path(out_file).open("wb") as f:
         f.write(wav_data)
