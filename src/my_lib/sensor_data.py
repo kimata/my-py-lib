@@ -368,11 +368,12 @@ def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  
     try:
         every_min = 1
         window_min = 5
+
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
 
         if day_before == 0:
             start = f"-{day_offset}d{now.hour}h{now.minute}m"
-            stop = f"-{day_before + day_offset}d"
+            stop = f"-{day_offset}d"
         else:
             start = f"-{day_before + day_offset}d{now.hour}h{now.minute}m"
             stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
