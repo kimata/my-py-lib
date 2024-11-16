@@ -45,7 +45,7 @@ class RG_15:  # noqa: N801
             if (not self.event["fall_stop"]) and (
                 (time.time() - self.event["fall_time_last"]) > self.RAIN_STOP_INTERVAL_SEC
             ):
-                self.ser.write("O\r\n")
+                self.ser.write("O\r\n".encode(encoding="utf-8"))
                 self.ser.flush()
 
                 self.event["fall_stop"] = True
@@ -80,7 +80,7 @@ class RG_15:  # noqa: N801
 
     def ping(self):
         try:
-            self.ser.write("P\r\n")
+            self.ser.write("P\r\n".encode(encoding="utf-8"))
             self.ser.flush()
 
             res = self.ser.read(1).decode(encoding="utf-8")
@@ -90,7 +90,7 @@ class RG_15:  # noqa: N801
             return False
 
     def get_value(self):
-        self.ser.write("R\r\n")
+        self.ser.write("R\r\n".encode(encoding="utf-8"))
         self.ser.flush()
 
         res = self.ser.read(100).decode(encoding="utf-8").strip()
