@@ -364,7 +364,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
         return []
 
 
-def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  # noqa:  PLR0913
+def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offset=0):  # noqa:  PLR0913
     try:
         every_min = 1
         window_min = 5
@@ -372,10 +372,10 @@ def get_day_sum(config, measure, hostname, field, day_before=0, day_offset=0):  
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
 
         if day_before == 0:
-            start = f"-{day_offset}d{now.hour}h{now.minute}m"
+            start = f"-{day_offset+days-1}d{now.hour}h{now.minute}m"
             stop = f"-{day_offset}d"
         else:
-            start = f"-{day_before + day_offset}d{now.hour}h{now.minute}m"
+            start = f"-{day_before+ day_offset + days - 1 }d{now.hour}h{now.minute}m"
             stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
 
         table_list = fetch_data_impl(
