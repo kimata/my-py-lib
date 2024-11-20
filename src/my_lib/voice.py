@@ -13,12 +13,14 @@ Options:
   -o WAV            : 書き出す音声ファイル．[default: text.wav]
 """
 
-import audioop
 import io
+import json
 import logging
 import urllib.request
 import wave
 
+import numpy as np
+import scipy.signal
 import simpleaudio
 
 
@@ -51,14 +53,20 @@ def convert_wav_data(wav_data_in):
         audio_data = wav_in.readframes(n_frames)
 
         if framerate != 44100:
-            audio_data = audioop.ratecv(audio_data, sampwidth, n_channels, framerate, 44100, None)[0]
-            framerate = 44100
+            audio_data = np.frombuffer(audio_data, dtype=np.int16)
+            resampled_data = scipy.signal.resample(audio_data, int(len(audio_data) * 44100 / framerate))
+            audio_data = resampled_data.astype(np.int16).tobytes()
+
+        if n_channels == 2:
+            audio_data = np.frombuffer(audio_data, dtype=np.int16)
+            resampled_data = audio_data[::2] // 2 + audio_data[1::2] // 2
+            audio_data = resampled_data.astype(np.int16).tobytes()
 
         with io.BytesIO() as wav_data_out:
             with wave.open(wav_data_out, "wb") as wav_out:
-                wav_out.setnchannels(n_channels)
+                wav_out.setnchannels(1)
                 wav_out.setsampwidth(sampwidth)
-                wav_out.setframerate(framerate)
+                wav_out.setframerate(44100)
                 wav_out.setcomptype(comptype, compname)
                 wav_out.writeframes(audio_data)
 
@@ -68,9 +76,13 @@ def convert_wav_data(wav_data_in):
 def synthesize(config, text, speaker_id=3):
     req = urllib.request.Request(get_query_url(config, text, speaker_id), method="POST")  # noqa: S310
     res = urllib.request.urlopen(req)  # noqa: S310
-    query_json = res.read()
+    query_json = json.loads(res.read().decode("utf-8"))
+    query_json["volumeScale"] = 5
+    query_json["speedScale"] = 0.9
 
-    req = urllib.request.Request(get_synthesis_url(config, speaker_id), data=query_json, method="POST")  # noqa: S310
+    req = urllib.request.Request(  # noqa: S310
+        get_synthesis_url(config, speaker_id), data=json.dumps(query_json).encode("utf-8"), method="POST"
+    )
     req.add_header("Content-Type", "application/json")
     res = urllib.request.urlopen(req)  # noqa: S310
 
@@ -78,8 +90,7 @@ def synthesize(config, text, speaker_id=3):
 
 
 def play(wav_data):
-    wave_obj = simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data))
-    wave_obj.play().wait_done()
+    simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play().wait_done()
 
 
 if __name__ == "__main__":
