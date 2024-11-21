@@ -73,11 +73,11 @@ def convert_wav_data(wav_data_in):
             return wav_data_out.getvalue()
 
 
-def synthesize(config, text, speaker_id=3):
+def synthesize(config, text, volume=2, speaker_id=3):
     req = urllib.request.Request(get_query_url(config, text, speaker_id), method="POST")  # noqa: S310
     res = urllib.request.urlopen(req)  # noqa: S310
     query_json = json.loads(res.read().decode("utf-8"))
-    query_json["volumeScale"] = 5
+    query_json["volumeScale"] = volume
     query_json["speedScale"] = 0.9
 
     req = urllib.request.Request(  # noqa: S310
