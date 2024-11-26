@@ -3,13 +3,13 @@ import datetime
 import logging
 import pathlib
 
-import pytz
+import zoneinfo
 
 URL_PREFIX = None
 
 TIMEZONE_OFFSET = 9
 TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "JST")
-TIMEZONE_PYTZ = pytz.timezone("Asia/Tokyo")
+ZONEINFO = zoneinfo.ZoneInfo("Asia/Tokyo")
 
 STATIC_DIR_PATH = None
 
@@ -21,7 +21,7 @@ STAT_DIR_PATH = None
 def init(config):
     global TIMEZONE_OFFSET  # noqa: PLW0603
     global TIMEZONE  # noqa: PLW0603
-    global TIMEZONE_PYTZ  # noqa: PLW0603
+    global ZONEINFO  # noqa: PLW0603
     global STATIC_DIR_PATH  # noqa: PLW0603
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
@@ -37,7 +37,7 @@ def init(config):
             else:
                 TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "UNKOWN")
         if "zone" in config["webapp"]["timezone"]:
-            TIMEZONE_PYTZ = pytz.timezone(config["webapp"]["timezone"]["zone"])
+            ZONEINFO = zoneinfo.ZoneInfo(config["webapp"]["timezone"]["zone"])
 
     if "static_dir_path" in config["webapp"]:
         STATIC_DIR_PATH = pathlib.Path(config["webapp"]["static_dir_path"]).resolve()
