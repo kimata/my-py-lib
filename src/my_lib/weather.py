@@ -9,7 +9,7 @@ from lxml import html
 
 
 def fetch_page(url, encoding="UTF-8"):
-    logging.info("fetch %s", url)
+    logging.debug("fetch %s", url)
 
     # NOTE: 環境省のページはこれをしないとエラーになる
     ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
