@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
+"""
+Slack で通知を行います．
+
+Usage:
+  slack.py [-c CONFIG] [-d] [-m MESSAGE]
+
+Options:
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
+  -m MESSAGE        : 送信するメッセージ．[default: TEST]
+  -d                : デバッグモードで動作します．
+"""
+
 import json
 import logging
+import math
 import pathlib
 import tempfile
 import threading
+import time
 
 import my_lib.footprint
 import slack_sdk
@@ -46,13 +60,14 @@ def format_simple(title, message):
 def send(token, ch_name, message):
     try:
         client = slack_sdk.WebClient(token=token)
-        client.chat_postMessage(
+
+        return client.chat_postMessage(
             channel=ch_name,
             text=message["text"],
             blocks=message["json"],
         )
-    except slack_sdk.errors.SlackClientError as e:
-        logging.warning(e)
+    except slack_sdk.errors.SlackClientError:
+        logging.exception("Failed to sendo Slack message")
 
 
 def split_send(token, ch_name, title, message, formatter=format_simple):
@@ -61,42 +76,56 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
     logging.info("Post slack channel: %s", ch_name)
 
     message_lines = message.splitlines()
-    for i in range(0, len(message_lines), LINE_SPLIT):
+    total = math.ceil(len(message_lines) / LINE_SPLIT)
+    i = 0
+    for n in range(0, len(message_lines), LINE_SPLIT):
+        if total == 1:
+            split_title = title
+        else:
+            split_title = "{title} ({i}/{total})".format(title=title, i=i + 1, total=total)
+
         send(
             token,
             ch_name,
-            formatter(title, "\n".join(message_lines[i : i + LINE_SPLIT])),
+            formatter(split_title, "\n".join(message_lines[n : n + LINE_SPLIT])),
         )
 
+        time.sleep(1)
 
-def info(token, ch_name, name, message, formatter=format_simple):
-    title = "Info: " + name
+
+def info(token, ch_name, title, message, formatter=format_simple):
+    title = "Info: " + title
     split_send(token, ch_name, title, message, formatter)
 
 
-def error_img(token, ch_id, title, img, text):
+def upload_image(token, ch_id, title, img, text):
     client = slack_sdk.WebClient(token=token)
 
     with tempfile.TemporaryDirectory() as dname:
-        img_path = pathlib.Path(dname) / "error.png"
+        img_path = pathlib.Path(dname) / "image.png"
         img.save(img_path)
 
         try:
-            logging.info(img_path)
-            client.files_upload_v2(channel=ch_id, file=str(img_path), title=title, initial_comment=text)
-        except slack_sdk.errors.SlackApiError as e:
-            logging.warning(e.response["error"])
+            resp = client.files_upload_v2(
+                channel=ch_id, file=str(img_path), title=title, initial_comment=text
+            )
+
+            return resp["files"][0]["id"]
+        except slack_sdk.errors.SlackApiError:
+            logging.exception("Failed to sendo Slack message")
+
+            return None
 
 
 def error(  # noqa: PLR0913
     token,
     ch_name,
-    name,
+    title,
     message,
     interval_min=INTERVAL_MIN,
     formatter=format_simple,
 ):
-    title = "Error: " + name
+    title = "Error: " + title
 
     hist_add(message)
 
@@ -113,13 +142,13 @@ def error_with_image(  # noqa: PLR0913
     token,
     ch_name,
     ch_id,
-    name,
+    title,
     message,
     attatch_img,
     interval_min=INTERVAL_MIN,
     formatter=format_simple,
 ):  # def error_with_image
-    title = "Error: " + name
+    title = "Error: " + title
 
     hist_add(message)
 
@@ -133,7 +162,7 @@ def error_with_image(  # noqa: PLR0913
         if ch_id is None:
             raise ValueError("ch_id is None")  # noqa: TRY003, EM101
 
-        error_img(token, ch_id, title, attatch_img["data"], attatch_img["text"])
+        upload_image(token, ch_id, title, attatch_img["data"], attatch_img["text"])
 
     my_lib.footprint.update(NOTIFY_FOOTPRINT)
 
@@ -171,3 +200,43 @@ def hist_get(is_thread_local=True):
         return thread_local.notify_hist
     else:
         return notify_hist
+
+
+if __name__ == "__main__":
+    import sys
+
+    import docopt
+    import my_lib.config
+    import my_lib.logger
+
+    args = docopt.docopt(__doc__)
+
+    config_file = args["-c"]
+    message = args["-m"]
+    debug_mode = args["-d"]
+
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
+
+    config = my_lib.config.load(config_file)
+
+    if "slack" not in config:
+        logging.warning("Slack の設定が記載されていません．")
+        sys.exit(-1)
+
+    client = slack_sdk.WebClient(token=config["slack"]["bot_token"])
+
+    if "info" in config["slack"]:
+        info(
+            config["slack"]["bot_token"],
+            config["slack"]["info"]["channel"]["name"],
+            "Test",
+            "This is test",
+        )
+
+    if "error" in config["slack"]:
+        error(
+            config["slack"]["bot_token"],
+            config["slack"]["error"]["channel"]["name"],
+            "Test",
+            "This is test",
+        )

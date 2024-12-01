@@ -3,10 +3,11 @@
 ショップをスクレイピングで解析して価格情報を取得するライブラリです．
 
 Usage:
-  scrape.py [-c CONFIG] [-d]
+  scrape.py [-c CONFIG] [-s DATA_PATH] [-d]
 
 Options:n
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
+  -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ．[default: data]
   -d                : デバッグモードで動作します．
 """
 
@@ -188,13 +189,14 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
+    data_path = args["-s"]
     debug_mode = args["-d"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config = my_lib.config.load(config_file)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path("data"))
+    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
 
     item = {
         "name": "Raspberry Pi 5 / 8GB (switch-science)",

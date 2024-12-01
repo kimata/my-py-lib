@@ -2,6 +2,7 @@
 import logging
 import pathlib
 
+import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageEnhance
 import PIL.ImageFont

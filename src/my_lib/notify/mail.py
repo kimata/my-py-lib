@@ -18,60 +18,39 @@ import logging
 import pathlib
 import smtplib
 
-import my_lib.footprint
 
-NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/mail/send")  # noqa: S108
-INTERVAL_MIN = 60
-
-
-def send_impl(config, to, message, subject, png_data=None):
-    smtp = smtplib.SMTP(config["mail"]["smtp"]["host"], config["mail"]["smtp"]["port"])
-    smtp.starttls()
-    smtp.login(config["mail"]["user"], config["mail"]["pass"])
-
-    if subject is None:
-        subject = config["mail"].get("subject", "Notify")
-
-    msg = email.mime.multipart.MIMEMultipart()
+def build_message(subject, message, image=None):
+    msg = email.mime.multipart.MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["To"] = to
-    msg["From"] = config["mail"]["from"]
-
-    if png_data is not None:
-        cid = "image"
-        img = email.mime.image.MIMEImage(png_data, name="image.png")
-        img.add_header("Content-ID", "<" + cid + ">")
-        msg.attach(img)
-
-        message += f'<br/><img src="cid:{cid}"/>'
 
     msg.attach(email.mime.text.MIMEText(message, "html"))
 
-    smtp.send_message(msg)
+    if image is not None:
+        if "path" in image:
+            with pathlib.Path(image["path"]).open("rb") as img:
+                mime_img = email.mime.image.MIMEImage(img.read())
+        else:
+            mime_img = email.mime.image.MIMEImage(image["data"])
 
-    logging.info("Sent mail")
+        mime_img.add_header("Content-ID", "<" + image["id"] + ">")
+        msg.attach(mime_img)
 
+    return msg.as_string()
+
+
+def send_impl(config, message):
+    smtp = smtplib.SMTP(config["mail"]["smtp"]["host"], config["mail"]["smtp"]["port"])
+    smtp.starttls()
+    smtp.login(config["mail"]["user"], config["mail"]["pass"])
+    smtp.sendmail(config["mail"]["from"], config["mail"]["to"], message)
     smtp.quit()
 
 
-def send(config, message, subject=None, png_data=None, is_log_message=True, interval_min=INTERVAL_MIN):  # noqa: PLR0913
-    if is_log_message:
-        logging.info("notify: %s", message)
-
-    if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
-        logging.warning("Interval is too short. Skipping.")
-        return
-
-    to_list = []
-    if type(config["mail"]["to"]) is list:
-        to_list.extend(config["mail"]["to"])
-    else:
-        to_list.append(config["mail"]["to"])
-
-    for to in to_list:
-        send_impl(config, to, message, subject, png_data)
-
-    my_lib.footprint.update(NOTIFY_FOOTPRINT)
+def send(config, message):
+    try:
+        send_impl(config, message)
+    except Exception:
+        logging.exception("Failed to sendo Mail message")
 
 
 if __name__ == "__main__":

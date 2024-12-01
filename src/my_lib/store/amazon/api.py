@@ -3,7 +3,7 @@
 Amazon の PA-API 5.0 を使って Amazon の価格情報を取得するライブラリです．
 
 Usage:
-  amazon_api.py [-c CONFIG] [-t ASIN...] [-d]
+  api.py [-c CONFIG] [-t ASIN...] [-d]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]

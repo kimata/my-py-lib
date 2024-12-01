@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""
+オブジェクトをシリアライズします．
+
+Usage:
+  serializer.py [-d]
+
+Options:
+  -d                : デバッグモードで動作します．
+"""
+
 import logging
 import pathlib
 import pickle
@@ -38,3 +48,26 @@ def load(file_path, init_value=None):
             return data
         else:
             return pickle.load(f)  # noqa: S301
+
+
+if __name__ == "__main__":
+    import docopt
+    import my_lib.config
+    import my_lib.logger
+
+    args = docopt.docopt(__doc__)
+
+    debug_mode = args["-d"]
+
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
+
+    data = {"a": 1.0}
+
+    f = tempfile.NamedTemporaryFile()
+    file_path = pathlib.Path(f.name)
+    store(file_path, data)
+    f.flush()
+
+    assert load(file_path) == data
+
+    logging.info("OK")
