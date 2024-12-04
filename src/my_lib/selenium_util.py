@@ -160,8 +160,8 @@ def wait_patiently(driver, wait, target):
     raise error
 
 
-def dump_page(driver, index, dump_path):
-    name = inspect.stack()[1].function.replace("<", "").replace(">", "")
+def dump_page(driver, index, dump_path, stack=1):
+    name = inspect.stack()[stack].function.replace("<", "").replace(">", "")
 
     dump_path.mkdir(parents=True, exist_ok=True)
 
@@ -176,9 +176,9 @@ def dump_page(driver, index, dump_path):
     logging.info(
         "page dump: %02d from %s in %s line %d",
         index,
-        inspect.stack()[1].function,
-        inspect.stack()[1].filename,
-        inspect.stack()[1].lineno,
+        inspect.stack()[stack].function,
+        inspect.stack()[stack].filename,
+        inspect.stack()[stack].lineno,
     )
 
 
