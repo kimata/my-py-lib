@@ -87,6 +87,11 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):
 
 
 def create_driver(profile_name, data_path, agent_name=AGENT_NAME, is_headless=True):
+    # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+    logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
+    logging.getLogger("selenium.webdriver.remote.remote_connection").setLevel(logging.WARNING)
+
     # NOTE: 1回だけ自動リトライ
     try:
         return create_driver_impl(profile_name, data_path, agent_name, is_headless)
