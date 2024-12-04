@@ -50,6 +50,15 @@ def load(file_path, init_value=None):
             return pickle.load(f)  # noqa: S301
 
 
+def get_size_str(file_path):
+    size = file_path.stat().st_size
+
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+
 if __name__ == "__main__":
     import docopt
     import my_lib.config
