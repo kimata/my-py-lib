@@ -47,39 +47,38 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
-    options.add_argument(f"user-agent={agent_name}")
+    # options.add_argument(f'--user-agent="{agent_name}"')
 
     driver = webdriver.Chrome(
         service=Service(
-            log_path=str(log_path / "webdriver.log"),
-            service_args=["--verbose"],
+            service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')}"],
         ),
         options=options,
     )
 
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    driver.execute_cdp_cmd(
-        "Network.setUserAgentOverride",
-        {
-            "userAgent": agent_name,
-            "acceptLanguage": "ja,en-US;q=0.9,en;q=0.8",
-            "platform": "macOS",
-            "userAgentMetadata": {
-                "brands": [
-                    {"brand": "Google Chrome", "version": "128"},
-                    {"brand": "Not:A-Brand", "version": "24"},
-                    {"brand": "Chromium", "version": "128"},
-                ],
-                "platform": "macOS",
-                "platformVersion": "15.0.0",
-                "architecture": "x86",
-                "model": "",
-                "mobile": False,
-                "bitness": "64",
-                "wow64": False,
-            },
-        },
-    )
+    # driver.execute_cdp_cmd(
+    #     "Network.setUserAgentOverride",
+    #     {
+    #         "userAgent": agent_name,
+    #         "acceptLanguage": "ja,en-US;q=0.9,en;q=0.8",
+    #         "platform": "macOS",
+    #         "userAgentMetadata": {
+    #             "brands": [
+    #                 {"brand": "Google Chrome", "version": "131"},
+    #                 {"brand": "Not:A-Brand", "version": "24"},
+    #                 {"brand": "Chromium", "version": "131"},
+    #             ],
+    #             "platform": "macOS",
+    #             "platformVersion": "15.0.0",
+    #             "architecture": "x86",
+    #             "model": "",
+    #             "mobile": False,
+    #             "bitness": "64",
+    #             "wow64": False,
+    #         },
+    #     },
+    # )
 
     driver.set_page_load_timeout(30)
 
