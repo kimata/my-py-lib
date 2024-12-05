@@ -3,7 +3,7 @@
 Amazon へのログインをを行います．
 
 Usage:
-  handle.py [-c CONFIG] [-t TARGET] [-d]
+  login.py [-c CONFIG] [-t TARGET] [-d]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
