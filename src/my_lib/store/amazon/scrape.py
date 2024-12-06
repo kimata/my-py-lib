@@ -14,6 +14,7 @@ Options:
 
 import io
 import logging
+import random
 import re
 import time
 import traceback
@@ -49,8 +50,9 @@ def fetch_price_impl(driver, wait, config, item):
         )
         != 0
     ):
+        logging.warning("Failed to load page: %s", item["url"])
         time.sleep(5)
-        return None
+        return {}
 
     if (
         len(
@@ -65,7 +67,17 @@ def fetch_price_impl(driver, wait, config, item):
         ).click()
         wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
 
-    my_lib.store.amazon.captcha.resolve(driver, wait, config)
+    # my_lib.store.amazon.captcha.resolve(driver, wait, config)
+
+    try:
+        breadcrumb_list = driver.find_elements(
+            selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
+        )
+        category = list(map(lambda x: x.text, breadcrumb_list))[0]
+
+    except Exception:
+        logging.exception("Failed to fetch category")
+        category = None
 
     price_text = ""
     for price_elem in PRICE_ELEM_LIST:
@@ -98,7 +110,7 @@ def fetch_price_impl(driver, wait, config, item):
             ).text
             if (price_text == "現在在庫切れです。") or (price_text == "この商品は現在お取り扱いできません。"):
                 logging.warning("Price is NOT displayed: {url}".format(url=item["url"]))
-                return 0
+                return {"price": 0, "category": category}
         elif (
             len(
                 driver.find_elements(
@@ -109,7 +121,7 @@ def fetch_price_impl(driver, wait, config, item):
             )
             != 0
         ):
-            return 0
+            return {"price": 0, "category": category}
         else:
             logging.warning("Unable to fetch price: {url}".format(url=item["url"]))
 
@@ -122,7 +134,7 @@ def fetch_price_impl(driver, wait, config, item):
                 PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
                 interval_min=0.5,
             )
-            return 0
+            return {"price": 0, "category": category}
 
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", re.sub(r"[^0-9][0-9]+個", "", price_text))
@@ -140,23 +152,34 @@ def fetch_price_impl(driver, wait, config, item):
             PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
             interval_min=0.5,
         )
-        return 0
+        return {"price": 0, "category": category}
 
-    return price
+    return {"price": price, "category": category}
 
 
 def fetch_price(driver, wait, config, item):
     driver.execute_script('window.open(arguments[0], "newtab")', item["url"])
     driver.switch_to.window(driver.window_handles[1])
+
     driver.get(item["url"])
     wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
 
-    price = fetch_price_impl(driver, wait, config, item)
+    try:
+        item |= fetch_price_impl(driver, wait, config, item)
+
+        if (item["price"] is None) or (item["price"] == 0):
+            my_lib.selenium_util.dump_page(
+                driver,
+                int(random.random() * 100),
+                pathlib.Path(config["data"]["dump"]),
+            )
+    except Exception:
+        logging.exception("Failed to fetch price")
 
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
 
-    return price
+    return item
 
 
 if __name__ == "__main__":
