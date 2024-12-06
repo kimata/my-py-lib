@@ -23,7 +23,7 @@ def store(file_path_str, data):
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     f = tempfile.NamedTemporaryFile("wb", dir=str(file_path.parent), delete=False)
-    pickle.dump(data, f)
+    pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     f.close()
 
     if file_path.exists():
