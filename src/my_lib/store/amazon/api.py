@@ -155,10 +155,13 @@ def fetch_price_new(config, asin_list):  # noqa: C901
                     if offer.condition.value != "New":
                         continue
 
-                    price = int(offer.lowest_price.amount)
-                    if ("price" not in item) or (price < item["price"]):
-                        item["price"] = price
-                    break
+                    try:
+                        price = int(offer.lowest_price.amount)
+                        if ("price" not in item) or (price < item["price"]):
+                            item["price"] = price
+                        break
+                    except Exception:
+                        logging.exception("Failed to fetch price: %s", item_data.asin)
 
                 if "price" not in item:
                     continue
