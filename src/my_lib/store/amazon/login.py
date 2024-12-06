@@ -15,6 +15,7 @@ import pathlib
 import random
 import time
 
+import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 import selenium.webdriver.common.by
 import selenium.webdriver.support
