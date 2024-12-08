@@ -128,8 +128,8 @@ def fetch_price_impl(driver, wait, config, item):
 
             my_lib.notify.slack.error_with_image(
                 config["slack"]["bot_token"],
-                config["slack"]["captcha"]["channel"]["name"],
-                config["slack"]["captcha"]["channel"]["id"],
+                config["slack"]["error"]["channel"]["name"],
+                config["slack"]["error"]["channel"]["id"],
                 "価格取得に失敗",
                 "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
                 PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
@@ -146,8 +146,8 @@ def fetch_price_impl(driver, wait, config, item):
         )
         my_lib.notify.slack.error_with_image(
             config["slack"]["bot_token"],
-            config["slack"]["captcha"]["channel"]["name"],
-            config["slack"]["captcha"]["channel"]["id"],
+            config["slack"]["error"]["channel"]["name"],
+            config["slack"]["error"]["channel"]["id"],
             "価格取得に失敗",
             "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
             PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
