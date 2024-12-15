@@ -16,6 +16,7 @@ Options:
 import io
 import json
 import logging
+import time
 import urllib.request
 import wave
 
@@ -89,8 +90,12 @@ def synthesize(config, text, volume=2, speaker_id=3):
     return convert_wav_data(res.read())
 
 
-def play(wav_data):
-    simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play().wait_done()
+def play(wav_data, wait_sec=None):
+    if wait_sec is None:
+        simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play().wait_done()
+    else:
+        simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play()
+        time.sleep(wait_sec)
 
 
 if __name__ == "__main__":
