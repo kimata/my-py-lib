@@ -15,8 +15,9 @@ def check_liveness(name, liveness_file, interval):
     if elapsed > max(interval * 2, 60):
         logging.warning("Execution interval of %s is too long. %s sec)", name, f"{elapsed:,.1f}")
         return False
-
-    return True
+    else:
+        logging.debug("Execution interval of %s: %s sec)", name, f"{elapsed:,.1f}")
+        return True
 
 
 def check_port(port, address="127.0.0.1"):
