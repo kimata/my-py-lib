@@ -15,7 +15,6 @@ import datetime
 import logging
 import os
 import time
-import traceback
 
 import influxdb_client
 from docopt import docopt
@@ -97,9 +96,8 @@ def fetch_data_impl(  # noqa: PLR0913
         query_api = client.query_api()
 
         return query_api.query(query=query)
-    except Exception as e:
-        logging.warning(e)
-        logging.warning(traceback.format_exc())
+    except Exception:
+        logging.exception("Failed to fetch data")
         raise
 
 
@@ -187,7 +185,7 @@ def fetch_data(  # noqa: PLR0913
 
         return {"value": data_list, "time": time_list, "valid": len(time_list) != 0}
     except Exception:
-        logging.warning(traceback.format_exc())
+        logging.exception("Failed to fetch data")
 
         return {"value": [], "time": [], "valid": False}
 
@@ -257,7 +255,7 @@ def get_equip_on_minutes(  # noqa: PLR0913
 
         return count * int(every_min)
     except Exception:
-        logging.warning(traceback.format_exc())
+        logging.exception("Failed to fetch data")
         return 0
 
 
@@ -360,7 +358,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
             )
         return on_range
     except Exception:
-        logging.warning(traceback.format_exc())
+        logging.exception("Failed to fetch data")
         return []
 
 
@@ -389,7 +387,7 @@ def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offs
         else:
             return value_list[0][1]
     except Exception:
-        logging.warning(traceback.format_exc())
+        logging.exception("Failed to fetch data")
         return 0
 
 
