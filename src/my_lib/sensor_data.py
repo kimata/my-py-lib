@@ -406,8 +406,8 @@ def get_last_event(config, measure, hostname, field, start="-7d"):
         else:
             return value_list[0][0]
     except Exception:
-        logging.warning(traceback.format_exc())
-        return 0
+        logging.exception("Failed to fetch data")
+        return None
 
 
 def dump_data(data):
