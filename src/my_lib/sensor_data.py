@@ -391,6 +391,23 @@ def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offs
         return 0
 
 
+def get_sum(config, measure, hostname, field, start="-30h", stop="now()", every_min=1, window_min=3):  # noqa:  PLR0913
+    try:
+        table_list = fetch_data_impl(
+            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
+        )
+
+        value_list = table_list.to_values(columns=["count", "sum"])
+
+        if len(value_list) == 0:
+            return 0
+        else:
+            return value_list[0][1]
+    except Exception:
+        logging.exception("Failed to fetch data")
+        return 0
+
+
 def get_last_event(config, measure, hostname, field, start="-7d"):
     try:
         table_list = fetch_data_impl(
