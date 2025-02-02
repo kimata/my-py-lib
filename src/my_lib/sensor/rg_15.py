@@ -80,6 +80,7 @@ class RG_15:  # noqa: N801
 
     def ping(self):
         try:
+            self.ser.reset_input_buffer()
             self.ser.write("P\r\n".encode(encoding="utf-8"))  # noqa: UP012
             self.ser.flush()
 
