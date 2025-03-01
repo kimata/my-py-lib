@@ -3,12 +3,12 @@
 Slack で通知を行います．
 
 Usage:
-  slack.py [-c CONFIG] [-d] [-m MESSAGE]
+  slack.py [-c CONFIG] [-m MESSAGE] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
   -m MESSAGE        : 送信するメッセージ．[default: TEST]
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import json
@@ -204,6 +204,7 @@ def hist_get(is_thread_local=True):
 
 
 if __name__ == "__main__":
+    # TEST Code
     import sys
 
     import docopt
@@ -214,7 +215,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     message = args["-m"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 

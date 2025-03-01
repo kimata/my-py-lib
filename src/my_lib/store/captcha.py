@@ -3,12 +3,12 @@
 CAPTCHA を Slack を使って解決するライブラリです．
 
 Usage:
-  captcha.py [-c CONFIG] [-i IMAGE] [-d]
+  captcha.py [-c CONFIG] [-i IMAGE] [-D]
 
-Options:n
+Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
   -i IMAGE          : CAPTCA 画像．[default: tests/data/captcha.png]
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import logging
@@ -285,7 +285,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     captcha_file = args["-i"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 

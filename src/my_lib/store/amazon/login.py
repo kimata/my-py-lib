@@ -3,11 +3,11 @@
 Amazon へのログインをを行います．
 
 Usage:
-  login.py [-c CONFIG] [-t TARGET] [-d]
+  login.py [-c CONFIG] [-t TARGET] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import logging
@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     target_file = args["-t"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 

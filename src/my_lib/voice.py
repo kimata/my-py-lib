@@ -3,14 +3,14 @@
 VOICEVOX を WEB API 経由でたたいて，音声ファイルを生成します．
 
 Usage:
-  voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-d] [-o WAV]
+  voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-o WAV] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
   -m MESSAGE        : 音声化するメッセージ．[default: テストです]
   -s SPEAKER_ID     : スピーカ．[default: 3]
-  -d                : デバッグモードで動作します．
   -o WAV            : 書き出す音声ファイル．[default: text.wav]
+  -D                : デバッグモードで動作します．
 """
 
 import io
@@ -99,6 +99,7 @@ def play(wav_data, duration_sec=None):
 
 
 if __name__ == "__main__":
+    # TEST Code
     import pathlib
 
     import docopt
@@ -110,8 +111,8 @@ if __name__ == "__main__":
     config_file = args["-c"]
     message = args["-m"]
     speaker_id = args["-s"]
-    debug_mode = args["-d"]
     out_file = args["-o"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("my-lib.config", level=logging.DEBUG if debug_mode else logging.INFO)
 

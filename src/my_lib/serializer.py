@@ -3,10 +3,10 @@
 オブジェクトをシリアライズします．
 
 Usage:
-  serializer.py [-d]
+  serializer.py [-D]
 
 Options:
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import logging
@@ -60,13 +60,13 @@ def get_size_str(file_path):
 
 
 if __name__ == "__main__":
+    # TEST Code
     import docopt
-    import my_lib.config
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
 
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 

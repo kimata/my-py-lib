@@ -71,5 +71,6 @@ def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_
 
 
 if __name__ == "__main__":
+    # TEST Code
     init("test")
     logging.info("Test")

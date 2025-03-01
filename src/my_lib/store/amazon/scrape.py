@@ -3,13 +3,13 @@
 スクレイピングで Amazon の価格情報を取得するライブラリです．
 
 Usage:
-  scrape.py [-c CONFIG] [-t ASIN...] [-s DATA_PATH] [-d]
+  scrape.py [-c CONFIG] [-t ASIN...] [-s DATA_PATH] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
   -t ASIN           : 価格情報を取得する ASIN．[default: B01MUZOWBH]
   -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ．[default: data]
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import io
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     config_file = args["-c"]
     data_path = args["-s"]
     asin_list = args["-t"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 

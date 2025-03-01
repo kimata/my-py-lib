@@ -3,12 +3,12 @@
 Amazon の PA-API 5.0 を使って Amazon の価格情報を取得するライブラリです．
 
 Usage:
-  api.py [-c CONFIG] [-t ASIN...] [-d]
+  api.py [-c CONFIG] [-t ASIN...] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
   -t ASIN           : 価格情報を取得する ASIN．[default: B01MUZOWBH]
-  -d                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します．
 """
 
 import logging
@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     asin_list = args["-t"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
