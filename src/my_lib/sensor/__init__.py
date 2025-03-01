@@ -7,22 +7,25 @@ import my_lib.sensor
 
 from .ads1015 import ADS1015 as ads1015  # noqa: N811
 from .apds9250 import APDS9250 as apds9250  # noqa: N811
+from .bp35a1 import BP35A1 as bp35a1  # noqa: N811
+from .echonetenergy import EchonetEnergy as echonetenergy  # noqa: N811
+from .echonetlite import ECHONETLite as echonetlite  # noqa: N811
 from .ezo_ph import EZO_PH as ezo_ph  # noqa: N811
 from .ezo_rtd import EZO_RTD as ezo_rtd  # noqa: N811
 from .fd_q10c import FD_Q10C as fd_q10c  # noqa: N811
 from .grove_tds import GROVE_TDS as grove_tds  # noqa: N811
-from .i2cbus import I2CBUS as i2cbus  # noqa: N811
+from .i2cbus import I2CBUS as i2cbus  # noqa: N811  # noqa: N811
 from .lp_pyra03 import LP_PYRA03 as lp_pyra03  # noqa: N811
 from .rg_15 import RG_15 as rg_15  # noqa: N811
 from .scd4x import SCD4X as scd4x  # noqa: N811
 from .sht35 import SHT35 as sht35  # noqa: N811
-from .sm9561 import SM9561 as sm9561  # noqa: N811
 
 iolink = importlib.import_module(".io_link", __package__)
 
 __all__ = [
     "ads1015",
     "apds9250",
+    "bp35a10",
     "ezo_ph",
     "ezo_rtd",
     "grove_tds",
@@ -34,6 +37,8 @@ __all__ = [
     "fd_q10c",
     "rg_15",
     "iolink",
+    "echonetlite",
+    "echonetenergy",
 ]
 
 
@@ -47,7 +52,7 @@ def load(sensor_def_list):
         param = {}
         if "i2c_bus" in sensor_def:
             param["bus_id"] = getattr(i2cbus, sensor_def["i2c_bus"])
-            i2c_dev_file = pathlib.Path(f'/dev/i2c-{param["bus_id"]}')
+            i2c_dev_file = pathlib.Path(f"/dev/i2c-{param['bus_id']}")
             if not i2c_dev_file.exists():
                 logging.warning(
                     "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], i2c_dev_file
