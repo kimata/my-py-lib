@@ -16,10 +16,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 WAIT_RETRY_COUNT = 1
-AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"  # noqa: E501
 
 
-def create_driver_impl(profile_name, data_path, agent_name, is_headless):
+def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -48,7 +48,7 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):
 
     driver = webdriver.Chrome(
         service=Service(
-            service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')}"],
+            service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
         ),
         options=options,
     )
@@ -222,11 +222,11 @@ def log_memory_usage(driver):
 
 def warmup(driver, keyword, url_pattern, sleep_sec=3):
     # NOTE: ダミーアクセスを行って BOT ではないと思わせる．(効果なさそう...)
-    driver.get("https://www.google.com/")
+    driver.get("https://www.yahoo.co.jp/")
     time.sleep(sleep_sec)
 
-    driver.find_element(By.XPATH, '//textarea[@name="q"]').send_keys(keyword)
-    driver.find_element(By.XPATH, '//textarea[@name="q"]').send_keys(Keys.ENTER)
+    driver.find_element(By.XPATH, '//input[@name="p"]').send_keys(keyword)
+    driver.find_element(By.XPATH, '//input[@name="p"]').send_keys(Keys.ENTER)
 
     time.sleep(sleep_sec)
 
