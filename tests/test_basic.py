@@ -107,7 +107,7 @@ def test_webapp_log(client):
     response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
     assert response.status_code == 200
     log_list = response.json["data"]
-    time.sleep(1)
+    time.sleep(2)
 
     assert log_list[0]["message"] == "TEST WARN"
     assert log_list[1]["message"] == "TEST ERROR"
