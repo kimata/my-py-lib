@@ -25,7 +25,7 @@ iolink = importlib.import_module(".io_link", __package__)
 __all__ = [
     "ads1015",
     "apds9250",
-    "bp35a10",
+    "bp35a1",
     "ezo_ph",
     "ezo_rtd",
     "grove_tds",
