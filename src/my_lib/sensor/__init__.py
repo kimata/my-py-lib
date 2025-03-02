@@ -50,21 +50,27 @@ def load(sensor_def_list):
         logging.info("Load %s driver", sensor_def["name"])
 
         param = {}
-        if "i2c_bus" in sensor_def:
-            param["bus_id"] = getattr(i2cbus, sensor_def["i2c_bus"])
-            i2c_dev_file = pathlib.Path(f"/dev/i2c-{param['bus_id']}")
-            if not i2c_dev_file.exists():
-                logging.warning(
-                    "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], i2c_dev_file
-                )
-                continue
+        if "uart_dev" in sensor_def:
+            dev_file = sensor_def["uart_dev"]
 
-        if "dev_addr" in sensor_def:
-            param["dev_addr"] = sensor_def["dev_addr"]
+            sensor = getattr(my_lib.sensor, sensor_def["name"])(dev_file, sensor_def["param"])
+        else:
+            # NOTE: デフォルトは I2C デバイスと見なす
+            if "i2c_bus" in sensor_def:
+                param["bus_id"] = getattr(i2cbus, sensor_def["i2c_bus"])
+                dev_file = pathlib.Path(f"/dev/i2c-{param['bus_id']}")
+                if not dev_file.exists():
+                    logging.warning(
+                        "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], dev_file
+                    )
+                    continue
 
-        sensor = getattr(my_lib.sensor, sensor_def["name"])(
-            **{k: v for k, v in param.items() if k in ["bus_id", "dev_addr"]}
-        )
+            if "dev_addr" in sensor_def:
+                param["dev_addr"] = sensor_def["dev_addr"]
+
+            sensor = getattr(my_lib.sensor, sensor_def["name"])(
+                **{k: v for k, v in param.items() if k in ["bus_id", "dev_addr"]}
+            )
 
         sensor_list.append(sensor)
 

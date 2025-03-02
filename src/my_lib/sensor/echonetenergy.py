@@ -12,6 +12,7 @@ Options:
   -D                : デバッグモードで動作します．
 """
 
+import importlib
 import logging
 import pathlib
 import pickle
@@ -23,21 +24,29 @@ import my_lib.sensor.echonetlite
 from my_lib.sensor.echonetlite import ECHONETLite
 
 PAN_DESC_DAT_PATH = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
+RETRY_COUNT = 5
 
 
 class EchonetEnergy:
-    RETRY_COUNT = 5
+    NAME = "EchonetEnergy"
+    TYPE = "UART"
 
-    def __init__(self, echonet_if, b_id, b_pass, debug=False):  # noqa: D107
-        echonet_if.set_id(b_id)
-        echonet_if.set_password(b_pass)
+    def __init__(self, dev_file, param, debug=False):  # noqa: D107
+        echonet_if = getattr(my_lib.sensor, param["if"].lower())(dev_file, debug)
+
+        self.b_id = param["id"]
+        self.b_pass = param["pass"]
 
         self.echonet_if = echonet_if
         self.ipv6_addr = None
+        self.is_connected = False
 
         self.logger = logging.getLogger(__name__)
         self.logger.addHandler(logging.NullHandler())
         self.logger.setLevel(logging.DEBUG if debug else logging.WARNING)
+
+    def ping(self):
+        return self.echonet_if.ping()
 
     def parse_frame(self, recv_packet):
         self.logger.debug("recv_packet = \n%s", pprint.pformat(recv_packet, indent=2))
@@ -46,10 +55,29 @@ class EchonetEnergy:
 
         return frame
 
+    # PAN ID の探索 (キャッシュ付き)
     def get_pan_info(self):
+        if PAN_DESC_DAT_PATH.exists():
+            with PAN_DESC_DAT_PATH.open(mode="rb") as f:
+                try:
+                    return pickle.load(f)  # noqa: S301
+                except Exception:  # noqa: S110
+                    pass
+
+        pan_info = self.get_pan_info_impl()
+
+        with PAN_DESC_DAT_PATH.open(mode="wb") as f:
+            pickle.dump(pan_info, f)
+
+        return pan_info
+
+    def get_pan_info_impl(self):
         return self.echonet_if.scan_channel()
 
     def connect(self, pan_info):
+        self.echonet_if.set_id(self.b_id)
+        self.echonet_if.set_password(self.b_pass)
+
         self.ipv6_addr = self.echonet_if.connect(pan_info)
         if self.ipv6_addr is None:
             raise Exception("Faile to connect Wi-SUN")  # noqa: EM101, TRY002, TRY003
@@ -57,7 +85,7 @@ class EchonetEnergy:
         # NOTE: インスタンスリスト通知メッセージが来ない場合があるので
         # チェックを省略
 
-        # for i in range(self.RETRY_COUNT):
+        # for i in range(RETRY_COUNT):
         #     recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
 
         #     frame = self.parse_frame(recv_packet)
@@ -79,7 +107,11 @@ class EchonetEnergy:
     def disconnect(self):
         self.echonet_if.disconnect()
 
-    def get_current_energy(self):
+    def get_value(self):
+        if not self.is_connected:
+            self.connect(self.get_pan_info())
+            self.is_connected = True
+
         meter_eoj = ECHONETLite.build_eoj(
             ECHONETLite.EOJ.CLASS_GROUP_HOUSING, ECHONETLite.EOJ.HOUSE_CLASS_GROUP.LOW_VOLTAGE_SMART_METER
         )
@@ -111,30 +143,16 @@ class EchonetEnergy:
                     continue
                 if len(prop["EDT"]) != prop["PDC"]:
                     continue
-                return struct.unpack(">I", prop["EDT"])[0]
+                return [struct.unpack(">I", prop["EDT"])[0]]
 
+    def get_value_map(self):
+        value = self.get_value()
 
-# PAN ID の探索 (キャッシュ付き)
-def get_pan_info(energy_meter):
-    if PAN_DESC_DAT_PATH.exists():
-        with PAN_DESC_DAT_PATH.open(mode="rb") as f:
-            try:
-                return pickle.load(f)  # noqa: S301
-            except Exception:  # noqa: S110
-                pass
-
-    pan_info = energy_meter.get_pan_info()
-
-    with PAN_DESC_DAT_PATH.open(mode="wb") as f:
-        pickle.dump(pan_info, f)
-
-    return pan_info
+        return {"power": value[0]}
 
 
 if __name__ == "__main__":
     # TEST Code
-    import importlib
-
     import docopt
     import my_lib.config
     import my_lib.logger
@@ -150,19 +168,11 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    class_name = if_dev
-    module_name = f"my_lib.sensor.{if_dev.lower()}"
+    sensor = EchonetEnergy(dev_file, {**config, "if": if_dev})
 
-    module = importlib.import_module(module_name)
-    if_class = getattr(module, class_name)
+    ping = sensor.ping()
+    logging.info("PING: %s", ping)
 
-    echonet_if = if_class(dev_file, debug_mode)
-    energy_meter = EchonetEnergy(echonet_if, config["id"], config["pass"])
-
-    pan_info = get_pan_info(energy_meter)
-    print(pan_info)
-
-    energy_meter.connect(pan_info)
-
-    while True:
-        logging.info(energy_meter.get_current_energy())
+    if ping:
+        while True:
+            logging.info(sensor.get_value_map())

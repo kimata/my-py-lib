@@ -12,7 +12,7 @@ WAIT_COUNT = 30
 class BP35A1:
     NAME = "BP35A1"
 
-    def __init__(self, port, debug=False):  # noqa: D107
+    def __init__(self, port="/dev/ttyAMA0", debug=False):  # noqa: D107
         self.ser = serial.Serial(port=port, baudrate=115200, timeout=5)
         self.opt = None
         self.ser.flushInput()
@@ -21,8 +21,19 @@ class BP35A1:
         self.logger.addHandler(logging.NullHandler())
         self.logger.setLevel(logging.DEBUG if debug else logging.WARNING)
 
+    def ping(self):
+        try:
+            ret = self.__send_command_raw("SKINFO")
+            self.__expect("OK")
+            ret = ret.split(" ", 1)
+
+            return ret[0] == "EINFO"
+        except Exception:
+            return False
+
     def write(self, data):
         self.logger.debug("SEND: [%s]", pprint.pformat(data))
+
         if type(data) is str:
             data = data.encode()
 
