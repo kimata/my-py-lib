@@ -115,7 +115,7 @@ def parse_wbgt_daily(content, wbgt_measured_today):
 
     if len(wbgt_col_list) != 35:
         logging.warning("Invalid format")
-        return {"today": None, "tomorro": None}
+        return {"today": None, "tomorrow": None}
 
     wbgt_col_list = wbgt_col_list[8:]
     wbgt_list = []
