@@ -89,7 +89,9 @@ def fetch_price_outlet(config, asin_list):
 
                 # NOTE: Amazonアウトレットのみ対象にする
                 for listing in item_data.offers.listings:
-                    if not re.compile("Amazonアウトレット").search(listing.merchant_info.name):
+                    if listing.merchant_info is None or not re.compile("Amazonアウトレット").search(
+                        listing.merchant_info.name
+                    ):
                         continue
                     item["price"] = int(listing.price.amount)
                     break
