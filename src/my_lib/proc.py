@@ -2,6 +2,8 @@
 import logging
 import os
 
+import psutil
+
 
 def signal_name(sig):
     import signal
@@ -31,6 +33,12 @@ def reap_zombie():
             pid, status = os.waitpid(-1, os.WNOHANG)
             if pid == 0:
                 break
-            logging.warning("Reaped zombie process: pid=%d status=%s", pid, status_text(status))
+
+            logging.warning(
+                "Reaped zombie process: pid=%d cmd=%s status=%s",
+                pid,
+                psutil.Process(pid).name(),
+                status_text(status),
+            )
     except ChildProcessError:
         pass
