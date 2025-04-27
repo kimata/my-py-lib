@@ -39,6 +39,8 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-gpu")
 
+    options.add_argument("--disable-crash-reporter")
+
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1200")
 
