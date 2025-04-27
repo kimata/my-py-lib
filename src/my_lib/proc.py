@@ -27,7 +27,24 @@ def status_text(status):
         return f"Unknown status: {status}"
 
 
+def get_child_pid_map():
+    pid_map = {}
+    parent = psutil.Process()
+
+    try:
+        children = parent.children(recursive=False)
+    except psutil.Error:
+        return pid_map
+
+    children = parent.children(recursive=False)
+    for child in children:
+        pid_map[child.pid] = child.name()
+
+    return pid_map
+
+
 def reap_zombie():
+    pid_map = get_child_pid_map()
     try:
         while True:
             pid, status = os.waitpid(-1, os.WNOHANG)
@@ -37,7 +54,7 @@ def reap_zombie():
             logging.warning(
                 "Reaped zombie process: pid=%d cmd=%s status=%s",
                 pid,
-                psutil.Process(pid).name(),
+                pid_map[pid],
                 status_text(status),
             )
     except ChildProcessError:
