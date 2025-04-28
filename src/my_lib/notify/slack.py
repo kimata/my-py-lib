@@ -77,19 +77,14 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
 
     message_lines = message.splitlines()
     total = math.ceil(len(message_lines) / LINE_SPLIT)
-    i = 0
-    for n in range(0, len(message_lines), LINE_SPLIT):
-        if total == 1:
-            split_title = title
-        else:
-            split_title = "{title} ({i}/{total})".format(title=title, i=i + 1, total=total)
+    for i in range(0, len(message_lines), LINE_SPLIT):
+        split_title = title if total == 1 else f"{title} ({i + 1}/{total})"
 
         send(
             token,
             ch_name,
-            formatter(split_title, "\n".join(message_lines[n : n + LINE_SPLIT])),
+            formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
         )
-        i += 1
 
         time.sleep(1)
 
