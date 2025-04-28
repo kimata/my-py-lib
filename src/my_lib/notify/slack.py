@@ -67,7 +67,7 @@ def send(token, ch_name, message):
             blocks=message["json"],
         )
     except slack_sdk.errors.SlackClientError:
-        logging.exception("Failed to sendo Slack message")
+        logging.exception("Failed to send Slack message")
 
 
 def split_send(token, ch_name, title, message, formatter=format_simple):
