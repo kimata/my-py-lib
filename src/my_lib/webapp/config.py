@@ -3,12 +3,14 @@ import datetime
 import logging
 import pathlib
 
+import pytz
 import zoneinfo
 
 URL_PREFIX = None
 
 TIMEZONE_OFFSET = 9
 TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "JST")
+TIMEZONE_PYTZ = pytz.timezone("Asia/Tokyo")
 ZONEINFO = zoneinfo.ZoneInfo("Asia/Tokyo")
 
 STATIC_DIR_PATH = None
