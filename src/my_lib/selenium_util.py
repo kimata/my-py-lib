@@ -108,6 +108,20 @@ def get_text(driver, xpath, safe_text):
         return safe_text
 
 
+def input_xpath(driver, xpath, text, wait=None, is_warn=True):
+    if wait is not None:
+        wait.until(selenium.webdriver.support.expected_conditions.element_to_be_clickable((By.XPATH, xpath)))
+        time.sleep(0.05)
+
+    if xpath_exists(driver, xpath):
+        driver.find_element(By.XPATH, xpath).send_keys(text)
+        return True
+    else:
+        if is_warn:
+            logging.warning("Element is not found: %s", xpath)
+        return False
+
+
 def click_xpath(driver, xpath, wait=None, is_warn=True):
     if wait is not None:
         wait.until(selenium.webdriver.support.expected_conditions.element_to_be_clickable((By.XPATH, xpath)))
