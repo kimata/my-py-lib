@@ -67,7 +67,7 @@ def parse_item(driver, index):
     }
 
 
-def execute_item(driver, wait, profile, debug_mode, index, item_func_list):
+def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list):
     item = parse_item(driver, index)
 
     logging.info(
@@ -94,7 +94,7 @@ def execute_item(driver, wait, profile, debug_mode, index, item_func_list):
     for item_func in item_func_list:
         while True:
             try:
-                item_func(driver, wait, profile, item, debug_mode)
+                item_func(driver, wait, scrape_config, item, debug_mode)
                 fail_count = 0
                 break
             except selenium.common.exceptions.TimeoutException:
@@ -125,7 +125,7 @@ def expand_all(driver, wait):
         time.sleep(2)
 
 
-def iter_items_on_display(driver, wait, profile, debug_mode, item_func_list):
+def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
     my_lib.selenium_util.click_xpath(
         driver,
         '//button[@data-testid="account-button"]',
@@ -157,7 +157,7 @@ def iter_items_on_display(driver, wait, profile, debug_mode, item_func_list):
 
     list_url = driver.current_url
     for i in range(1, item_count + 1):
-        execute_item(driver, wait, profile, debug_mode, i, item_func_list)
+        execute_item(driver, wait, scrape_config, debug_mode, i, item_func_list)
 
         if debug_mode:
             break

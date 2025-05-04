@@ -17,7 +17,7 @@ LINE_LOGIN_TIMEOUT = 30
 LOGIN_URL = "https://jp.mercari.com"
 
 
-def login_via_line(config, driver, wait, line_use, line_pass):
+def login_via_line(driver, wait, line_use, line_pass, slack_config):
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 
     wait.until(selenium.webdriver.support.expected_conditions.title_contains("LINE Login"))
@@ -37,13 +37,14 @@ def login_via_line(config, driver, wait, line_use, line_pass):
             selenium.webdriver.common.by.By.XPATH, '//p[contains(@class, "Number")]'
         ).text
 
-        my_lib.notify.slack.info(
-            config["slack"]["bot_token"],
-            config["slack"]["captcha"]["channel"]["name"],
-            "LINE ログイン",
-            f"LINE アプリで認証番号「{code}」を入力してください。",
-        )
-        logging.warning("LINE アプリで認証番号「%s」を入力してください。", code)
+        if slack_config is not None:
+            my_lib.notify.slack.info(
+                slack_config["slack"]["bot_token"],
+                slack_config["slack"]["captcha"]["channel"]["name"],
+                "LINE ログイン",
+                f"LINE アプリで認証番号「{code}」を入力してください。",
+            )
+        logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
 
         login_wait = selenium.webdriver.support.ui.WebDriverWait(driver, LINE_LOGIN_TIMEOUT)
         login_wait.until(
@@ -56,7 +57,7 @@ def login_via_line(config, driver, wait, line_use, line_pass):
         )
 
 
-def execute_impl(config, driver, wait, line_use, line_pass):
+def execute_impl(driver, wait, line_use, line_pass, slack_config):
     logging.info("ログインを行います．")
     driver.get(LOGIN_URL)
 
@@ -90,7 +91,7 @@ def execute_impl(config, driver, wait, line_use, line_pass):
         )
     )
 
-    login_via_line(config, driver, wait, line_use, line_pass)
+    login_via_line(driver, wait, line_use, line_pass, slack_config)
 
     # time.sleep(2)
     # if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//div[@id="recaptchaV2"]')) != 0:
@@ -107,18 +108,19 @@ def execute_impl(config, driver, wait, line_use, line_pass):
 
     logging.info("認証番号の対応を行います．")
 
-    if "slack" in config:
+    if slack_config is not None:
         ts = my_lib.store.captcha.send_request_text_slack(
-            config["slack"]["bot_token"],
-            config["slack"]["captcha"]["channel"]["name"],
+            slack_config["bot_token"],
+            slack_config["captcha"]["channel"]["name"],
             "CAPTCHA",
             "SMS で送られてきた認証番号を入力してください",
         )
         code = my_lib.store.captcha.recv_response_text_slack(
-            config["slack"]["bot_token"],
-            config["slack"]["captcha"]["channel"]["id"],
+            slack_config["bot_token"],
+            slack_config["captcha"]["channel"]["id"],
             ts,
         )
+        logging.info("Slack に SMS で送られてきた認証番号を入力してください")
     else:
         code = input("SMS で送られてきた認証番号を入力してください: ")
 
@@ -151,13 +153,13 @@ def execute_impl(config, driver, wait, line_use, line_pass):
     logging.info("ログインに成功しました．")
 
 
-def execute(config, driver, wait, line_use, line_pass, dump_path):
+def execute(driver, wait, line_use, line_pass, slack_config, dump_path):
     try:
-        execute_impl(config, driver, wait, line_use, line_pass)
+        execute_impl(driver, wait, line_use, line_pass, slack_config)
     except Exception:
         logging.error(traceback.format_exc())
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)
         # NOTE: 1回だけリトライする
         logging.error("ログインをリトライします．")
         time.sleep(10)
-        execute_impl(config, driver, wait, line_use, line_pass)
+        execute_impl(driver, wait, line_use, line_pass, slack_config)
