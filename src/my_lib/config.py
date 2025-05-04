@@ -13,6 +13,7 @@ Options:
 
 import json
 import logging
+import os
 import pathlib
 
 import genson
@@ -20,6 +21,10 @@ import jsonschema
 import yaml
 
 CONFIG_PATH = "config.yaml"
+
+
+def abs_path(config_path=CONFIG_PATH):
+    return pathlib.Path(os.getcwd(), config_path)
 
 
 def load(config_path=CONFIG_PATH, schema_path=None):
@@ -39,6 +44,8 @@ def load(config_path=CONFIG_PATH, schema_path=None):
             except jsonschema.exceptions.ValidationError:
                 logging.error("設定ファイルのフォーマットに問題があります．")  # noqa: TRY400
                 raise
+
+    yaml_data["base_dir"] = abs_path(config_path).parent
 
     return yaml_data
 
