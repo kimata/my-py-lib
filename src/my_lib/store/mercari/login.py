@@ -65,11 +65,10 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
                 selenium.webdriver.common.by.By.XPATH,
-                '//div[@class="merNavigationTopMenu"]',
+                '//button[contains(@class, "iconButton") and @aria-label="お知らせ"]',
             )
         )
     )
-    time.sleep(1)
 
     my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "はじめる")]')
     time.sleep(1)
