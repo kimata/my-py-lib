@@ -38,17 +38,17 @@ def build_message(subject, message, image=None):
     return msg.as_string()
 
 
-def send_impl(config, message):
-    smtp = smtplib.SMTP(config["mail"]["smtp"]["host"], config["mail"]["smtp"]["port"])
+def send_impl(mail_config, message):
+    smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
     smtp.starttls()
-    smtp.login(config["mail"]["user"], config["mail"]["pass"])
-    smtp.sendmail(config["mail"]["from"], config["mail"]["to"], message)
+    smtp.login(mail_config["user"], mail_config["pass"])
+    smtp.sendmail(mail_config["from"], mail_config["to"], message)
     smtp.quit()
 
 
-def send(config, message):
+def send(mail_config, message):
     try:
-        send_impl(config, message)
+        send_impl(mail_config, message)
     except Exception:
         logging.exception("Failed to sendo Mail message")
 
