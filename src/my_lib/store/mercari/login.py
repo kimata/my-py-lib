@@ -39,8 +39,8 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
 
         if slack_config is not None:
             my_lib.notify.slack.info(
-                slack_config["slack"]["bot_token"],
-                slack_config["slack"]["captcha"]["channel"]["name"],
+                slack_config["bot_token"],
+                slack_config["captcha"]["channel"]["name"],
                 "LINE ログイン",
                 f"LINE アプリで認証番号「{code}」を入力してください。",
             )
