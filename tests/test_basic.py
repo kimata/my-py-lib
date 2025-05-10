@@ -479,8 +479,6 @@ def test_selenium_util(mocker):
     my_lib.selenium_util.click_xpath(driver, "//h10", is_warn=False)
 
     with my_lib.selenium_util.browser_tab(driver, TEST_URL):
-        time.sleep(1)
-        my_lib.selenium_util.dump_page(driver, 0, pathlib.Path("tests/evidence"))
         wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
                 (selenium.webdriver.common.by.By.XPATH, "//h1")
@@ -497,10 +495,10 @@ def test_selenium_util(mocker):
             ),
         )
 
+    my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
+
     assert my_lib.selenium_util.get_text(driver, "//h1", "TEST") != "TEST"
     assert my_lib.selenium_util.get_text(driver, "//h10", "TEST") == "TEST"
-
-    my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
 
     dummy_file_path = DUMP_PATH / "dummy.file"
     dummy_file_path.touch()
