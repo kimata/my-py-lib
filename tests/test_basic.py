@@ -478,6 +478,8 @@ def test_selenium_util(mocker):
     my_lib.selenium_util.click_xpath(driver, "//h10")
     my_lib.selenium_util.click_xpath(driver, "//h10", is_warn=False)
 
+    my_lib.selenium_util.dump_page(driver, 0, pathlib.Path("tests/evidence"))
+
     with my_lib.selenium_util.browser_tab(driver, TEST_URL):
         wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
@@ -496,6 +498,7 @@ def test_selenium_util(mocker):
         )
 
     my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
+    my_lib.selenium_util.dump_page(driver, 1, pathlib.Path("tests/evidence"))
 
     assert my_lib.selenium_util.get_text(driver, "//h1", "TEST") != "TEST"
     assert my_lib.selenium_util.get_text(driver, "//h10", "TEST") == "TEST"
