@@ -449,8 +449,8 @@ def test_panel_util():
     )
 
 
-def test_selenium_util(mocker):  # noqa: ARG001
-    # import os
+def test_selenium_util(mocker):
+    import os
 
     import my_lib.selenium_util
     import selenium.webdriver.common.by
@@ -458,7 +458,7 @@ def test_selenium_util(mocker):  # noqa: ARG001
     import selenium.webdriver.support.wait
 
     TEST_URL = "https://example.com/"
-    # DUMP_PATH = pathlib.Path("tests/data/dump")
+    DUMP_PATH = pathlib.Path("tests/data/dump")
 
     driver = my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
@@ -466,10 +466,12 @@ def test_selenium_util(mocker):  # noqa: ARG001
     my_lib.selenium_util.warmup(driver, "Yaoo.co.jp", "yahoo")
 
     driver.get(TEST_URL)
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (selenium.webdriver.common.by.By.TAG_NAME, "h1")
-        )
+    my_lib.selenium_util.wait_patiently(
+        driver,
+        wait,
+        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+            (selenium.webdriver.common.by.By.XPATH, "//h1")
+        ),
     )
 
     my_lib.selenium_util.click_xpath(driver, "//h1", wait)
@@ -477,52 +479,48 @@ def test_selenium_util(mocker):  # noqa: ARG001
     my_lib.selenium_util.click_xpath(driver, "//h10", is_warn=False)
 
     with my_lib.selenium_util.browser_tab(driver, TEST_URL):
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
+                (selenium.webdriver.common.by.By.XPATH, "//h1")
+            )
+        )
         my_lib.selenium_util.is_display(driver, "//h1")
 
-    my_lib.selenium_util.dump_page(driver, 0, pathlib.Path("tests/evidence"))
+    with pytest.raises(selenium.common.exceptions.TimeoutException):
+        my_lib.selenium_util.wait_patiently(
+            driver,
+            wait,
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+                (selenium.webdriver.common.by.By.XPATH, "//h10")
+            ),
+        )
 
-    # my_lib.selenium_util.wait_patiently(
-    #     driver,
-    #     wait,
-    #     selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-    #         (selenium.webdriver.common.by.By.XPATH, "//h1")
-    #     ),
-    # )
-    # with pytest.raises(selenium.common.exceptions.TimeoutException):
-    #     my_lib.selenium_util.wait_patiently(
-    #         driver,
-    #         wait,
-    #         selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-    #             (selenium.webdriver.common.by.By.XPATH, "//h10")
-    #         ),
-    #     )
+    assert my_lib.selenium_util.get_text(driver, "//h1", "TEST") != "TEST"
+    assert my_lib.selenium_util.get_text(driver, "//h10", "TEST") == "TEST"
 
-    # assert my_lib.selenium_util.get_text(driver, "//h1", "TEST") != "TEST"
-    # assert my_lib.selenium_util.get_text(driver, "//h10", "TEST") == "TEST"
+    my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
 
-    # my_lib.selenium_util.dump_page(driver, 0, DUMP_PATH)
+    dummy_file_path = DUMP_PATH / "dummy.file"
+    dummy_file_path.touch()
+    os.utime(dummy_file_path, (0, 0))
 
-    # dummy_file_path = DUMP_PATH / "dummy.file"
-    # dummy_file_path.touch()
-    # os.utime(dummy_file_path, (0, 0))
+    (DUMP_PATH / "dummy.dir").mkdir(parents=True, exist_ok=True)
 
-    # (DUMP_PATH / "dummy.dir").mkdir(parents=True, exist_ok=True)
+    my_lib.selenium_util.clear_cache(driver)
 
-    # my_lib.selenium_util.clear_cache(driver)
+    my_lib.selenium_util.clean_dump(DUMP_PATH)
+    my_lib.selenium_util.clean_dump(pathlib.Path("tests/not_exists"))
 
-    # my_lib.selenium_util.clean_dump(DUMP_PATH)
-    # my_lib.selenium_util.clean_dump(pathlib.Path("tests/not_exists"))
+    my_lib.selenium_util.log_memory_usage(driver)
 
-    # my_lib.selenium_util.log_memory_usage(driver)
+    my_lib.selenium_util.random_sleep(0.5)
 
-    # my_lib.selenium_util.random_sleep(0.5)
+    driver.quit()
 
-    # driver.quit()
+    mocker.patch("my_lib.selenium_util.create_driver_impl", side_effect=RuntimeError())
 
-    # mocker.patch("my_lib.selenium_util.create_driver_impl", side_effect=RuntimeError())
-
-    # with pytest.raises(RuntimeError):
-    #     my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
+    with pytest.raises(RuntimeError):
+        my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
 
 
 def test_weather():
