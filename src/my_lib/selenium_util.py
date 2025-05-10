@@ -265,8 +265,3 @@ class browser_tab:  # noqa: N801
         self.driver.close()
         self.driver.switch_to.window(self.driver.window_handles[-1])
         time.sleep(0.5)
-
-
-if __name__ == "__main__":
-    # TEST Code
-    clean_dump()
