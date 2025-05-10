@@ -257,9 +257,9 @@ class browser_tab:  # noqa: N801
         self.url = url
 
     def __enter__(self):  # noqa: D105
-        self.driver.execute_script(f"window.open('{self.url}', '_blank');")
+        self.driver.execute_script("window.open('');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
-        time.sleep(0.5)
+        self.driver.get(self.url)
 
     def __exit__(self, exception_type, exception_value, traceback):  # noqa: D105
         self.driver.close()
