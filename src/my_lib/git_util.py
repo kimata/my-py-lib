@@ -28,7 +28,6 @@ def revision_str():
 
 if __name__ == "__main__":
     import docopt
-
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
