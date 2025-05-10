@@ -155,7 +155,7 @@ def random_sleep(sec):
 
 def wait_patiently(driver, wait, target):
     error = None
-    for _ in range(WAIT_RETRY_COUNT + 1):
+    for i in range(WAIT_RETRY_COUNT + 1):
         try:
             wait.until(target)
             return
@@ -166,8 +166,10 @@ def wait_patiently(driver, wait, target):
                 inspect.stack()[1].filename,
                 inspect.stack()[1].lineno,
             )
-            driver.refresh()
             error = e
+
+            if i != WAIT_RETRY_COUNT:
+                driver.refresh()
 
     raise error
 
