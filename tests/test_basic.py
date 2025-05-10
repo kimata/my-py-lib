@@ -454,17 +454,23 @@ def test_selenium_util(mocker):  # noqa: ARG001
 
     import my_lib.selenium_util
     import selenium.webdriver.common.by
+    import selenium.webdriver.support.expected_conditions
     import selenium.webdriver.support.wait
 
     TEST_URL = "https://example.com/"
     # DUMP_PATH = pathlib.Path("tests/data/dump")
 
     driver = my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 0.5)
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
 
-    my_lib.selenium_util.warmup(driver, "Yaoo.co.jp", "yahoo", 0.5)
+    my_lib.selenium_util.warmup(driver, "Yaoo.co.jp", "yahoo")
 
     driver.get(TEST_URL)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (selenium.webdriver.common.by.By.TAG_NAME, "h1")
+        )
+    )
 
     my_lib.selenium_util.click_xpath(driver, "//h1", wait)
     my_lib.selenium_util.click_xpath(driver, "//h10")
