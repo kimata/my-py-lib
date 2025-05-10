@@ -168,7 +168,9 @@ def wait_patiently(driver, wait, target):
             )
             error = e
 
+            logging.info(i)
             if i != WAIT_RETRY_COUNT:
+                logging.info("refresh")
                 driver.refresh()
 
     raise error
