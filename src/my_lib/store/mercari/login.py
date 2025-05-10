@@ -2,7 +2,6 @@
 import logging
 import random
 import time
-import traceback
 
 import my_lib.notify.slack
 import my_lib.selenium_util
@@ -152,13 +151,12 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
     logging.info("ログインに成功しました．")
 
 
-def execute(driver, wait, line_use, line_pass, slack_config, dump_path):
+def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa: PLR0913
     try:
         execute_impl(driver, wait, line_use, line_pass, slack_config)
     except Exception:
-        logging.error(traceback.format_exc())
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)
+        logging.exception("ログインをリトライします．")
+        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
         # NOTE: 1回だけリトライする
-        logging.error("ログインをリトライします．")
         time.sleep(10)
         execute_impl(driver, wait, line_use, line_pass, slack_config)

@@ -67,13 +67,15 @@ def parse_item(driver, index):
     }
 
 
-def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list):
+def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list):  # noqa: PLR0913
     item = parse_item(driver, index)
 
     logging.info(
-        "{name} [{id}] [{price:,}円] [{view:,} view] を処理します．".format(
-            id=item["id"], name=item["name"], price=item["price"], view=item["view"]
-        )
+        "%s [%s] [%s円] [%s view] を処理します．",
+        item["name"],
+        item["id"],
+        f"{item['price']:,}",
+        f"{item['view']:,}",
     )
 
     driver.execute_script("window.scrollTo(0, 0);")
@@ -82,7 +84,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
         ITEM_LIST_XPATH + "[" + str(index) + "]//a",
     )
     # NOTE: アイテムにスクロールしてから，ヘッダーに隠れないようちょっと前に戻す
-    item_link.location_once_scrolled_into_view
+    item_link.location_once_scrolled_into_view  # noqa: B018
     driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
     item_link.click()
 
@@ -153,7 +155,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
         )
     )
 
-    logging.info("{item_count}個の出品があります．".format(item_count=item_count))
+    logging.info("%d 個の出品があります．", item_count)
 
     list_url = driver.current_url
     for i in range(1, item_count + 1):

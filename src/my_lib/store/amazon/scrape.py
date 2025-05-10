@@ -27,7 +27,7 @@ import selenium.webdriver.common.by
 import selenium.webdriver.support
 
 
-def fetch_price_impl(driver, wait, config, item):
+def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
     PRICE_ELEM_LIST = [
         {
             "xpath": '//span[contains(@class, "apexPriceToPay")]/span[@aria-hidden]',
@@ -74,7 +74,7 @@ def fetch_price_impl(driver, wait, config, item):
         breadcrumb_list = driver.find_elements(
             selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
         )
-        category = list(map(lambda x: x.text, breadcrumb_list))[0]
+        category = next(x.text for x in breadcrumb_list)
 
     except Exception:
         logging.exception("Failed to fetch category")
@@ -85,7 +85,7 @@ def fetch_price_impl(driver, wait, config, item):
         if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, price_elem["xpath"])) == 0:
             continue
 
-        logging.debug('xpath: "{xpath}'.format(xpath=price_elem["xpath"]))
+        logging.debug('xpath: "%s', price_elem["xpath"])
 
         if price_elem["type"] == "html":
             price_text = (
@@ -109,22 +109,24 @@ def fetch_price_impl(driver, wait, config, item):
             price_text = driver.find_element(
                 selenium.webdriver.common.by.By.XPATH, '//span[contains(@class, "a-color-price")]'
             ).text
-            if (price_text == "現在在庫切れです。") or (price_text == "この商品は現在お取り扱いできません。"):
-                logging.warning("Price is NOT displayed: {url}".format(url=item["url"]))
+            if price_text in {"現在在庫切れです。", "この商品は現在お取り扱いできません。"}:
+                logging.warning("Price is NOT displayed: %s", item["url"])
                 return {"price": 0, "category": category}
         elif (
             len(
                 driver.find_elements(
                     selenium.webdriver.common.by.By.XPATH,
-                    '//div[contains(@class, "a-box-inner") and contains(@class, "a-padding-medium")]'
-                    + '/span[contains(text(), "ありません")]',
+                    (
+                        '//div[contains(@class, "a-box-inner") and contains(@class, "a-padding-medium")]'
+                        '/span[contains(text(), "ありません")]'
+                    ),
                 )
             )
             != 0
         ):
             return {"price": 0, "category": category}
         else:
-            logging.warning("Unable to fetch price: {url}".format(url=item["url"]))
+            logging.warning("Unable to fetch price: %s", item["url"])
 
             my_lib.notify.slack.error_with_image(
                 config["slack"]["bot_token"],
@@ -132,7 +134,7 @@ def fetch_price_impl(driver, wait, config, item):
                 config["slack"]["error"]["channel"]["id"],
                 "価格取得に失敗",
                 "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
-                PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
+                PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
                 interval_min=0.5,
             )
             return {"price": 0, "category": category}
@@ -141,16 +143,15 @@ def fetch_price_impl(driver, wait, config, item):
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", re.sub(r"[^0-9][0-9]+個", "", price_text))
         price = int(m.group(1).replace(",", ""))
     except Exception:
-        logging.warning(
-            'Unable to parse "{price_text}": {url}.'.format(price_text=price_text, url=item["url"])
-        )
+        logging.warning('Unable to parse "%s": %s.', price_text, item["url"])
+
         my_lib.notify.slack.error_with_image(
             config["slack"]["bot_token"],
             config["slack"]["error"]["channel"]["name"],
             config["slack"]["error"]["channel"]["id"],
             "価格取得に失敗",
             "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
-            PIL.Image.open((io.BytesIO(driver.get_screenshot_as_png()))),
+            PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
             interval_min=0.5,
         )
         return {"price": 0, "category": category}
@@ -171,7 +172,7 @@ def fetch_price(driver, wait, config, item):
         if (item["price"] is None) or (item["price"] == 0):
             my_lib.selenium_util.dump_page(
                 driver,
-                int(random.random() * 100),
+                int(random.random() * 100),  # noqa: S311
                 pathlib.Path(config["data"]["dump"]),
             )
     except Exception:

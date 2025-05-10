@@ -12,7 +12,6 @@ Options:
   -D                : デバッグモードで動作します．
 """
 
-import importlib
 import logging
 import pathlib
 import pickle

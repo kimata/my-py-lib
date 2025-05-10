@@ -90,7 +90,7 @@ def execute_impl(driver, wait, config, login_mark_xpath):
         config["store"]["amazon"]["pass"]
     )
 
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]')) != 0:
+    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]')) != 0:  # noqa: SIM102
         if not driver.find_element(
             selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]'
         ).get_attribute("checked"):
@@ -116,12 +116,12 @@ def execute_impl(driver, wait, config, login_mark_xpath):
     if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
         my_lib.selenium_util.dump_page(
             driver,
-            int(random.random() * 100),
+            int(random.random() * 100),  # noqa: S311
             pathlib.Path(config["data"]["dump"]),
         )
 
 
-def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MARK_XPATH, retry=2):
+def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MARK_XPATH, retry=2):  # noqa: PLR0913
     logging.info("Login start")
 
     driver.get(login_url)
@@ -138,7 +138,7 @@ def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MA
 
             my_lib.selenium_util.dump_page(
                 driver,
-                int(random.random() * 100),
+                int(random.random() * 100),  # noqa: S311
                 pathlib.Path(config["data"]["dump"]),
             )
 
@@ -168,11 +168,11 @@ if __name__ == "__main__":
     try:
         execute(driver, wait, config)
     except Exception:
-        logging.error("URL: %s", driver.current_url)
+        logging.exception("URL: %s", driver.current_url)
 
         my_lib.selenium_util.dump_page(
             driver,
-            int(random.random() * 100),
+            int(random.random() * 100),  # noqa: S311
             pathlib.Path(config["data"]["dump"]),
         )
 

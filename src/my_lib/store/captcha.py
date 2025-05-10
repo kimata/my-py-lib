@@ -148,9 +148,9 @@ def resolve_recaptcha_mail(driver, wait, config):
             ):
                 time.sleep(0.5)
                 continue
-            elif my_lib.selenium_util.click_xpath(
+            if my_lib.selenium_util.click_xpath(
                 driver, '//button[contains(text(), "確認")]', move=True, is_warn=False
-            ):  # noqa: RET507
+            ):
                 time.sleep(0.5)
 
                 if my_lib.selenium_util.is_display(
@@ -158,12 +158,10 @@ def resolve_recaptcha_mail(driver, wait, config):
                 ) or my_lib.selenium_util.is_display(driver, '//div[contains(text(), "もう一度")]'):
                     continue
                 break
-            else:
-                my_lib.selenium_util.click_xpath(
-                    driver, '//button[contains(text(), "次へ")]', move=True, is_warn=False
-                )
-                time.sleep(0.5)
-                continue
+            my_lib.selenium_util.click_xpath(
+                driver, '//button[contains(text(), "次へ")]', move=True, is_warn=False
+            )
+            time.sleep(0.5)
 
         for idx in list(select_str):
             if ord(idx) <= 57:  # noqa: SIM108
@@ -304,7 +302,7 @@ if __name__ == "__main__":
         config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
     )
 
-    logging.info("CAPTCHA is '{captcha}'".format(captcha=captcha))
+    logging.info('CAPTCHA is "%s"', captcha)
 
     ts = send_request_text_slack(
         config["slack"]["bot_token"],
@@ -317,4 +315,4 @@ if __name__ == "__main__":
         config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], ts
     )
 
-    logging.info("CAPTCHA is '{captcha}'".format(captcha=captcha))
+    logging.info('CAPTCHA is "%s"', captcha)

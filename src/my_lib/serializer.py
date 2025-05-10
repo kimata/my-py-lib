@@ -58,6 +58,9 @@ def get_size_str(file_path):
             return f"{size:.2f} {unit}"
         size /= 1024
 
+    # NOTE: ここには来ない
+    return "?"
+
 
 if __name__ == "__main__":
     # TEST Code
@@ -77,6 +80,6 @@ if __name__ == "__main__":
     store(file_path, data)
     f.flush()
 
-    assert load(file_path) == data
+    assert load(file_path) == data  # noqa: S101
 
     logging.info("OK")

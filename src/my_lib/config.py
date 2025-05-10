@@ -13,7 +13,6 @@ Options:
 
 import json
 import logging
-import os
 import pathlib
 
 import genson
@@ -24,7 +23,7 @@ CONFIG_PATH = "config.yaml"
 
 
 def abs_path(config_path=CONFIG_PATH):
-    return pathlib.Path(os.getcwd(), config_path)
+    return pathlib.Path(pathlib.Path.cwd(), config_path)
 
 
 def load(config_path=CONFIG_PATH, schema_path=None):
