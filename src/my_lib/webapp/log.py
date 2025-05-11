@@ -16,6 +16,7 @@ import my_lib.flask_util
 import my_lib.notify.slack
 import my_lib.webapp.config
 import my_lib.webapp.event
+import zoneinfo
 
 
 class LOG_LEVEL(IntEnum):  # noqa: N801
@@ -175,7 +176,16 @@ def get(stop_day):
         # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
         [f"-{stop_day} days"],
     )
-    return cur.fetchall()
+    log_list = [dict(log) for log in cur.fetchall()]
+    for log in log_list:
+        log["date"] = (
+            datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
+            .replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+            .astimezone(my_lib.webapp.config.TIMEZONE)
+            .strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+    return log_list
 
 
 def clear():
@@ -208,18 +218,18 @@ def api_log_view():
     # 無効化する。
     flask.g.disable_cache = True
 
-    log = get(stop_day)
+    log_list = get(stop_day)
 
-    if len(log) == 0:
+    if len(log_list) == 0:
         last_time = time.time()
     else:
         last_time = (
-            datetime.datetime.strptime(log[0]["date"], "%Y-%m-%d %H:%M:%S")
+            datetime.datetime.strptime(log_list[0]["date"], "%Y-%m-%d %H:%M:%S")
             .replace(tzinfo=my_lib.webapp.config.TIMEZONE)
             .timestamp()
         )
 
-    response = flask.jsonify({"data": log, "last_time": last_time})
+    response = flask.jsonify({"data": log_list, "last_time": last_time})
 
     response.headers["Last-Modified"] = format_date_time(last_time)
     response.make_conditional(flask.request)
