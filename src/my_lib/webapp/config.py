@@ -4,11 +4,14 @@ import logging
 import pathlib
 
 import my_lib.time
+import pytz
 
 URL_PREFIX = None
 
 TIMEZONE = my_lib.time.get_timezone()
+TIMEZONE_PYTZ = pytz.timezone(TIMEZONE.key)  # NOTE: schedule モジュールを使う場合に必要
 TIMEZONE_OFFSET = datetime.datetime.now(TIMEZONE).utcoffset().total_seconds() / 3600
+
 
 STATIC_DIR_PATH = None
 
