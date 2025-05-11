@@ -5,7 +5,7 @@ import re
 import ssl
 import urllib.request
 
-import lxml
+import lxml.html
 import my_lib.time
 
 
