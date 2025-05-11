@@ -27,7 +27,10 @@ def elapsed(path):
         return diff_sec
 
     with pathlib.Path(path).open() as f:
-        diff_sec -= float(f.read())
+        last_update = f.read()
+
+        if last_update != "":
+            diff_sec -= float(last_update)
 
     return diff_sec
 
