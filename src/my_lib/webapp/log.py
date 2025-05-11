@@ -179,7 +179,7 @@ def get(stop_day):
     log_list = [dict(log) for log in cur.fetchall()]
     for log in log_list:
         log["date"] = (
-            datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
+            datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
             .replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
             .astimezone(my_lib.webapp.config.TIMEZONE)
             .strftime("%Y-%m-%d %H:%M:%S")
