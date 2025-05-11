@@ -540,6 +540,14 @@ def test_weather():
     my_lib.weather.get_sunset_nao({"data": {"nao": {"pref": 13}}})
 
 
+def test_time():
+    import datetime
+
+    import my_lib.time
+
+    assert isinstance(my_lib.time.now(), datetime.datetime)
+
+
 def test_webapp_log_term():
     import my_lib.webapp.log
 
