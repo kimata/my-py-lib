@@ -94,15 +94,11 @@ def log_impl(message, level):
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
     with log_lock:
-        # NOTE: SQLite に記録する時刻はローカルタイムにする
         sqlite.execute(
-            'INSERT INTO log VALUES (NULL, DATETIME("now", ?), ?)',
-            [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours", message],
+            'INSERT INTO log VALUES (NULL, DATETIME("now"), ?)',
+            [message],
         )
-        sqlite.execute(
-            'DELETE FROM log WHERE date <= DATETIME("now", ?, "-60 days")',
-            [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours"],
-        )
+        sqlite.execute('DELETE FROM log WHERE date <= DATETIME("now", "-60 days")')
         sqlite.commit()
 
         my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
@@ -175,9 +171,9 @@ def get(stop_day):
 
     cur = sqlite.cursor()
     cur.execute(
-        'SELECT * FROM log WHERE date <= DATETIME("now", ?,?) ORDER BY id DESC LIMIT 500',
-        # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにるす
-        [f"{my_lib.webapp.config.TIMEZONE_OFFSET} hours", f"-{stop_day} days"],
+        'SELECT * FROM log WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',
+        # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
+        [f"-{stop_day} days"],
     )
     return cur.fetchall()
 
