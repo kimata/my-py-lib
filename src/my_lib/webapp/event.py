@@ -25,6 +25,7 @@ blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.c
 event_count = multiprocessing.Array("i", 4)
 
 is_stop_watch = False
+watch_thread = None
 
 
 def notify_watch_impl(queue):
@@ -42,21 +43,35 @@ def notify_watch_impl(queue):
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際，freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
+        except ValueError:  # pragma: no cover
+            # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
+            # 発生する．
+            logging.warning(traceback.format_exc())
 
     logging.info("Stop notify watch thread")
 
 
 def notify_watch(queue):
     global is_stop_watch  # noqa: PLW0603
+    global watch_thread  # noqa: PLW0603
 
     is_stop_watch = False
-    threading.Thread(target=notify_watch_impl, args=(queue,)).start()
+
+    watch_thread = threading.Thread(target=notify_watch_impl, args=(queue,))
+    watch_thread.start()
 
 
 def stop_watch():
     global is_stop_watch  # noqa: PLW0603
+    global watch_thread  # noqa: PLW0603
 
-    is_stop_watch = True
+    if watch_thread is not None:
+        is_stop_watch = True
+
+        # NOTE: pytest で freezer 使うと下記で固まるので join を見送る
+        # watch_thread.join()
+
+        watch_thread = None
 
 
 def event_index(event_type):

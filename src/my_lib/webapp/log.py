@@ -34,7 +34,7 @@ config = None
 should_terminate = False
 
 
-def init(config_):
+def init(config_, is_read_only=False):
     global config  # noqa: PLW0603
     global sqlite  # noqa: PLW0603
     global log_lock  # noqa: PLW0603
@@ -47,6 +47,7 @@ def init(config_):
     if sqlite is not None:
         raise ValueError("sqlite should be None")  # noqa: TRY003, EM101
 
+    my_lib.webapp.config.LOG_DIR_PATH.parent.mkdir(parents=True, exist_ok=True)
     sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=False)
     sqlite.execute(
         "CREATE TABLE IF NOT EXISTS log(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
@@ -55,28 +56,32 @@ def init(config_):
     sqlite.commit()
     sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
 
-    should_terminate = False
+    if not is_read_only:
+        should_terminate = False
 
-    log_lock = threading.Lock()
-    log_queue = Queue()
-    log_thread = threading.Thread(target=worker, args=(log_queue,))
-    log_thread.start()
+        log_lock = threading.Lock()
+        log_queue = Queue()
+        log_thread = threading.Thread(target=worker, args=(log_queue,))
+        log_thread.start()
 
 
-def term():
+def term(is_read_only=False):
     global sqlite  # noqa: PLW0603
     global log_thread  # noqa: PLW0603
     global should_terminate  # noqa: PLW0603
 
-    if log_thread is None:
-        return
+    if sqlite is not None:
+        sqlite.close()
+        sqlite = None
 
-    should_terminate = True
+    if not is_read_only:
+        if log_thread is None:
+            return
+        should_terminate = True
 
-    log_thread.join()
-    log_thread = None
-    sqlite.close()
-    sqlite = None
+        log_queue.close()
+        log_thread.join()
+        log_thread = None
 
 
 def log_impl(message, level):
@@ -133,6 +138,10 @@ def worker(log_queue):
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際，freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
+        except ValueError:  # pragma: no cover
+            # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
+            # 発生する．
+            logging.warning(traceback.format_exc())
 
         time.sleep(sleep_sec)
 
