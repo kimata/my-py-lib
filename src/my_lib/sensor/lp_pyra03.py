@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-LP PYRA03 を使って日射量を計測するライブラリです．
+LP PYRA03 を使って日射量を計測するライブラリです。
 
 Usage:
-  lp_pyra03.py [-b BUS] [-d DEV_ADDR]
+  lp_pyra03.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x48]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x48]
+  -D                : デバッグモードで動作します。
 """
 
-# 日射計の電圧は，ADS1115 を使って取得することを想定しています．
+# 日射計の電圧は，ADS1115 を使って取得することを想定しています。
 
 import logging
 
@@ -49,8 +50,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.lp_pyra03(bus_id=bus_id, dev_addr=dev_addr)
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-YAML 型式で定義された設定ファイルを読み込むライブラリです．
+YAML 型式で定義された設定ファイルを読み込むライブラリです。
 
 Usage:
   config.py [-c CONFIG] [-S] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -S                : YAML 記述をもとにして，JSON Schema の雛形を生成します．
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -S                : YAML 記述をもとにして，JSON Schema の雛形を生成します。
+  -D                : デバッグモードで動作します。
 """
 
 import json
@@ -41,7 +41,7 @@ def load(config_path=CONFIG_PATH, schema_path=None):
             try:
                 jsonschema.validate(instance=yaml_data, schema=schema)
             except jsonschema.exceptions.ValidationError:
-                logging.error("設定ファイルのフォーマットに問題があります．")  # noqa: TRY400
+                logging.error("設定ファイルのフォーマットに問題があります。")  # noqa: TRY400
                 raise
 
     yaml_data["base_dir"] = abs_path(config_path).parent
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     schema_mode = args["-S"]
     debug_mode = args["-D"]
 
-    my_lib.logger.init("my-lib.config", level=logging.DEBUG if debug_mode else logging.INFO)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     if schema_mode:
         generate_schema(config_file)

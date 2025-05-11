@@ -166,8 +166,8 @@ class BP35A1:
     def __send_command_raw(self, command, echo_back=lambda command: command):
         self.write(command)
         self.write("\r\n")
-        # NOTE: echo_back はコマンドからエコーバック文字列を生成する関数．
-        # デフォルトはコマンドそのもの．
+        # NOTE: echo_back はコマンドからエコーバック文字列を生成する関数。
+        # デフォルトはコマンドそのもの。
         self.__expect(echo_back(command))
 
         return self.read().rstrip()

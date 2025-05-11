@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-SHT-35 を使って温度や湿度を取得するライブラリです．
+SHT-35 を使って温度や湿度を取得するライブラリです。
 
 Usage:
-  sht35.py [-b BUS] [-d DEV_ADDR]
+  sht35.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x44]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x44]
+  -D                : デバッグモードで動作します。
 """
 
 # 作成時に使用したのは，Tindie の
-# 「SHT35-D (Digital) Humidity & Temperature Sensor」．
+# 「SHT35-D (Digital) Humidity & Temperature Sensor」。
 # https://www.tindie.com/products/closedcube/sht35-d-digital-humidity-temperature-sensor/
 
 import logging
@@ -87,8 +88,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.sht35(bus_id=bus_id, dev_addr=dev_addr)
 

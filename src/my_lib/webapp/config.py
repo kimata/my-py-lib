@@ -3,15 +3,12 @@ import datetime
 import logging
 import pathlib
 
-import pytz
-import zoneinfo
+import my_lib.time
 
 URL_PREFIX = None
 
-TIMEZONE_OFFSET = 9
-TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "JST")
-TIMEZONE_PYTZ = pytz.timezone("Asia/Tokyo")
-ZONEINFO = zoneinfo.ZoneInfo("Asia/Tokyo")
+TIMEZONE = my_lib.time.get_timezone()
+TIMEZONE_OFFSET = datetime.datetime.now(TIMEZONE).utcoffset().total_seconds() / 3600
 
 STATIC_DIR_PATH = None
 
@@ -21,25 +18,10 @@ STAT_DIR_PATH = None
 
 
 def init(config):
-    global TIMEZONE_OFFSET  # noqa: PLW0603
-    global TIMEZONE  # noqa: PLW0603
-    global ZONEINFO  # noqa: PLW0603
     global STATIC_DIR_PATH  # noqa: PLW0603
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
     global STAT_DIR_PATH  # noqa: PLW0603
-
-    if "timezone" in config["webapp"]:
-        if "offset" in config["webapp"]["timezone"]:
-            TIMEZONE_OFFSET = int(config["webapp"]["timezone"]["offset"])
-            if "name" in config["webapp"]["timezone"]:
-                TIMEZONE = datetime.timezone(
-                    datetime.timedelta(hours=TIMEZONE_OFFSET), config["webapp"]["timezone"]["name"]
-                )
-            else:
-                TIMEZONE = datetime.timezone(datetime.timedelta(hours=TIMEZONE_OFFSET), "UNKOWN")
-        if "zone" in config["webapp"]["timezone"]:
-            ZONEINFO = zoneinfo.ZoneInfo(config["webapp"]["timezone"]["zone"])
 
     if "static_dir_path" in config["webapp"]:
         STATIC_DIR_PATH = pathlib.Path(config["webapp"]["static_dir_path"]).resolve()

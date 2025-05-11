@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-InfluxDB から電子機器の使用時間を取得します．
+InfluxDB から電子機器の使用時間を取得します。
 
 Usage:
-  sensor_data.py [-c CONFIG]  [-e EVERY] [-w WINDOW]
+  sensor_data.py [-c CONFIG]  [-e EVERY] [-w WINDOW] [-D]
 
 Options:
-  -c CONFIG    : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -e EVERY     : 何分ごとのデータを取得するか [default: 1]
-  -w WINDOWE   : 算出に使うウィンドウ [default: 5]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -d DB_CONFIG      :
+  -e EVERY          : 何分ごとのデータを取得するか [default: 1]
+  -w WINDOWE        : 算出に使うウィンドウ [default: 5]
+  -D                : デバッグモードで動作します。
 """
 
 import datetime
@@ -17,11 +19,11 @@ import os
 import time
 
 import influxdb_client
-from docopt import docopt
+import my_lib.time
 
 # NOTE: データが欠損している期間も含めてデータを敷き詰めるため，
-# timedMovingAverage を使う．timedMovingAverage の計算の結果，データが後ろに
-# ずれるので，あらかじめ offset を使って前にずらしておく．
+# timedMovingAverage を使う。timedMovingAverage の計算の結果，データが後ろに
+# ずれるので，あらかじめ offset を使って前にずらしておく。
 FLUX_QUERY = """
 from(bucket: "{bucket}")
 |> range(start: {start}, stop: {stop})
@@ -367,7 +369,7 @@ def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offs
         every_min = 1
         window_min = 5
 
-        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
+        now = my_lib.time.now()
 
         if day_before == 0:
             start = f"-{day_offset+days-1}d{now.hour}h{now.minute}m"
@@ -430,68 +432,83 @@ def dump_data(data):
         logging.info("%s: %s", data["time"][i], data["value"][i])
 
 
-if __name__ == "__main__":
-    import json
+# if __name__ == "__main__":
+# TEST Code
 
-    import logger
-    from config import get_db_config, load_config
+# def get_config(config, dotted_key):
+#     keys = dotted_key.split(".")
+#     value = config
 
-    args = docopt(__doc__)
+#     for key in keys:
+#         value = value[key]
+#         return value
 
-    logger.init("test", logging.DEBUG)
+# import json
 
-    config = load_config(args["-c"])
-    every = args["-e"]
-    window = args["-w"]
+# import docopt
+# import my_lib.config
+# import my_lib.logger
 
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
-    measure = config["USAGE"]["TARGET"]["TYPE"]
-    hostname = config["USAGE"]["TARGET"]["HOST"]
-    param = config["USAGE"]["TARGET"]["PARAM"]
-    threshold = config["USAGE"]["TARGET"]["THRESHOLD"]["WORK"]
-    start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
+# args = docopt.docopt(__doc__)
 
-    db_config = get_db_config(config)
+# config_file = args["-c"]
+# every = args["-e"]
+# window = args["-w"]
+# debug_mode = args["-D"]
 
-    dump_data(fetch_data(db_config, measure, hostname, param, start, "now()", every, window))
+# my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    start = f"-{now.hour}h{now.minute}m"
+# config = my_lib.config.load(config_file)
 
-    logging.info(
-        "Today ON minutes (%s) = %s min",
-        start,
-        get_equip_on_minutes(
-            db_config,
-            measure,
-            hostname,
-            param,
-            threshold,
-            start,
-            "now()",
-            every,
-            window,
-        ),
-    )
+# now = my_lib.time.now()
 
-    measure = config["GRAPH"]["VALVE"]["TYPE"]
-    hostname = config["GRAPH"]["VALVE"]["HOST"]
-    param = config["GRAPH"]["VALVE"]["PARAM"]
-    threshold = [
-        # NOTE: 閾値が高いものから並べる
-        config["GRAPH"]["VALVE"]["THRESHOLD"]["FULL"],
-        config["GRAPH"]["VALVE"]["THRESHOLD"]["INTERM"],
-    ]
-    start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
+# measure = config["USAGE"]["TARGET"]["TYPE"]
+# hostname = config["USAGE"]["TARGET"]["HOST"]
+# param = config["USAGE"]["TARGET"]["PARAM"]
+# threshold = config["USAGE"]["TARGET"]["THRESHOLD"]["WORK"]
+# start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
 
-    logging.info(
-        "Valve on period = %s",
-        json.dumps(
-            get_equip_mode_period(db_config, measure, hostname, param, threshold, start, "now()"),
-            indent=2,
-            default=str,
-        ),
-    )
+# db_config = get_db_config(config)
 
-    logging.info(
-        "Amount of cooling water used today = {get_day_sum(db_config, measure, hostname, param):.2f} L"
-    )
+# dump_data(fetch_data(db_config, measure, hostname, param, start, "now()", every, window))
+
+# start = f"-{now.hour}h{now.minute}m"
+
+# logging.info(
+#     "Today ON minutes (%s) = %s min",
+#     start,
+#     get_equip_on_minutes(
+#         db_config,
+#         measure,
+#         hostname,
+#         param,
+#         threshold,
+#         start,
+#         "now()",
+#         every,
+#         window,
+#     ),
+# )
+
+# measure = config["GRAPH"]["VALVE"]["TYPE"]
+# hostname = config["GRAPH"]["VALVE"]["HOST"]
+# param = config["GRAPH"]["VALVE"]["PARAM"]
+# threshold = [
+#     # NOTE: 閾値が高いものから並べる
+#     config["GRAPH"]["VALVE"]["THRESHOLD"]["FULL"],
+#     config["GRAPH"]["VALVE"]["THRESHOLD"]["INTERM"],
+# ]
+# start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
+
+# logging.info(
+#     "Valve on period = %s",
+#     json.dumps(
+#         get_equip_mode_period(db_config, measure, hostname, param, threshold, start, "now()"),
+#         indent=2,
+#         default=str,
+#     ),
+# )
+
+# logging.info(
+#     "Amount of cooling water used today = {get_day_sum(db_config, measure, hostname, param):.2f} L"
+# )

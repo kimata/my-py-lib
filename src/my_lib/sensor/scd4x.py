@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-SCD4x を使って CO2 濃度を取得するライブラリです．
+SCD4x を使って CO2 濃度を取得するライブラリです。
 
 Usage:
-  scd4x.py [-b BUS] [-d DEV_ADDR]
+  scd4x.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x62]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x62]
+  -D                : デバッグモードで動作します。
 """
 
-# 作成時に使用したのは，Sensirion の SEK SCD41．
+# 作成時に使用したのは，Sensirion の SEK SCD41。
 # https://www.sensirion.com/en/environmental-sensors/evaluation-kit-sek-environmental-sensing/evaluation-kit-sek-scd41/
-# 明示的に start_periodic_measurement を呼ばなくても済むように少し工夫しています．
+# 明示的に start_periodic_measurement を呼ばなくても済むように少し工夫しています。
 
 import logging
 import time
@@ -125,8 +126,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.scd4x(bus_id=bus_id, dev_addr=dev_addr)
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-スクレイピングで Amazon の価格情報を取得するライブラリです．
+スクレイピングで Amazon の価格情報を取得するライブラリです。
 
 Usage:
   scrape.py [-c CONFIG] [-t ASIN...] [-s DATA_PATH] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -t ASIN           : 価格情報を取得する ASIN．[default: B01MUZOWBH]
-  -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ．[default: data]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
+  -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
+  -D                : デバッグモードで動作します。
 """
 
 import io

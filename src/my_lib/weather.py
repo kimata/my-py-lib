@@ -5,7 +5,8 @@ import re
 import ssl
 import urllib.request
 
-from lxml import html
+import lxml
+import my_lib.time
 
 
 def fetch_page(url, encoding="UTF-8"):
@@ -18,9 +19,9 @@ def fetch_page(url, encoding="UTF-8"):
     data = urllib.request.urlopen(url, context=ctx)  # noqa: S310
 
     if encoding is not None:
-        return html.fromstring(data.read().decode(encoding))
+        return lxml.html.fromstring(data.read().decode(encoding))
     else:
-        return html.fromstring(data.read())
+        return lxml.html.fromstring(data.read())
 
 
 def parse_weather_yahoo(content):
@@ -119,7 +120,7 @@ def parse_wbgt_daily(content, wbgt_measured_today):
 
     wbgt_col_list = wbgt_col_list[8:]
     wbgt_list = []
-    # NOTE: 0, 3, ..., 21 時のデータが入るようにする．0 時はダミーで可．
+    # NOTE: 0, 3, ..., 21 時のデータが入るようにする。0 時はダミーで可。
     for i in range(27):
         if i % 9 == 0:
             # NOTE: 日付を取得しておく
@@ -132,10 +133,7 @@ def parse_wbgt_daily(content, wbgt_measured_today):
             else:
                 wbgt_list.append(int(val))
 
-    if (
-        wbgt_list[0]
-        == datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST")).date().day
-    ):
+    if wbgt_list[0] == my_lib.time.now().day:
         # NOTE: 日付が入っている部分は誤解を招くので None で上書きしておく
         wbgt_list[0] = None
         wbgt_list[9] = None
@@ -171,7 +169,7 @@ def get_wbgt_measured_today(wbgt_config):
     for i, col in enumerate(wbgt_col_list):
         if i % 12 != 9:
             continue
-        # NOTE: 0, 3, ..., 21 時のデータが入るようにする．0 時はダミーで可．
+        # NOTE: 0, 3, ..., 21 時のデータが入るようにする。0 時はダミーで可。
         val = col.text_content().strip()
         if val == "---":
             wbgt_list.append(None)
@@ -183,13 +181,13 @@ def get_wbgt_measured_today(wbgt_config):
 
 def get_wbgt(wbgt_config):
     # NOTE: 夏季にしか提供されないので冬は取りに行かない
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
+    now = my_lib.time.now()
 
     if (now.month < 3) or ((now.month == 4) and (now.day < 20)) or (now.month > 9):
         return {"current": None, "daily": {"today": None, "tomorrow": None}}
 
     # NOTE: 当日の過去時間のデータは表示されず，
-    # 別ページに実測値があるので，それを取ってくる．
+    # 別ページに実測値があるので，それを取ってくる。
     wbgt_measured_today = get_wbgt_measured_today(wbgt_config)
 
     content = fetch_page(wbgt_config["data"]["env_go"]["url"])
@@ -225,7 +223,7 @@ def get_sunset_date_nao(sunset_config, date):
 
 
 def get_sunset_nao(sunset_config):
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9), "JST"))
+    now = my_lib.time.now()
 
     return {
         "today": get_sunset_date_nao(sunset_config, now),

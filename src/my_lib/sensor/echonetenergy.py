@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 """
-ECHONET Lite を使って電力系から電力を取得するライブラリです．
+ECHONET Lite を使って電力系から電力を取得するライブラリです。
 
 Usage:
   echonetenergy.py [-c CONFIG] [-i IF_DEV] [-d DEV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -i IF_DEV         : ECHONET Lite のインターフェースデバイスを指定します．[default: BP35A1]
-  -d DEV_FILE       : デバイスファイルを指定します．[default: /dev/ttyAMA0]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -i IF_DEV         : ECHONET Lite のインターフェースデバイスを指定します。[default: BP35A1]
+  -d DEV_FILE       : デバイスファイルを指定します。[default: /dev/ttyAMA0]
+  -D                : デバッグモードで動作します。
 """
 
 import logging

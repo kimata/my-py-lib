@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-VOICEVOX を WEB API 経由でたたいて，音声ファイルを生成します．
+VOICEVOX を WEB API 経由でたたいて，音声ファイルを生成します。
 
 Usage:
   voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-o WAV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -m MESSAGE        : 音声化するメッセージ．[default: テストです]
-  -s SPEAKER_ID     : スピーカ．[default: 3]
-  -o WAV            : 書き出す音声ファイル．[default: text.wav]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -m MESSAGE        : 音声化するメッセージ。[default: テストです]
+  -s SPEAKER_ID     : スピーカ。[default: 3]
+  -o WAV            : 書き出す音声ファイル。[default: text.wav]
+  -D                : デバッグモードで動作します。
 """
 
 import io

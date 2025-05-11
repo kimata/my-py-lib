@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-RG-15 を使って雨量を計測するライブラリです．
+RG-15 を使って雨量を計測するライブラリです。
 
 Usage:
-  rg_15.py [-d DEV]
+  rg_15.py [-d DEV] [-D]
 
 Options:
-  -d DEV        : シリアルポート． [default: /dev/ttyAMA0]
+  -d DEV            : シリアルポート。 [default: /dev/ttyAMA0]
+  -D                : デバッグモードで動作します。
 """
 
 import logging
@@ -121,8 +122,9 @@ if __name__ == "__main__":
 
     args = docopt.docopt(__doc__)
     dev = args["-d"]
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.rg_15(dev=dev)
 

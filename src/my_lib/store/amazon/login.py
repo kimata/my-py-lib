@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Amazon へのログインをを行います．
+Amazon へのログインをを行います。
 
 Usage:
   login.py [-c CONFIG] [-t TARGET] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -D                : デバッグモードで動作します。
 """
 
 import logging
@@ -148,6 +148,7 @@ def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MA
 
 
 if __name__ == "__main__":
+    # TEST Code
     import docopt
     import my_lib.config
     import my_lib.logger

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-CAPTCHA を Slack を使って解決するライブラリです．
+CAPTCHA を Slack を使って解決するライブラリです。
 
 Usage:
   captcha.py [-c CONFIG] [-i IMAGE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -i IMAGE          : CAPTCA 画像．[default: tests/data/captcha.png]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -i IMAGE          : CAPTCA 画像。[default: tests/data/captcha.png]
+  -D                : デバッグモードで動作します。
 """
 
 import logging
@@ -136,10 +136,10 @@ def resolve_recaptcha_mail(driver, wait, config):
         )
         tile_idx_list = [elem.get_attribute("tabindex") for elem in tile_list]
 
-        # NOTE: メールを見て人間に選択するべき画像のインデックスを入力してもらう．
-        # インデックスは左上を 0 として横方向に 1, 2, ... とする形．
-        # 入力を簡単にするため，10以上は a, b, ..., g で指定．
-        # 0 は入力の完了を意味する．
+        # NOTE: メールを見て人間に選択するべき画像のインデックスを入力してもらう。
+        # インデックスは左上を 0 として横方向に 1, 2, ... とする形。
+        # 入力を簡単にするため，10以上は a, b, ..., g で指定。
+        # 0 は入力の完了を意味する。
         select_str = input("選択タイル(1-9,a-g,end=0): ").strip()
 
         if select_str == "0":

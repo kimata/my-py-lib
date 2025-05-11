@@ -6,7 +6,7 @@ import os
 import pathlib
 
 # NOTE: freezegun を使ったテスト時に，別スレッドのものも含めて time.time() を mock で
-# 置き換えたいので，別名にしておく．
+# 置き換えたいので，別名にしておく。
 from time import time as gpio_time
 
 

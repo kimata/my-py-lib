@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Line を使って通知を送ります．
+Line を使って通知を送ります。
 
 Usage:
   line.py [-c CONFIG] [-D] [-m MESSAGE]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -m MESSAGE        : 送信するメッセージ．[default: TEST]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -m MESSAGE        : 送信するメッセージ。[default: TEST]
+  -D                : デバッグモードで動作します。
 """
 
 import logging

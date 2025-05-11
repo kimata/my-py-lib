@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Slack で通知を行います．
+Slack で通知を行います。
 
 Usage:
   slack.py [-c CONFIG] [-m MESSAGE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します．[default: config.yaml]
-  -m MESSAGE        : 送信するメッセージ．[default: TEST]
-  -D                : デバッグモードで動作します．
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -m MESSAGE        : 送信するメッセージ。[default: TEST]
+  -D                : デバッグモードで動作します。
 """
 
 import json
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     config = my_lib.config.load(config_file)
 
     if "slack" not in config:
-        logging.warning("Slack の設定が記載されていません．")
+        logging.warning("Slack の設定が記載されていません。")
         sys.exit(-1)
 
     client = slack_sdk.WebClient(token=config["slack"]["bot_token"])

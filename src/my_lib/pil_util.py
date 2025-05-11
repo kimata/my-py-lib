@@ -28,7 +28,7 @@ def text_size(img, font, text):
 
 
 # NOTE: 詳細追えてないものの，英語フォントでボディサイズがおかしいものがあったので，
-# font_height_scale で補正できるようにしている．FuturaStd とかだと 0.75 が良さそう．
+# font_height_scale で補正できるようにしている。FuturaStd とかだと 0.75 が良さそう。
 def draw_text(  # noqa: PLR0913
     img,
     text,

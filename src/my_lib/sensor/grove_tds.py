@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Groove 水質測定センサー を使って TDS を取得するライブラリです．
+Groove 水質測定センサー を使って TDS を取得するライブラリです。
 
 Usage:
-  grove_tds.py [-b BUS] [-d DEV_ADDR]
+  grove_tds.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4A]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x4A]
+  -D                : デバッグモードで動作します。
 """
 
 import logging
@@ -51,8 +52,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.grove_tds(bus_id=bus_id, dev_addr=dev_addr)
 

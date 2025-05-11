@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-オブジェクトをシリアライズします．
+オブジェクトをシリアライズします。
 
 Usage:
   serializer.py [-D]
 
 Options:
-  -D                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します。
 """
 
 import logging

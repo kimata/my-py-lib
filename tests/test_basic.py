@@ -548,6 +548,12 @@ def test_time():
     assert isinstance(my_lib.time.now(), datetime.datetime)
 
 
+def test_git_util():
+    import my_lib.git_util
+
+    assert my_lib.git_util.get_revision_str() != ""
+
+
 def test_webapp_log_term():
     import my_lib.webapp.log
 

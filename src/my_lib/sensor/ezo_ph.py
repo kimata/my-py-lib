@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-EZO-pH を使って pH を取得するライブラリです．
+EZO-pH を使って pH を取得するライブラリです。
 
 Usage:
-  ezo_ph.py [-b BUS] [-d DEV_ADDR] [-C DEV_ADDR]
+  ezo_ph.py [-b BUS] [-d DEV_ADDR] [-C DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x64]
-  -C DEV_ADDR   : デバイスアドレスを変更します．
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x64]
+  -C DEV_ADDR       : デバイスアドレスを変更します。
+  -D                : デバッグモードで動作します。
 """
 
 import contextlib
@@ -84,8 +85,9 @@ if __name__ == "__main__":
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
     dev_addr_new = args["-C"]
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.ezo_ph(bus_id=bus_id, dev_addr=dev_addr)
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-KEYENCE のクランプオン式流量センサ FD-Q10C と IO-LINK で通信を行なって流量を取得するスクリプトです．
+KEYENCE のクランプオン式流量センサ FD-Q10C と IO-LINK で通信を行なって流量を取得するスクリプトです。
 
 Usage:
-  fd_q10c.py [-l LOCK] [-t TIMEOUT]
+  fd_q10c.py [-l LOCK] [-t TIMEOUT] [-D]
 
 Options:
-  -l LOCK       : ロックファイル． [default: /dev/shm/fd_q10c.lock]
-  -t TIMEOUT    : タイムアウト時間． [default: 5]
+  -l LOCK           : ロックファイル。 [default: /dev/shm/fd_q10c.lock]
+  -t TIMEOUT        : タイムアウト時間。 [default: 5]
+  -D                : デバッグモードで動作します。
 """
 
 import fcntl
@@ -147,8 +148,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     lock_file = args["-l"]
     timeout = int(args["-t"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.fd_q10c(lock_file, timeout)
 

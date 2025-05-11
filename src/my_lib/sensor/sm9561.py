@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-SM9561 を使って照度を計測するライブラリです．
+SM9561 を使って照度を計測するライブラリです。
 
 Usage:
-  sm9561.py [-b BUS] [-d DEV_ADDR]
+  sm9561.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4D]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x4D]
+  -D                : デバッグモードで動作します。
 """
 
 # SM9561: http://www.sonbest.com/english/products/SM9561.html
 
-# RS485 通信は，下記の基板を使って I2C 経由で行うことを想定しています．
+# RS485 通信は，下記の基板を使って I2C 経由で行うことを想定しています。
 # I2C-RS422/485変換基板
 # https://www.switch-science.com/products/7395
 # https://github.com/meerstern/I2C_RS422_RS485_Converter
@@ -227,8 +228,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.sm9561(bus_id=bus_id, dev_addr=dev_addr)
 

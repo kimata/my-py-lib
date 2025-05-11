@@ -71,7 +71,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
     item = parse_item(driver, index)
 
     logging.info(
-        "%s [%s] [%s円] [%s view] を処理します．",
+        "%s [%s] [%s円] [%s view] を処理します。",
         item["name"],
         item["id"],
         f"{item['price']:,}",
@@ -105,7 +105,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
                 if fail_count > RETRY_COUNT:
                     raise
 
-                logging.warning("タイムアウトしたので，リトライします．")
+                logging.warning("タイムアウトしたので，リトライします。")
 
                 if driver.current_url != item_url:
                     driver.back()
@@ -155,7 +155,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
         )
     )
 
-    logging.info("%d 個の出品があります．", item_count)
+    logging.info("%d 個の出品があります。", item_count)
 
     list_url = driver.current_url
     for i in range(1, item_count + 1):

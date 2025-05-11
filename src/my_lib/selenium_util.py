@@ -161,7 +161,7 @@ def wait_patiently(driver, wait, target):
             return
         except TimeoutException as e:  # noqa: PERF203
             logging.warning(
-                "タイムアウトが発生しました．(%s in %s line %d)",
+                "タイムアウトが発生しました。(%s in %s line %d)",
                 inspect.stack()[1].function,
                 inspect.stack()[1].filename,
                 inspect.stack()[1].lineno,
@@ -241,7 +241,7 @@ def log_memory_usage(driver):
 
 
 def warmup(driver, keyword, url_pattern, sleep_sec=3):
-    # NOTE: ダミーアクセスを行って BOT ではないと思わせる．(効果なさそう...)
+    # NOTE: ダミーアクセスを行って BOT ではないと思わせる。(効果なさそう...)
     driver.get("https://www.yahoo.co.jp/")
     time.sleep(sleep_sec)
 

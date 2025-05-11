@@ -59,6 +59,10 @@ def init(config_, is_read_only=False):
     if not is_read_only:
         should_terminate = False
 
+        # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
+        if log_queue is not None:
+            log_queue.close()
+
         log_lock = threading.Lock()
         log_queue = Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
@@ -79,7 +83,6 @@ def term(is_read_only=False):
             return
         should_terminate = True
 
-        log_queue.close()
         log_thread.join()
         log_thread = None
 
@@ -140,7 +143,7 @@ def worker(log_queue):
             logging.debug(traceback.format_exc())
         except ValueError:  # pragma: no cover
             # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
-            # 発生する．
+            # 発生する。
             logging.warning(traceback.format_exc())
 
         time.sleep(sleep_sec)
@@ -206,7 +209,7 @@ def api_log_view():
     stop_day = flask.request.args.get("stop_day", 0, type=int)
 
     # NOTE: @gzipped をつけた場合，キャッシュ用のヘッダを付与しているので，
-    # 無効化する．
+    # 無効化する。
     flask.g.disable_cache = True
 
     log = get(stop_day)

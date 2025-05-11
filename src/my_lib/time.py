@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-タイムゾーンを考慮した時刻を取得します．
+タイムゾーンを考慮した時刻を取得します。
 
 Usage:
   time.py [-D]
 
 Options:
-  -D                : デバッグモードで動作します．
+  -D                : デバッグモードで動作します。
 """
 
 import datetime
@@ -17,8 +17,12 @@ import zoneinfo
 TIMEZONE_DEFAULT = "Asia/Tokyo"
 
 
+def get_timezone():
+    return zoneinfo.ZoneInfo(os.environ.get("TZ", TIMEZONE_DEFAULT))
+
+
 def now():
-    return datetime.datetime.now(zoneinfo.ZoneInfo(os.environ.get("TZ", TIMEZONE_DEFAULT)))
+    return datetime.datetime.now(get_timezone())
 
 
 if __name__ == "__main__":

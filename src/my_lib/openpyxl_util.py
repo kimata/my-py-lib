@@ -111,7 +111,7 @@ def insert_table_cell_image(sheet, row, col, thumb_path, cell_width, cell_height
 
     img = openpyxl.drawing.image.Image(thumb_path)
 
-    # NOTE: マジックナンバー「8」は下記等を参考にして設定．(日本語フォントだと 8 が良さそう)
+    # NOTE: マジックナンバー「8」は下記等を参考にして設定。(日本語フォントだと 8 が良さそう)
     # > In all honesty, I cannot tell you how many blogs and stack overflow answers
     # > I read before I stumbled across this magic number: 7.5
     # https://imranhugo.medium.com/how-to-right-align-an-image-in-excel-cell-using-python-and-openpyxl-7ca75a85b13a

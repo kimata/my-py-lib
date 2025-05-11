@@ -45,7 +45,7 @@ def notify_watch_impl(queue):
             logging.debug(traceback.format_exc())
         except ValueError:  # pragma: no cover
             # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
-            # 発生する．
+            # 発生する。
             logging.warning(traceback.format_exc())
 
     logging.info("Stop notify watch thread")

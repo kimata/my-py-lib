@@ -57,7 +57,7 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
 
 
 def execute_impl(driver, wait, line_use, line_pass, slack_config):
-    logging.info("ログインを行います．")
+    logging.info("ログインを行います。")
     driver.get(LOGIN_URL)
 
     wait.until(
@@ -78,7 +78,7 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
     )
 
     if len(account_button) != 0:
-        logging.info("既にログイン済みでした．")
+        logging.info("既にログイン済みでした。")
         return
 
     my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
@@ -93,9 +93,9 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
 
     # time.sleep(2)
     # if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//div[@id="recaptchaV2"]')) != 0:
-    #     logging.warning("画像認証が要求されました．")
+    #     logging.warning("画像認証が要求されました。")
     #     captcha.resolve_mp3(driver, wait)
-    #     logging.warning("画像認証を突破しました．")
+    #     logging.warning("画像認証を突破しました。")
     #     click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
 
     wait.until(
@@ -104,7 +104,7 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
         )
     )
 
-    logging.info("認証番号の対応を行います．")
+    logging.info("認証番号の対応を行います。")
 
     if slack_config is not None:
         ts = my_lib.store.captcha.send_request_text_slack(
@@ -148,14 +148,14 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
             )
         )
     )
-    logging.info("ログインに成功しました．")
+    logging.info("ログインに成功しました。")
 
 
 def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa: PLR0913
     try:
         execute_impl(driver, wait, line_use, line_pass, slack_config)
     except Exception:
-        logging.exception("ログインをリトライします．")
+        logging.exception("ログインをリトライします。")
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
         # NOTE: 1回だけリトライする
         time.sleep(10)

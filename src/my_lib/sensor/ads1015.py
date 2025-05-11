@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-ADS-1015 を使って電圧を計測するライブラリです．
+ADS-1015 を使って電圧を計測するライブラリです。
 
 Usage:
-  ads1015.py [-b BUS] [-d DEV_ADDR]
+  ads1015.py [-b BUS] [-d DEV_ADDR] [-D]
 
 Options:
-  -b BUS        : I2C バス番号．[default: 0x01]
-  -d DEV_ADDR   : デバイスアドレス(7bit)． [default: 0x4A]
+  -b BUS            : I2C バス番号。[default: 0x01]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x4A]
+  -D                : デバッグモードで動作します。
 """
 
 import logging
@@ -93,8 +94,9 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)
+    debug_mode = args["-D"]
 
-    my_lib.logger.init("test", level=logging.DEBUG)
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     sensor = my_lib.sensor.ads1015(bus_id=bus_id, dev_addr=dev_addr)
 
