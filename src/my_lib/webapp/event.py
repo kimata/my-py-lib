@@ -41,10 +41,10 @@ def notify_watch_impl(queue):
                 notify_event(queue.get())
             time.sleep(0.1)
         except OverflowError:  # pragma: no cover
-            # NOTE: テストする際，freezer 使って日付をいじるとこの例外が発生する
+            # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
         except ValueError:  # pragma: no cover
-            # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
+            # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
             # 発生する。
             logging.warning(traceback.format_exc())
 
@@ -115,7 +115,7 @@ def api_event():
                     if i == count:
                         return
 
-            # NOTE: クライアントが切断された時にソケットを解放するため，定期的に yield を呼ぶ
+            # NOTE: クライアントが切断された時にソケットを解放するため、定期的に yield を呼ぶ
             j += 1
             if j == YEILD_TIMEOUT:
                 yield "data: dummy\n\n"

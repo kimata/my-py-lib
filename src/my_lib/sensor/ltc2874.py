@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ADI の LTC2874 を使って，IO-LINK 通信を行うライブラリです。
+# ADI の LTC2874 を使って、IO-LINK 通信を行うライブラリです。
 
 import logging
 import pprint

@@ -135,7 +135,7 @@ def fetch_price_impl(driver, item, dump_path, loop):  # noqa: PLR0912, C901
         logging.info("%s%s", f"""{item["price"]:,}""", item["price_unit"])
     except Exception:
         if item["stock"] == 0:
-            # NOTE: 在庫がない場合は，価格が取得できなくてもエラーにしない
+            # NOTE: 在庫がない場合は、価格が取得できなくてもエラーにしない
             pass
         else:
             logging.debug('Unable to parse price: "%s"', price_text)

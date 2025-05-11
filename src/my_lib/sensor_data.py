@@ -21,9 +21,9 @@ import time
 import influxdb_client
 import my_lib.time
 
-# NOTE: データが欠損している期間も含めてデータを敷き詰めるため，
-# timedMovingAverage を使う。timedMovingAverage の計算の結果，データが後ろに
-# ずれるので，あらかじめ offset を使って前にずらしておく。
+# NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
+# timedMovingAverage を使う。timedMovingAverage の計算の結果、データが後ろに
+# ずれるので、あらかじめ offset を使って前にずらしておく。
 FLUX_QUERY = """
 from(bucket: "{bucket}")
 |> range(start: {start}, stop: {stop})
@@ -158,7 +158,7 @@ def fetch_data(  # noqa: PLR0913
         if len(table_list) != 0:
             for record in table_list[0].records:
                 # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
-                # だとタイミングによって，先頭に None が入る
+                # だとタイミングによって、先頭に None が入る
                 if record.get_value() is None:
                     logging.debug("DELETE %s", record.get_time() + localtime_offset)
                     continue
@@ -167,7 +167,7 @@ def fetch_data(  # noqa: PLR0913
                 time_list.append(record.get_time() + localtime_offset)
 
         if create_empty and not last:
-            # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと，
+            # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと、
             # 末尾に余分なデータが入るので取り除く
             every_min = int(every_min)
             window_min = int(window_min)
@@ -245,11 +245,11 @@ def get_equip_on_minutes(  # noqa: PLR0913
         record_num = len(table_list[0].records)
         for i, record in enumerate(table_list[0].records):
             if create_empty and (window_min > every_min) and (i > record_num - 1 - (window_min - every_min)):
-                # NOTE: timedMovingAverage を使うと，末尾に余分なデータが入るので取り除く
+                # NOTE: timedMovingAverage を使うと、末尾に余分なデータが入るので取り除く
                 continue
 
             # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
-            # だとタイミングによって，先頭に None が入る
+            # だとタイミングによって、先頭に None が入る
             if record.get_value() is None:
                 continue
             if record.get_value() >= threshold:
@@ -316,7 +316,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
 
         for record in table_list[0].records:
             # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
-            # だとタイミングによって，先頭に None が入る
+            # だとタイミングによって、先頭に None が入る
             if record.get_value() is None:
                 logging.debug("DELETE %s", datetime=record.get_time() + localtime_offset)
                 continue

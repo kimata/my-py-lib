@@ -7,7 +7,7 @@ Usage:
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
-  -S                : YAML 記述をもとにして，JSON Schema の雛形を生成します。
+  -S                : YAML 記述をもとにして、JSON Schema の雛形を生成します。
   -D                : デバッグモードで動作します。
 """
 

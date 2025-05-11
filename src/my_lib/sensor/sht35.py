@@ -11,7 +11,7 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
-# 作成時に使用したのは，Tindie の
+# 作成時に使用したのは、Tindie の
 # 「SHT35-D (Digital) Humidity & Temperature Sensor」。
 # https://www.tindie.com/products/closedcube/sht35-d-digital-humidity-temperature-sensor/
 

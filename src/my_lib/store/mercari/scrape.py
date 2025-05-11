@@ -83,7 +83,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
         selenium.webdriver.common.by.By.XPATH,
         ITEM_LIST_XPATH + "[" + str(index) + "]//a",
     )
-    # NOTE: アイテムにスクロールしてから，ヘッダーに隠れないようちょっと前に戻す
+    # NOTE: アイテムにスクロールしてから、ヘッダーに隠れないようちょっと前に戻す
     item_link.location_once_scrolled_into_view  # noqa: B018
     driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
     item_link.click()
@@ -105,7 +105,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
                 if fail_count > RETRY_COUNT:
                     raise
 
-                logging.warning("タイムアウトしたので，リトライします。")
+                logging.warning("タイムアウトしたので、リトライします。")
 
                 if driver.current_url != item_url:
                     driver.back()

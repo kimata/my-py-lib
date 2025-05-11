@@ -120,7 +120,7 @@ def test_webapp_event(client):
     assert response.status_code == 200
     assert response.data.decode()
 
-    # NOTE: event に先にアクセスさせておいてから，ログに書き込む
+    # NOTE: event に先にアクセスさせておいてから、ログに書き込む
     def log_write():
         time.sleep(3)
         client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/log_write")

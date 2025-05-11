@@ -13,7 +13,7 @@ Options:
 
 # SM9561: http://www.sonbest.com/english/products/SM9561.html
 
-# RS485 通信は，下記の基板を使って I2C 経由で行うことを想定しています。
+# RS485 通信は、下記の基板を使って I2C 経由で行うことを想定しています。
 # I2C-RS422/485変換基板
 # https://www.switch-science.com/products/7395
 # https://github.com/meerstern/I2C_RS422_RS485_Converter
@@ -75,7 +75,7 @@ class SM9561:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_IOC)
         data |= 0x08
 
-        # NOTE: Software reset をしたときは NACK が帰ってくるので，エラーは無視する
+        # NOTE: Software reset をしたときは NACK が帰ってくるので、エラーは無視する
         with contextlib.suppress(OSError):
             self.i2cbus.write_byte_data(self.dev_addr, self.REG_IOC, data)
 

@@ -186,8 +186,8 @@ def get_wbgt(wbgt_config):
     if (now.month < 3) or ((now.month == 4) and (now.day < 20)) or (now.month > 9):
         return {"current": None, "daily": {"today": None, "tomorrow": None}}
 
-    # NOTE: 当日の過去時間のデータは表示されず，
-    # 別ページに実測値があるので，それを取ってくる。
+    # NOTE: 当日の過去時間のデータは表示されず、
+    # 別ページに実測値があるので、それを取ってくる。
     wbgt_measured_today = get_wbgt_measured_today(wbgt_config)
 
     content = fetch_page(wbgt_config["data"]["env_go"]["url"])
@@ -205,7 +205,7 @@ def get_sunset_url_nao(sunset_config, date):
 
 
 def get_sunset_date_nao(sunset_config, date):
-    # NOTE: XHTML で encoding が指定されているので，decode しないようにする
+    # NOTE: XHTML で encoding が指定されているので、decode しないようにする
     content = fetch_page(get_sunset_url_nao(sunset_config, date), None)
 
     sun_data = content.xpath('//table[contains(@class, "result")]//td')

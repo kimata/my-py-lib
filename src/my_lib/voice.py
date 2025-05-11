@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VOICEVOX を WEB API 経由でたたいて，音声ファイルを生成します。
+VOICEVOX を WEB API 経由でたたいて、音声ファイルを生成します。
 
 Usage:
   voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-o WAV] [-D]

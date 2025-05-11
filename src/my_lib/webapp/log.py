@@ -135,10 +135,10 @@ def worker(log_queue):
                 log = log_queue.get()
                 log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
-            # NOTE: テストする際，freezer 使って日付をいじるとこの例外が発生する
+            # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
         except ValueError:  # pragma: no cover
-            # NOTE: 終了時，queue が close された後に empty() や get() を呼ぶとこの例外が
+            # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
             # 発生する。
             logging.warning(traceback.format_exc())
 
@@ -148,21 +148,21 @@ def worker(log_queue):
 def error(message):
     logging.error(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
+    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
     log_queue.put({"message": message, "level": LOG_LEVEL.ERROR})
 
 
 def warning(message):
     logging.warning(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
+    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
     log_queue.put({"message": message, "level": LOG_LEVEL.WARN})
 
 
 def info(message):
     logging.info(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて，すぐにリターンする
+    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
     log_queue.put({"message": message, "level": LOG_LEVEL.INFO})
 
 
@@ -204,7 +204,7 @@ def api_log_clear():
 def api_log_view():
     stop_day = flask.request.args.get("stop_day", 0, type=int)
 
-    # NOTE: @gzipped をつけた場合，キャッシュ用のヘッダを付与しているので，
+    # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
     # 無効化する。
     flask.g.disable_cache = True
 

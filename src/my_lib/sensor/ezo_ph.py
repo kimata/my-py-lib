@@ -69,7 +69,7 @@ class EZO_PH:  # noqa: N801
         return {"ph": value}
 
     def change_devaddr(self, dev_addr_new):
-        # NOTE: アドレスを変更したときは NACK が帰ってくるっぽいので，エラーは無視する
+        # NOTE: アドレスを変更したときは NACK が帰ってくるっぽいので、エラーは無視する
         with contextlib.suppress(OSError):
             self.exec_command(f"I2C,{dev_addr_new}")
 

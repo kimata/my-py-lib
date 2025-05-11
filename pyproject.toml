@@ -85,7 +85,7 @@ exclude_lines = [
   "pragma: no cover",
   "if __name__ == .__main__.:",
 
-  # 以下，未使用関数
+  # 以下、未使用関数
   # webapp/log.py
   "if sqlite is not None:",
 ]

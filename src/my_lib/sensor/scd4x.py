@@ -11,7 +11,7 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
-# 作成時に使用したのは，Sensirion の SEK SCD41。
+# 作成時に使用したのは、Sensirion の SEK SCD41。
 # https://www.sensirion.com/en/environmental-sensors/evaluation-kit-sek-environmental-sensing/evaluation-kit-sek-scd41/
 # 明示的に start_periodic_measurement を呼ばなくても済むように少し工夫しています。
 
@@ -84,7 +84,7 @@ class SCD4X:
         return (int.from_bytes(resp[0:2], byteorder="big") & 0x7F) != 0
 
     def __start_measurement(self):
-        # NOTE: まず待ってみて，それでもデータが準備できないようだったら
+        # NOTE: まず待ってみて、それでもデータが準備できないようだったら
         # 計測が始まっていないと判断する
         for _ in range(10):
             if self.__get_data_ready():
