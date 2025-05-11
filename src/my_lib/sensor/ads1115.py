@@ -15,7 +15,6 @@ import logging
 import time
 
 import my_lib.sensor.i2cbus
-from my_lib.sensor.i2cbus import I2CBUS
 
 
 class ADS1115:
@@ -32,7 +31,7 @@ class ADS1115:
     REG_CONFIG_MUX_01 = 0
     REG_CONFIG_MUX_0G = 4
 
-    def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
+    def __init__(self, bus_id=my_lib.sensor.i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)

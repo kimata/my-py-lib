@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
+import enum
 import logging
 import multiprocessing
 import threading
 import time
 import traceback
-from enum import Enum
 
 import flask
 import my_lib.webapp.config
@@ -12,7 +12,7 @@ import my_lib.webapp.config
 YEILD_TIMEOUT = 100
 
 
-class EVENT_TYPE(Enum):  # noqa: N801
+class EVENT_TYPE(enum.Enum):  # noqa: N801
     CONTROL = "control"
     SCHEDULE = "schedule"
     LOG = "log"

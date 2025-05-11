@@ -20,7 +20,6 @@ import struct
 import tempfile
 
 import my_lib.sensor.echonetlite
-from my_lib.sensor.echonetlite import ECHONETLite
 
 PAN_DESC_DAT_PATH = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
 RETRY_COUNT = 5
@@ -49,7 +48,7 @@ class EchonetEnergy:
 
     def parse_frame(self, recv_packet):
         self.logger.debug("recv_packet = \n%s", pprint.pformat(recv_packet, indent=2))
-        frame = ECHONETLite.parse_frame(recv_packet)
+        frame = my_lib.sensor.echonetlite.ECHONETLite.parse_frame(recv_packet)
         self.logger.debug("frame = \n%s", pprint.pformat(frame, indent=2))
 
         return frame
@@ -111,34 +110,43 @@ class EchonetEnergy:
             self.connect(self.get_pan_info())
             self.is_connected = True
 
-        meter_eoj = ECHONETLite.build_eoj(
-            ECHONETLite.EOJ.CLASS_GROUP_HOUSING, ECHONETLite.EOJ.HOUSE_CLASS_GROUP.LOW_VOLTAGE_SMART_METER
+        meter_eoj = my_lib.sensor.echonetlite.ECHONETLite.build_eoj(
+            my_lib.sensor.echonetlite.ECHONETLite.EOJ.CLASS_GROUP_HOUSING,
+            my_lib.sensor.echonetlite.ECHONETLite.EOJ.HOUSE_CLASS_GROUP.LOW_VOLTAGE_SMART_METER,
         )
 
-        edata = ECHONETLite.build_edata(
-            ECHONETLite.build_eoj(
-                ECHONETLite.EOJ.CLASS_GROUP_MANAGEMENT, ECHONETLite.EOJ.MANAGEMENT_CLASS_GROUP.CONTROLLER
+        edata = my_lib.sensor.echonetlite.ECHONETLite.build_edata(
+            my_lib.sensor.echonetlite.ECHONETLite.build_eoj(
+                my_lib.sensor.echonetlite.ECHONETLite.EOJ.CLASS_GROUP_MANAGEMENT,
+                my_lib.sensor.echonetlite.ECHONETLite.EOJ.MANAGEMENT_CLASS_GROUP.CONTROLLER,
             ),
             meter_eoj,
-            ECHONETLite.ESV.PROP_READ,
+            my_lib.sensor.echonetlite.ECHONETLite.ESV.PROP_READ,
             [
                 {
-                    "EPC": ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY,
+                    "EPC": (
+                        my_lib.sensor.echonetlite.ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY
+                    ),
                     "PDC": 0,
                 }
             ],
         )
-        send_packet = ECHONETLite.build_frame(edata)
+        send_packet = my_lib.sensor.echonetlite.ECHONETLite.build_frame(edata)
 
         while True:
-            self.echonet_if.send_udp(self.ipv6_addr, ECHONETLite.UDP_PORT, send_packet)
+            self.echonet_if.send_udp(
+                self.ipv6_addr, my_lib.sensor.echonetlite.ECHONETLite.UDP_PORT, send_packet
+            )
             recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
             frame = self.parse_frame(recv_packet)
 
             if frame["EDATA"]["SEOJ"] != meter_eoj:
                 continue
             for prop in frame["EDATA"]["prop_list"]:
-                if prop["EPC"] != ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY:
+                if (
+                    prop["EPC"]
+                    != my_lib.sensor.echonetlite.ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY
+                ):
                     continue
                 if len(prop["EDT"]) != prop["PDC"]:
                     continue

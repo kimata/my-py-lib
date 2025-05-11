@@ -13,17 +13,19 @@ Options:
 
 import logging
 
-from my_lib.sensor import ads1115
+import my_lib.sensor
 
 
 class GROVE_TDS:  # noqa: N801
     NAME = "GROVE-TDS"
     TYPE = "I2C"
 
-    def __init__(self, bus_id=ads1115.I2CBUS.ARM, dev_addr=ads1115.ADS1115.DEV_ADDR):  # noqa: D107
+    def __init__(  # noqa: D107
+        self, bus_id=my_lib.sensor.ads1115.I2CBUS.ARM, dev_addr=my_lib.sensor.ads1115.ADS1115.DEV_ADDR
+    ):
         self.bus_id = bus_id
         self.dev_addr = dev_addr
-        self.adc = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+        self.adc = my_lib.sensor.ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
 
         self.adc.set_mux(self.adc.REG_CONFIG_MUX_0G)
         self.adc.set_pga(self.adc.REG_CONFIG_FSR_2048)

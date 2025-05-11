@@ -4,15 +4,15 @@ import gzip
 import io
 import socket
 
-from flask import after_this_request, current_app, g, request
+import flask
 
 
 def gzipped(f):
     @functools.wraps(f)
     def view_func(*args, **kwargs):
-        @after_this_request
+        @flask.after_this_request
         def zipper(response):
-            accept_encoding = request.headers.get("Accept-Encoding", "")
+            accept_encoding = flask.request.headers.get("Accept-Encoding", "")
 
             if "gzip" not in accept_encoding.lower():
                 return response
@@ -35,7 +35,7 @@ def gzipped(f):
             response.headers["Vary"] = "Accept-Encoding"
             response.headers["Content-Length"] = len(response.data)
 
-            if g.pop("disable_cache", False):
+            if flask.g.pop("disable_cache", False):
                 response.headers["Cache-Control"] = "no-store, must-revalidate"
                 response.headers["Expires"] = "0"
             else:
@@ -51,10 +51,10 @@ def gzipped(f):
 def support_jsonp(f):
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
-        callback = request.args.get("callback", False)
+        callback = flask.request.args.get("callback", False)
         if callback:
             content = callback + "(" + f().data.decode().strip() + ")"
-            return current_app.response_class(content, mimetype="text/javascript")
+            return flask.current_app.response_class(content, mimetype="text/javascript")
         else:
             return f(*args, **kwargs)
 

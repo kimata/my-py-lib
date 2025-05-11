@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 import datetime
+import enum
 import json
 import logging
+import multiprocessing
 import os
 import sqlite3
 import threading
 import time
 import traceback
-from enum import IntEnum
-from multiprocessing import Queue
-from wsgiref.handlers import format_date_time
+import wsgiref.handlers
 
 import flask
 import my_lib.flask_util
@@ -19,7 +19,7 @@ import my_lib.webapp.event
 import zoneinfo
 
 
-class LOG_LEVEL(IntEnum):  # noqa: N801
+class LOG_LEVEL(enum.IntEnum):  # noqa: N801
     INFO = 0
     WARN = 1
     ERROR = 2
@@ -65,7 +65,7 @@ def init(config_, is_read_only=False):
             log_queue.close()
 
         log_lock = threading.Lock()
-        log_queue = Queue()
+        log_queue = multiprocessing.Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
         log_thread.start()
 
@@ -231,7 +231,7 @@ def api_log_view():
 
     response = flask.jsonify({"data": log_list, "last_time": last_time})
 
-    response.headers["Last-Modified"] = format_date_time(last_time)
+    response.headers["Last-Modified"] = wsgiref.handlers.format_date_time(last_time)
     response.make_conditional(flask.request)
 
     return response

@@ -6,14 +6,14 @@ import random
 import subprocess
 import time
 
+import selenium
+import selenium.common.exceptions
+import selenium.webdriver.chrome.options
+import selenium.webdriver.chrome.service
+import selenium.webdriver.common.action_chains
+import selenium.webdriver.common.by
+import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 
 WAIT_RETRY_COUNT = 1
 AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"  # noqa: E501
@@ -26,7 +26,7 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
     chrome_data_path.mkdir(parents=True, exist_ok=True)
     log_path.mkdir(parents=True, exist_ok=True)
 
-    options = Options()
+    options = selenium.webdriver.chrome.options.Options()
 
     if is_headless:
         options.add_argument("--headless")
@@ -48,8 +48,8 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
 
     # options.add_argument(f'--user-agent="{agent_name}"')
 
-    driver = webdriver.Chrome(
-        service=Service(
+    driver = selenium.webdriver.Chrome(
+        service=selenium.webdriver.chrome.service.Service(
             service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
         ),
         options=options,
@@ -98,23 +98,27 @@ def create_driver(profile_name, data_path, agent_name=AGENT_NAME, is_headless=Tr
 
 
 def xpath_exists(driver, xpath):
-    return len(driver.find_elements(By.XPATH, xpath)) != 0
+    return len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0
 
 
 def get_text(driver, xpath, safe_text):
-    if len(driver.find_elements(By.XPATH, xpath)) != 0:
-        return driver.find_element(By.XPATH, xpath).text.strip()
+    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0:
+        return driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).text.strip()
     else:
         return safe_text
 
 
 def input_xpath(driver, xpath, text, wait=None, is_warn=True):
     if wait is not None:
-        wait.until(selenium.webdriver.support.expected_conditions.element_to_be_clickable((By.XPATH, xpath)))
+        wait.until(
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+                (selenium.webdriver.common.by.By.XPATH, xpath)
+            )
+        )
         time.sleep(0.05)
 
     if xpath_exists(driver, xpath):
-        driver.find_element(By.XPATH, xpath).send_keys(text)
+        driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).send_keys(text)
         return True
     else:
         if is_warn:
@@ -124,12 +128,16 @@ def input_xpath(driver, xpath, text, wait=None, is_warn=True):
 
 def click_xpath(driver, xpath, wait=None, is_warn=True):
     if wait is not None:
-        wait.until(selenium.webdriver.support.expected_conditions.element_to_be_clickable((By.XPATH, xpath)))
+        wait.until(
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+                (selenium.webdriver.common.by.By.XPATH, xpath)
+            )
+        )
         time.sleep(0.05)
 
     if xpath_exists(driver, xpath):
-        elem = driver.find_element(By.XPATH, xpath)
-        action = ActionChains(driver)
+        elem = driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath)
+        action = selenium.webdriver.common.action_chains.ActionChains(driver)
         action.move_to_element(elem)
         action.perform()
 
@@ -142,8 +150,8 @@ def click_xpath(driver, xpath, wait=None, is_warn=True):
 
 
 def is_display(driver, xpath):
-    return (len(driver.find_elements(By.XPATH, xpath)) != 0) and (
-        driver.find_element(By.XPATH, xpath).is_displayed()
+    return (len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0) and (
+        driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).is_displayed()
     )
 
 
@@ -159,7 +167,7 @@ def wait_patiently(driver, wait, target):
         try:
             wait.until(target)
             return
-        except TimeoutException as e:  # noqa: PERF203
+        except selenium.common.exceptions.TimeoutException as e:  # noqa: PERF203
             logging.warning(
                 "タイムアウトが発生しました。(%s in %s line %d)",
                 inspect.stack()[1].function,
@@ -245,12 +253,16 @@ def warmup(driver, keyword, url_pattern, sleep_sec=3):
     driver.get("https://www.yahoo.co.jp/")
     time.sleep(sleep_sec)
 
-    driver.find_element(By.XPATH, '//input[@name="p"]').send_keys(keyword)
-    driver.find_element(By.XPATH, '//input[@name="p"]').send_keys(Keys.ENTER)
+    driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="p"]').send_keys(keyword)
+    driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="p"]').send_keys(
+        selenium.webdriver.common.keys.Keys.ENTER
+    )
 
     time.sleep(sleep_sec)
 
-    driver.find_element(By.XPATH, f'//a[contains(@href, "{url_pattern}")]').click()
+    driver.find_element(
+        selenium.webdriver.common.by.By.XPATH, f'//a[contains(@href, "{url_pattern}")]'
+    ).click()
 
     time.sleep(sleep_sec)
 

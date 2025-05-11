@@ -5,9 +5,9 @@ import logging
 import pprint
 import time
 
+import my_lib.sensor
 import serial
 import spidev
-from my_lib.sensor import io_link
 
 DEBUG = True
 
@@ -154,7 +154,13 @@ def com_read(spi, ser, length):  # noqa: ARG001
 def dir_param_read(spi, ser, addr):
     logging.debug("***** CALL: dir_param_read(addr: 0x%02X) ****", addr)
 
-    msq = msq_build(io_link.MSQ_RW_READ, io_link.MSQ_CH_PAGE, addr, io_link.MSQ_TYPE_0, None)
+    msq = msq_build(
+        my_lib.sensor.io_link.MSQ_RW_READ,
+        my_lib.sensor.io_link.MSQ_CH_PAGE,
+        addr,
+        my_lib.sensor.io_link.MSQ_TYPE_0,
+        None,
+    )
     com_write(spi, ser, msq)
 
     data = com_read(spi, ser, 4)[2:]
@@ -170,7 +176,13 @@ def dir_param_read(spi, ser, addr):
 def dir_param_write(spi, ser, addr, value):
     logging.debug("***** CALL: dir_param_write(addr: 0x%02X, value: 0x%02X) ****", addr, value)
 
-    msq = msq_build(io_link.MSQ_RW_WRITE, io_link.MSQ_CH_PAGE, addr, io_link.MSQ_TYPE_0, [value])
+    msq = msq_build(
+        my_lib.sensor.io_link.MSQ_RW_WRITE,
+        my_lib.sensor.io_link.MSQ_CH_PAGE,
+        addr,
+        my_lib.sensor.io_link.MSQ_TYPE_0,
+        [value],
+    )
     com_write(spi, ser, msq)
 
     data = com_read(spi, ser, 4)[3:]
@@ -182,24 +194,36 @@ def dir_param_write(spi, ser, addr, value):
 
 
 def isdu_req_build(index, length):
-    rw = io_link.MSQ_RW_WRITE
-    isrv = io_link.ISDU_ISRV_READ_8BIT_IDX
+    rw = my_lib.sensor.io_link.MSQ_RW_WRITE
+    isrv = my_lib.sensor.io_link.ISDU_ISRV_READ_8BIT_IDX
 
     return [
-        msq_build(rw, io_link.MSQ_CH_ISDU, 0x10, io_link.MSQ_TYPE_0, [(isrv << 4) | length]),
-        msq_build(rw, io_link.MSQ_CH_ISDU, 0x01, io_link.MSQ_TYPE_0, [index]),
         msq_build(
             rw,
-            io_link.MSQ_CH_ISDU,
+            my_lib.sensor.io_link.MSQ_CH_ISDU,
+            0x10,
+            my_lib.sensor.io_link.MSQ_TYPE_0,
+            [(isrv << 4) | length],
+        ),
+        msq_build(rw, my_lib.sensor.io_link.MSQ_CH_ISDU, 0x01, my_lib.sensor.io_link.MSQ_TYPE_0, [index]),
+        msq_build(
+            rw,
+            my_lib.sensor.io_link.MSQ_CH_ISDU,
             0x02,
-            io_link.MSQ_TYPE_0,
+            my_lib.sensor.io_link.MSQ_TYPE_0,
             [((isrv << 4) | length) ^ index],
         ),
     ]
 
 
 def isdu_res_read(spi, ser, flow):
-    msq = msq_build(io_link.MSQ_RW_READ, io_link.MSQ_CH_ISDU, flow, io_link.MSQ_TYPE_0, None)
+    msq = msq_build(
+        my_lib.sensor.io_link.MSQ_RW_READ,
+        my_lib.sensor.io_link.MSQ_CH_ISDU,
+        flow,
+        my_lib.sensor.io_link.MSQ_TYPE_0,
+        None,
+    )
     com_write(spi, ser, msq)
 
     data = com_read(spi, ser, 4)[2:]

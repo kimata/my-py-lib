@@ -15,18 +15,18 @@ import logging
 import re
 import time
 
-from paapi5_python_sdk.api.default_api import DefaultApi
-from paapi5_python_sdk.condition import Condition
-from paapi5_python_sdk.get_items_request import GetItemsRequest
-from paapi5_python_sdk.get_items_resource import GetItemsResource
-from paapi5_python_sdk.merchant import Merchant
-from paapi5_python_sdk.partner_type import PartnerType
+import paapi5_python_sdk.api.default_api
+import paapi5_python_sdk.condition
+import paapi5_python_sdk.get_items_request
+import paapi5_python_sdk.get_items_resource
+import paapi5_python_sdk.merchant
+import paapi5_python_sdk.partner_type
 
 PAAPI_SPLIT = 10
 
 
 def get_paapi(config):
-    return DefaultApi(
+    return paapi5_python_sdk.api.default_api.DefaultApi(
         access_key=config["store"]["amazon"]["access_key"],
         secret_key=config["store"]["amazon"]["secret_key"],
         host=config["store"]["amazon"]["host"],
@@ -59,23 +59,23 @@ def fetch_price_outlet(config, asin_list):
             time.sleep(10)
 
         resp = default_api.get_items(
-            GetItemsRequest(
+            paapi5_python_sdk.get_items_request.GetItemsRequest(
                 partner_tag=config["store"]["amazon"]["associate"],
-                partner_type=PartnerType.ASSOCIATES,
+                partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
                 marketplace="www.amazon.co.jp",
                 # NOTE: listings にアウトレットが表示されるようにする
                 # (他に安価な中古品の出品がある場合は表示されない)
-                condition=Condition.USED,
-                merchant=Merchant.ALL,
+                condition=paapi5_python_sdk.condition.Condition.USED,
+                merchant=paapi5_python_sdk.merchant.Merchant.ALL,
                 item_ids=asin_sub_list,
                 resources=[
-                    GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
-                    GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
-                    GetItemsResource.OFFERS_LISTINGS_PRICE,
-                    GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
-                    GetItemsResource.ITEMINFO_CLASSIFICATIONS,
-                    GetItemsResource.IMAGES_PRIMARY_MEDIUM,
-                    GetItemsResource.IMAGES_PRIMARY_SMALL,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
                 ],
             )
         )
@@ -112,7 +112,7 @@ def fetch_price_new(config, asin_list):  # noqa: C901
 
     logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
 
-    default_api = DefaultApi(
+    default_api = paapi5_python_sdk.api.default_api.DefaultApi(
         access_key=config["store"]["amazon"]["access_key"],
         secret_key=config["store"]["amazon"]["secret_key"],
         host=config["store"]["amazon"]["host"],
@@ -127,21 +127,21 @@ def fetch_price_new(config, asin_list):  # noqa: C901
             time.sleep(10)
 
         resp = default_api.get_items(
-            GetItemsRequest(
+            paapi5_python_sdk.get_items_request.GetItemsRequest(
                 partner_tag=config["store"]["amazon"]["associate"],
-                partner_type=PartnerType.ASSOCIATES,
+                partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
                 marketplace="www.amazon.co.jp",
-                condition=Condition.NEW,
-                merchant=Merchant.ALL,
+                condition=paapi5_python_sdk.condition.Condition.NEW,
+                merchant=paapi5_python_sdk.merchant.Merchant.ALL,
                 item_ids=asin_sub_list,
                 resources=[
-                    GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
-                    GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
-                    GetItemsResource.OFFERS_LISTINGS_PRICE,
-                    GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
-                    GetItemsResource.ITEMINFO_CLASSIFICATIONS,
-                    GetItemsResource.IMAGES_PRIMARY_MEDIUM,
-                    GetItemsResource.IMAGES_PRIMARY_SMALL,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
                 ],
             )
         )

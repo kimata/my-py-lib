@@ -14,7 +14,6 @@ Options:
 import logging
 
 import my_lib.sensor.i2cbus
-from my_lib.sensor.i2cbus import I2CBUS
 
 
 class APDS9250:
@@ -22,7 +21,7 @@ class APDS9250:
     TYPE = "I2C"
     DEV_ADDR = 0x52  # 7bit
 
-    def __init__(self, bus_id=I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
+    def __init__(self, bus_id=my_lib.sensor.i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
         self.i2cbus = my_lib.sensor.i2cbus(bus_id)
