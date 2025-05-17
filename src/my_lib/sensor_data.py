@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-InfluxDB から電子機器の使用時間を取得します。
+InfluxDB からデータを取得します。
 
 Usage:
-  sensor_data.py [-c CONFIG]  [-e EVERY] [-w WINDOW] [-D]
+  sensor_data.py [-c CONFIG] [-i DB_SPEC] [-s SENSOR_SPEC] [-f FIELD] [-e EVERY] [-w WINDOW] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
-  -d DB_CONFIG      :
+  -i DB_SPEC        : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
+  -s SENSOR_SPEC    : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
+  -f FIELD          : 取得するフィールド。[default: lux]
   -e EVERY          : 何分ごとのデータを取得するか [default: 1]
   -w WINDOWE        : 算出に使うウィンドウ [default: 5]
   -D                : デバッグモードで動作します。
@@ -432,83 +434,61 @@ def dump_data(data):
         logging.info("%s: %s", data["time"][i], data["value"][i])
 
 
-# if __name__ == "__main__":
-# TEST Code
+# -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+# -d DB_CONFIG      : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
+# -d SENSOR_CONFIG  : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
+# -e EVERY          : 何分ごとのデータを取得するか [default: 1]
+# -w WINDOWE        : 算出に使うウィンドウ [default: 5]
+# -D                : デバッグモードで動作します。
 
-# def get_config(config, dotted_key):
-#     keys = dotted_key.split(".")
-#     value = config
 
-#     for key in keys:
-#         value = value[key]
-#         return value
+if __name__ == "__main__":
+    # TEST Code
+    import docopt
+    import my_lib.config
+    import my_lib.logger
 
-# import json
+    def get_config(config, dotted_key):
+        keys = dotted_key.split(".")
+        value = config
 
-# import docopt
-# import my_lib.config
-# import my_lib.logger
+        for key in keys:
+            value = value[key]
 
-# args = docopt.docopt(__doc__)
+        return value
 
-# config_file = args["-c"]
-# every = args["-e"]
-# window = args["-w"]
-# debug_mode = args["-D"]
+    args = docopt.docopt(__doc__)
 
-# my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
+    config_file = args["-c"]
 
-# config = my_lib.config.load(config_file)
+    every = args["-e"]
+    window = args["-w"]
+    infxlux_db_spec = args["-i"]
+    sensor_spec = args["-s"]
+    field = args["-f"]
+    debug_mode = args["-D"]
 
-# now = my_lib.time.now()
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-# measure = config["USAGE"]["TARGET"]["TYPE"]
-# hostname = config["USAGE"]["TARGET"]["HOST"]
-# param = config["USAGE"]["TARGET"]["PARAM"]
-# threshold = config["USAGE"]["TARGET"]["THRESHOLD"]["WORK"]
-# start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
+    config = my_lib.config.load(config_file)
 
-# db_config = get_db_config(config)
+    db_config = get_config(config, infxlux_db_spec)
+    sensor_config = get_config(config, sensor_spec)
 
-# dump_data(fetch_data(db_config, measure, hostname, param, start, "now()", every, window))
+    logging.info("DB config: %s", db_config)
+    logging.info("Sensor config: %s", sensor_config)
 
-# start = f"-{now.hour}h{now.minute}m"
+    data = fetch_data(
+        db_config,
+        sensor_config["measure"],
+        sensor_config["hostname"],
+        field,
+        start="-10m",
+        stop="now()",
+        every_min=1,
+        window_min=3,
+        create_empty=True,
+        last=False,
+    )
 
-# logging.info(
-#     "Today ON minutes (%s) = %s min",
-#     start,
-#     get_equip_on_minutes(
-#         db_config,
-#         measure,
-#         hostname,
-#         param,
-#         threshold,
-#         start,
-#         "now()",
-#         every,
-#         window,
-#     ),
-# )
-
-# measure = config["GRAPH"]["VALVE"]["TYPE"]
-# hostname = config["GRAPH"]["VALVE"]["HOST"]
-# param = config["GRAPH"]["VALVE"]["PARAM"]
-# threshold = [
-#     # NOTE: 閾値が高いものから並べる
-#     config["GRAPH"]["VALVE"]["THRESHOLD"]["FULL"],
-#     config["GRAPH"]["VALVE"]["THRESHOLD"]["INTERM"],
-# ]
-# start = "-" + config["GRAPH"]["PARAM"]["PERIOD"]
-
-# logging.info(
-#     "Valve on period = %s",
-#     json.dumps(
-#         get_equip_mode_period(db_config, measure, hostname, param, threshold, start, "now()"),
-#         indent=2,
-#         default=str,
-#     ),
-# )
-
-# logging.info(
-#     "Amount of cooling water used today = {get_day_sum(db_config, measure, hostname, param):.2f} L"
-# )
+    logging.info(data)
