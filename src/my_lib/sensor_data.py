@@ -439,6 +439,7 @@ if __name__ == "__main__":
     import docopt
     import my_lib.config
     import my_lib.logger
+    import my_lib.pretty
 
     def get_config(config, dotted_key):
         keys = dotted_key.split(".")
@@ -467,8 +468,8 @@ if __name__ == "__main__":
     db_config = get_config(config, infxlux_db_spec)
     sensor_config = get_config(config, sensor_spec)
 
-    logging.info("DB config: %s", db_config)
-    logging.info("Sensor config: %s", sensor_config)
+    logging.info("DB config: %s", my_lib.pretty.format(db_config))
+    logging.info("Sensor config: %s", my_lib.pretty.format(db_config))
 
     data = fetch_data(
         db_config,
@@ -483,4 +484,4 @@ if __name__ == "__main__":
         last=False,
     )
 
-    logging.info(data)
+    logging.info(my_lib.pretty.format(data))
