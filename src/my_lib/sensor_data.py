@@ -434,14 +434,6 @@ def dump_data(data):
         logging.info("%s: %s", data["time"][i], data["value"][i])
 
 
-# -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
-# -d DB_CONFIG      : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
-# -d SENSOR_CONFIG  : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
-# -e EVERY          : 何分ごとのデータを取得するか [default: 1]
-# -w WINDOWE        : 算出に使うウィンドウ [default: 5]
-# -D                : デバッグモードで動作します。
-
-
 if __name__ == "__main__":
     # TEST Code
     import docopt
