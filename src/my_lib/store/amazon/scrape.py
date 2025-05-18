@@ -3,7 +3,7 @@
 スクレイピングで Amazon の価格情報を取得するライブラリです。
 
 Usage:
-  scrape.py [-c CONFIG] [-t ASIN...] [-s DATA_PATH] [-D]
+  scrape.py [-c CONFIG] [-t ASIN] [-s DATA_PATH] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
