@@ -134,7 +134,10 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
                 config["slack"]["error"]["channel"]["id"],
                 "価格取得に失敗",
                 "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
-                PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                {
+                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                    "text": "スクリーンショット",
+                },
                 interval_min=0.5,
             )
             return {"price": 0, "category": category}
@@ -151,7 +154,10 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
             config["slack"]["error"]["channel"]["id"],
             "価格取得に失敗",
             "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
-            PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+            {
+                "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                "text": "スクリーンショット",
+            },
             interval_min=0.5,
         )
         return {"price": 0, "category": category}
