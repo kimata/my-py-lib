@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     data_path = args["-s"]
-    asin_list = args["-t"]
+    asin = args["-t"]
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
@@ -208,4 +208,4 @@ if __name__ == "__main__":
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
 
-    logging.info(fetch_price(driver, wait, config, {"url": "https://www.amazon.co.jp/dp/B0DGPDJFZ4"}))
+    logging.info(fetch_price(driver, wait, config, {"url": f"https://www.amazon.co.jp/dp/{asin}"}))
