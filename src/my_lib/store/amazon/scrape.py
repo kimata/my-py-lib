@@ -197,6 +197,7 @@ if __name__ == "__main__":
     import docopt
     import my_lib.config
     import my_lib.logger
+    import my_lib.pretty
     import my_lib.selenium_util
     import selenium.webdriver.support.wait
 
@@ -214,4 +215,8 @@ if __name__ == "__main__":
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
 
-    logging.info(fetch_price(driver, wait, config, {"url": f"https://www.amazon.co.jp/dp/{asin}"}))
+    logging.info(
+        my_lib.pretty.format(
+            fetch_price(driver, wait, config, {"url": f"https://www.amazon.co.jp/dp/{asin}"})
+        )
+    )
