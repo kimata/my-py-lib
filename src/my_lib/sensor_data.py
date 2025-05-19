@@ -387,7 +387,7 @@ def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_m
 
 
 def get_day_sum(  # noqa:  PLR0913
-    config, measure, hostname, field, days=1, day_before=0, day_offset=0, every_min=1, window_min=5
+    config, measure, hostname, field, days, day_before=0, day_offset=0, every_min=1, window_min=5
 ):
     now = my_lib.time.now()
 
@@ -401,14 +401,14 @@ def get_day_sum(  # noqa:  PLR0913
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_hour_sum(config, measure, hostname, field, hours=12, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+def get_hour_sum(config, measure, hostname, field, hours, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
     start = f"-{day_offset*24 + hours}h"
     stop = f"-{day_offset*24}h"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_minute_sum(config, measure, hostname, field, minutes=3, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+def get_minute_sum(config, measure, hostname, field, minutes, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
     start = f"-{day_offset*24*60 + minutes}m"
     stop = f"-{day_offset*24*60}m"
 
