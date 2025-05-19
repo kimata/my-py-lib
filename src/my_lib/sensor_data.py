@@ -3,15 +3,18 @@
 InfluxDB からデータを取得します。
 
 Usage:
-  sensor_data.py [-c CONFIG] [-i DB_SPEC] [-s SENSOR_SPEC] [-f FIELD] [-e EVERY] [-w WINDOW] [-D]
+  sensor_data.py [-c CONFIG] [-m MODE] [-i DB_SPEC] [-s SENSOR_SPEC] [-f FIELD] [-e EVERY] [-w WINDOW]
+                 [-p HOURS] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -m MODE           : データ取得モード。(data, day_sum, hour_sum のいずれか) [default: data]
   -i DB_SPEC        : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
   -s SENSOR_SPEC    : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
   -f FIELD          : 取得するフィールド。[default: lux]
-  -e EVERY          : 何分ごとのデータを取得するか [default: 1]
-  -w WINDOWE        : 算出に使うウィンドウ [default: 5]
+  -e EVERY          : 何分ごとのデータを取得するか。[default: 1]
+  -w WINDOWE        : 算出に使うウィンドウ。[default: 5]
+  -p PERIOD         : 積算(sum)モードの場合に、過去どのくらいの分を取得するか。[default: 1]
   -D                : デバッグモードで動作します。
 """
 
@@ -395,6 +398,29 @@ def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offs
         return 0
 
 
+def get_hour_sum(config, measure, hostname, field, hours=24, day_offset=0):  # noqa:  PLR0913
+    try:
+        every_min = 1
+        window_min = 5
+
+        start = f"-{day_offset*24 + hours}h"
+        stop = f"-{day_offset*24}h"
+
+        table_list = fetch_data_impl(
+            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
+        )
+
+        value_list = table_list.to_values(columns=["count", "sum"])
+
+        if len(value_list) == 0:
+            return 0
+        else:
+            return value_list[0][1]
+    except Exception:
+        logging.exception("Failed to fetch data")
+        return 0
+
+
 def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_min=1, window_min=3):  # noqa:  PLR0913
     try:
         table_list = fetch_data_impl(
@@ -453,12 +479,13 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
-
+    mode = args["-m"]
     every = args["-e"]
     window = args["-w"]
     infxlux_db_spec = args["-i"]
     sensor_spec = args["-s"]
     field = args["-f"]
+    period = int(args["-p"])
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
@@ -469,19 +496,26 @@ if __name__ == "__main__":
     sensor_config = get_config(config, sensor_spec)
 
     logging.info("DB config: %s", my_lib.pretty.format(db_config))
-    logging.info("Sensor config: %s", my_lib.pretty.format(db_config))
+    logging.info("Sensor config: %s", my_lib.pretty.format(sensor_config))
 
-    data = fetch_data(
-        db_config,
-        sensor_config["measure"],
-        sensor_config["hostname"],
-        field,
-        start="-10m",
-        stop="now()",
-        every_min=1,
-        window_min=3,
-        create_empty=True,
-        last=False,
-    )
+    if mode == "data":
+        data = fetch_data(
+            db_config,
+            sensor_config["measure"],
+            sensor_config["hostname"],
+            field,
+            start="-10m",
+            stop="now()",
+            every_min=1,
+            window_min=3,
+            create_empty=True,
+            last=False,
+        )
+    elif mode == "day_sum":
+        data = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+    elif mode == "hour_sum":
+        data = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+    else:
+        logging.error("Unknown mode: %s", mode)
 
     logging.info(my_lib.pretty.format(data))
