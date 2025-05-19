@@ -8,7 +8,7 @@ Usage:
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
-  -m MODE           : データ取得モード。(data, day_sum, hour_sum のいずれか) [default: data]
+  -m MODE           : データ取得モード。(data, day_sum, hour_sum, minute_sum のいずれか) [default: data]
   -i DB_SPEC        : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
   -s SENSOR_SPEC    : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
   -f FIELD          : 取得するフィールド。[default: lux]
@@ -369,58 +369,6 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
         return []
 
 
-def get_day_sum(config, measure, hostname, field, days=1, day_before=0, day_offset=0):  # noqa:  PLR0913
-    try:
-        every_min = 1
-        window_min = 5
-
-        now = my_lib.time.now()
-
-        if day_before == 0:
-            start = f"-{day_offset+days-1}d{now.hour}h{now.minute}m"
-            stop = f"-{day_offset}d"
-        else:
-            start = f"-{day_before+ day_offset + days - 1 }d{now.hour}h{now.minute}m"
-            stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
-
-        table_list = fetch_data_impl(
-            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
-        )
-
-        value_list = table_list.to_values(columns=["count", "sum"])
-
-        if len(value_list) == 0:
-            return 0
-        else:
-            return value_list[0][1]
-    except Exception:
-        logging.exception("Failed to fetch data")
-        return 0
-
-
-def get_hour_sum(config, measure, hostname, field, hours=24, day_offset=0):  # noqa:  PLR0913
-    try:
-        every_min = 1
-        window_min = 5
-
-        start = f"-{day_offset*24 + hours}h"
-        stop = f"-{day_offset*24}h"
-
-        table_list = fetch_data_impl(
-            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
-        )
-
-        value_list = table_list.to_values(columns=["count", "sum"])
-
-        if len(value_list) == 0:
-            return 0
-        else:
-            return value_list[0][1]
-    except Exception:
-        logging.exception("Failed to fetch data")
-        return 0
-
-
 def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_min=1, window_min=3):  # noqa:  PLR0913
     try:
         table_list = fetch_data_impl(
@@ -436,6 +384,35 @@ def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_m
     except Exception:
         logging.exception("Failed to fetch data")
         return 0
+
+
+def get_day_sum(  # noqa:  PLR0913
+    config, measure, hostname, field, days=1, day_before=0, day_offset=0, every_min=1, window_min=5
+):
+    now = my_lib.time.now()
+
+    if day_before == 0:
+        start = f"-{day_offset+days-1}d{now.hour}h{now.minute}m"
+        stop = f"-{day_offset}d"
+    else:
+        start = f"-{day_before+ day_offset + days - 1 }d{now.hour}h{now.minute}m"
+        stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
+
+
+def get_hour_sum(config, measure, hostname, field, hours=12, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+    start = f"-{day_offset*24 + hours}h"
+    stop = f"-{day_offset*24}h"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
+
+
+def get_minute_sum(config, measure, hostname, field, minutes=3, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+    start = f"-{day_offset*24*60 + minutes}m"
+    stop = f"-{day_offset*24*60}m"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
 def get_last_event(config, measure, hostname, field, start="-7d"):
@@ -515,6 +492,8 @@ if __name__ == "__main__":
         data = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
     elif mode == "hour_sum":
         data = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+    elif mode == "minute_sum":
+        data = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
     else:
         logging.error("Unknown mode: %s", mode)
 
