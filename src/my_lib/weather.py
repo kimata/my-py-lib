@@ -8,6 +8,8 @@ import urllib.request
 import lxml.html
 import my_lib.time
 
+TIMEOUT_SEC = 5
+
 
 def fetch_page(url, encoding="UTF-8"):
     logging.debug("fetch %s", url)
@@ -16,7 +18,7 @@ def fetch_page(url, encoding="UTF-8"):
     ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
 
-    data = urllib.request.urlopen(url, context=ctx)  # noqa: S310
+    data = urllib.request.urlopen(url, context=ctx, timeout=TIMEOUT_SEC)  # noqa: S310
 
     if encoding is not None:
         return lxml.html.fromstring(data.read().decode(encoding))
@@ -225,10 +227,21 @@ def get_sunset_date_nao(sunset_config, date):
 def get_sunset_nao(sunset_config):
     now = my_lib.time.now()
 
-    return {
-        "today": get_sunset_date_nao(sunset_config, now),
-        "tomorrow": get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
-    }
+    try:
+        return {
+            "today": get_sunset_date_nao(sunset_config, now),
+            "tomorrow": get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
+        }
+    except Exception:
+        logging.exception("Faile to fetch sunset info.")
+
+        sunset_unknown = {
+            "day": "?",
+            "rise": "?",
+            "set": "?",
+        }
+
+        return {"today": sunset_unknown, "tomorrow": sunset_unknown}
 
 
 def parse_table_tenki(content, index):
