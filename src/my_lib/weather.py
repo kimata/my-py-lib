@@ -235,13 +235,7 @@ def get_sunset_nao(sunset_config):
     except Exception:
         logging.exception("Faile to fetch sunset info.")
 
-        sunset_unknown = {
-            "day": "?",
-            "rise": "?",
-            "set": "?",
-        }
-
-        return {"today": sunset_unknown, "tomorrow": sunset_unknown}
+        return {"today": "?", "tomorrow": "?"}
 
 
 def parse_table_tenki(content, index):
