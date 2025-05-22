@@ -18,12 +18,16 @@ import zoneinfo
 TIMEZONE_DEFAULT = "Asia/Tokyo"
 
 
+def get_tz():
+    return os.environ.get("TZ", TIMEZONE_DEFAULT)
+
+
 def get_zoneinfo():
-    return zoneinfo.ZoneInfo(os.environ.get("TZ", TIMEZONE_DEFAULT))
+    return zoneinfo.ZoneInfo(get_tz())
 
 
 def get_pytz():
-    return pytz.timezone(os.environ.get("TZ", TIMEZONE_DEFAULT))
+    return pytz.timezone(get_tz())
 
 
 def now():

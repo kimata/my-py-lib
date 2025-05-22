@@ -16,7 +16,6 @@ import my_lib.flask_util
 import my_lib.notify.slack
 import my_lib.webapp.config
 import my_lib.webapp.event
-import zoneinfo
 
 
 class LOG_LEVEL(enum.IntEnum):  # noqa: N801
@@ -180,7 +179,7 @@ def get(stop_day):
     for log in log_list:
         log["date"] = (
             datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
-            .replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+            .replace(tzinfo=datetime.timezone.utc)
             .astimezone(my_lib.webapp.config.TIMEZONE)
             .strftime("%Y-%m-%d %H:%M:%S")
         )
