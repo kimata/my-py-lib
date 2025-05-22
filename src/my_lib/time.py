@@ -12,17 +12,22 @@ Options:
 import datetime
 import os
 
+import pytz
 import zoneinfo
 
 TIMEZONE_DEFAULT = "Asia/Tokyo"
 
 
-def get_timezone():
+def get_zoneinfo():
     return zoneinfo.ZoneInfo(os.environ.get("TZ", TIMEZONE_DEFAULT))
 
 
+def get_pytz():
+    return pytz.timezone(os.environ.get("TZ", TIMEZONE_DEFAULT))
+
+
 def now():
-    return datetime.datetime.now(get_timezone())
+    return datetime.datetime.now(get_zoneinfo())
 
 
 if __name__ == "__main__":
