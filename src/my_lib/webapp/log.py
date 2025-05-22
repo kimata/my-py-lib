@@ -180,7 +180,7 @@ def get(stop_day):
         log["date"] = (
             datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
             .replace(tzinfo=datetime.timezone.utc)
-            .astimezone(my_lib.webapp.config.TIMEZONE)
+            .astimezone(my_lib.time.get_zoneinfo())
             .strftime("%Y-%m-%d %H:%M:%S")
         )
 
