@@ -45,7 +45,7 @@ def api_sysinfo():
     return flask.jsonify(
         {
             "date": my_lib.time.now().isoformat(),
-            "timezone": str(my_lib.webapp.config.TIMEZONE),
+            "timezone": my_lib.time.get_tz(),
             "image_build_date": os.environ.get("IMAGE_BUILD_DATE", ""),
             "uptime": uptime.boottime().isoformat(),
             "loadAverage": "{:.2f}, {:.2f}, {:.2f}".format(*os.getloadavg()),
