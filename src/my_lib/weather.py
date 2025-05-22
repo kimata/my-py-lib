@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+"""
+Web ページをスクレイピングして、天気に関する情報を取得します
+
+Usage:
+  weather.py [-c CONFIG] [-D]
+
+Options:
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -D                : デバッグモードで動作します。
+"""
+
 import datetime
 import logging
 import re
@@ -286,3 +297,24 @@ def get_precip_by_hour_tenki(tenki_config):
         "today": {"date": parse_date_tenki(content, 1), "data": parse_table_tenki(content, 1)},
         "tommorow": {"date": parse_date_tenki(content, 2), "data": parse_table_tenki(content, 2)},
     }
+
+
+if __name__ == "__main__":
+    # TEST Code
+    import docopt
+    import my_lib.config
+    import my_lib.logger
+    import my_lib.pretty
+
+    args = docopt.docopt(__doc__)
+
+    config_file = args["-c"]
+    debug_mode = args["-D"]
+
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
+
+    config = my_lib.config.load(config_file)
+
+    sunset_config = config["sunset"]
+
+    logging.info(my_lib.pretty.format(get_sunset_nao(sunset_config)))
