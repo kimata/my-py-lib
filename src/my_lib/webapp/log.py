@@ -145,25 +145,27 @@ def worker(log_queue):
         time.sleep(sleep_sec)
 
 
+def add(message, level):
+    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
+    log_queue.put({"message": message, "level": level})
+
+
 def error(message):
     logging.error(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-    log_queue.put({"message": message, "level": LOG_LEVEL.ERROR})
+    add(message, LOG_LEVEL.ERROR)
 
 
 def warning(message):
     logging.warning(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-    log_queue.put({"message": message, "level": LOG_LEVEL.WARN})
+    add(message, LOG_LEVEL.WARN)
 
 
 def info(message):
     logging.info(message)
 
-    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-    log_queue.put({"message": message, "level": LOG_LEVEL.INFO})
+    add(message, LOG_LEVEL.INFO)
 
 
 def get(stop_day):
