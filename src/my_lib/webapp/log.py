@@ -272,15 +272,14 @@ def api_log_view():
 
 
 def test_run(config, port, debug_mode):
+    import flask_cors
+
     app = flask.Flask("test")
 
     # NOTE: アクセスログは無効にする
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        my_lib.webapp.log.init(config)
-    else:  # pragma: no cover
-        pass
+    my_lib.webapp.log.init(config)
 
     flask_cors.CORS(app)
 
@@ -288,8 +287,9 @@ def test_run(config, port, debug_mode):
     app.json.compat = True
 
     app.register_blueprint(my_lib.webapp.log.blueprint)
+    app.register_blueprint(my_lib.webapp.event.blueprint)
 
-    app.run(host="0.0.0.0", port=port, threaded=True, use_reloader=True, debug=debug_mode)  # noqa: S104
+    app.run(host="0.0.0.0", port=port, threaded=True, use_reloader=False, debug=debug_mode)  # noqa: S104
 
 
 if __name__ == "__main__":
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
-    port = args["-p"]
+    port = int(args["-p"])
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
@@ -317,32 +317,32 @@ if __name__ == "__main__":
     my_lib.webapp.config.URL_PREFIX = "/test"
     my_lib.webapp.config.init(config)
 
-    import flask_cors
     import my_lib.webapp.base
+    import my_lib.webapp.event
     import my_lib.webapp.log
-    import my_lib.webapp.util
 
     def sig_handler(num, frame):  # noqa: ARG001
         my_lib.webapp.log.term()
 
     signal.signal(signal.SIGTERM, sig_handler)
 
+    base_url = f"http://127.0.0.1:{port}/test"
+
     proc = multiprocessing.Process(target=lambda: test_run(config, port, debug_mode))
     proc.start()
 
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        base_url = f"http://127.0.0.1:{port}/test"
+    time.sleep(0.5)
 
-        logging.info(my_lib.pretty.format(requests.get(f"{base_url}/api/log_clear").text))  # noqa: S113
+    logging.info(my_lib.pretty.format(requests.get(f"{base_url}/api/log_clear").text))  # noqa: S113
 
-        requests.post(f"{base_url}/api/log_add", data={"message": "Test INFO", "level": "INFO"})  # noqa: S113
-        requests.post(f"{base_url}/api/log_add", data={"message": "Test WARN", "level": "WARN"})  # noqa: S113
-        requests.post(f"{base_url}/api/log_add", data={"message": "Test ERROR", "level": "ERROR"})  # noqa: S113
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test INFO", "level": "INFO"})  # noqa: S113
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test WARN", "level": "WARN"})  # noqa: S113
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test ERROR", "level": "ERROR"})  # noqa: S113
 
-        time.sleep(1)
+    time.sleep(0.5)
 
-        logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url}/api/log_view").text)))  # noqa: S113
+    logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url}/api/log_view").text)))  # noqa: S113
 
-        os.kill(proc.pid, signal.SIGUSR1)
-        proc.terminate()
-        proc.join()
+    os.kill(proc.pid, signal.SIGUSR1)
+    proc.terminate()
+    proc.join()

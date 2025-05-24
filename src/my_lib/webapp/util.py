@@ -2,12 +2,13 @@
 import os
 import tracemalloc
 
-import flask
 import my_lib.flask_util
 import my_lib.time
 import my_lib.webapp.config
 import psutil
 import uptime
+
+import flask
 
 blueprint = flask.Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 

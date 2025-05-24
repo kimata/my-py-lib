@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import flask
 import my_lib.flask_util
 import my_lib.webapp.config
+
+import flask
 
 blueprint = flask.Blueprint("webapp-base", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
