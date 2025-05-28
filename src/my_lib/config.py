@@ -22,6 +22,18 @@ import yaml
 CONFIG_PATH = "config.yaml"
 
 
+def get_data(config, conf_path, suffix_path=[]):  # noqa: B006
+    conf = config
+    for key in conf_path + suffix_path:
+        conf = conf.get(key, None)
+
+    return conf
+
+
+def get_path(config, conf_path, suffix_path=[]):  # noqa: B006
+    return pathlib.Path(get_data(config, conf_path, suffix_path))
+
+
 def abs_path(config_path=CONFIG_PATH):
     return pathlib.Path(pathlib.Path.cwd(), config_path)
 
