@@ -37,3 +37,9 @@ def init(config):
     logging.info("SCHEDULE_FILE_PATH = %s", SCHEDULE_FILE_PATH)
     logging.info("LOG_DIR_PATH = %s", LOG_DIR_PATH)
     logging.info("STAT_DIR_PATH = %s", STAT_DIR_PATH)
+
+
+def show_handler_list(app):
+    with app.app_context():
+        for rule in app.url_map.iter_rules():
+            logging.info("path: %s %s → %s", rule.rule, rule.methods, rule.endpoint)
