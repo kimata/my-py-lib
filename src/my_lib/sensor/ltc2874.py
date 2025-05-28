@@ -229,9 +229,9 @@ def isdu_res_read(spi, ser, flow):
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        logging.error("response is too short")
-    elif data[1] != msq_checksum([data[0]]):
-        logging.error("checksum unmatch")
+        raise OSError("response is too short")  # noqa: EM101, TRY003
+    if data[1] != msq_checksum([data[0]]):
+        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
 
     return data[0]
 

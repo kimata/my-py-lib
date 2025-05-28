@@ -64,6 +64,7 @@ class FD_Q10C:  # noqa: N801
             # NOTE: 電源 ON なら True
             return driver.com_status(spi)
         except Exception:
+            logging.exception("Failed to get power status")
             return False
         finally:
             driver.com_close(spi)
