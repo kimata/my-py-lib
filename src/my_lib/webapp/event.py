@@ -25,21 +25,31 @@ blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.c
 # NOTE: サイズは上の Enum の個数+1 にしておく
 event_count = multiprocessing.Array("i", 4)
 
-is_stop_watch = False
+should_terminate = False
 watch_thread = None
 
 
-def notify_watch_impl(queue):
-    global is_stop_watch
+def start(event_queue):
+    global should_terminate  # noqa: PLW0603
+    global watch_thread  # noqa: PLW0603
+
+    should_terminate = False
+
+    watch_thread = threading.Thread(target=worker, args=(event_queue,))
+    watch_thread.start()
+
+
+def worker(event_queue):
+    global should_terminate
 
     logging.info("Start notify watch thread")
 
     while True:
-        if is_stop_watch:
+        if should_terminate:
             break
         try:
-            if not queue.empty():
-                notify_event(queue.get())
+            if not event_queue.empty():
+                notify_event(event_queue.get())
             time.sleep(0.1)
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
@@ -52,24 +62,14 @@ def notify_watch_impl(queue):
     logging.info("Stop notify watch thread")
 
 
-def notify_watch(queue):
-    global is_stop_watch  # noqa: PLW0603
-    global watch_thread  # noqa: PLW0603
-
-    is_stop_watch = False
-
-    watch_thread = threading.Thread(target=notify_watch_impl, args=(queue,))
-    watch_thread.start()
-
-
-def stop_watch():
-    global is_stop_watch  # noqa: PLW0603
+def term():
+    global should_terminate  # noqa: PLW0603
     global watch_thread  # noqa: PLW0603
 
     if watch_thread is not None:
-        is_stop_watch = True
+        should_terminate = True
 
-        # NOTE: pytest で freezer 使うと下記で固まるので join を見送る
+        # NOTE: pytest で timemachine 使うと下記で固まるので join を見送る
         # watch_thread.join()
 
         watch_thread = None
