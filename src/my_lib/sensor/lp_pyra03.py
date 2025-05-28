@@ -15,7 +15,7 @@ Options:
 
 import logging
 
-import my_lib.sensor
+from my_lib.sensor import ads1115
 
 
 class LP_PYRA03:  # noqa: N801
@@ -24,9 +24,9 @@ class LP_PYRA03:  # noqa: N801
     SENSITIVITY = 6.94  # mV/(kW/m^2)
 
     def __init__(  # noqa: D107
-        self, bus_id=my_lib.sensor.ads1115.I2CBUS.ARM, dev_addr=my_lib.sensor.ads1115.ADS1115.DEV_ADDR
+        self, bus_id=ads1115.i2cbus.I2CBUS.ARM, dev_addr=ads1115.ADS1115.DEV_ADDR
     ):
-        self.adc = my_lib.sensor.ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+        self.adc = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
         self.dev_addr = self.adc.dev_addr
 
     def ping(self):
