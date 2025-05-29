@@ -146,8 +146,9 @@ def worker(log_queue):
         try:
             while not log_queue.empty():
                 logging.debug("Found %d log message(s)", log_queue.qsize())
-                log = log_queue.get()
-                log_impl(log["message"], log["level"])
+                with log_lock:  # NOTE: クリア処理と排他したい
+                    log = log_queue.get()
+                    log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
             logging.debug(traceback.format_exc())
@@ -208,10 +209,14 @@ def get(stop_day):
 def clear():
     global sqlite
     global log_lock
+    global log_queue
 
     with log_lock:
         cur = sqlite.cursor()
         cur.execute("DELETE FROM log")
+
+        while not log_queue.empty():  # NOTE: 信用できないけど、許容する
+            log_queue.get_nowait()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
