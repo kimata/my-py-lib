@@ -266,8 +266,7 @@ def api_log_view():
     else:
         last_time = (
             datetime.datetime.strptime(log_list[0]["date"], "%Y-%m-%d %H:%M:%S")
-            .replace(tzinfo=datetime.timezone.utc)
-            .astimezone(my_lib.time.get_zoneinfo())
+            .replace(tzinfo=my_lib.time.get_zoneinfo())
             .timestamp()
         )
 
