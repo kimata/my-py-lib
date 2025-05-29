@@ -49,6 +49,6 @@ def api_sysinfo():
             "timezone": my_lib.time.get_tz(),
             "image_build_date": os.environ.get("IMAGE_BUILD_DATE", ""),
             "uptime": uptime.boottime().isoformat(),
-            "loadAverage": "{:.2f}, {:.2f}, {:.2f}".format(*os.getloadavg()),
+            "load_average": "{:.2f}, {:.2f}, {:.2f}".format(*os.getloadavg()),
         }
     )
