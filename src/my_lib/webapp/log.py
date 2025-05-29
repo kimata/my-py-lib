@@ -228,8 +228,6 @@ def api_log_add():
     message = flask.request.form.get("message", "")
     level = flask.request.form.get("level", LOG_LEVEL.INFO, type=lambda x: LOG_LEVEL[x])
 
-    logging.info([message, level])
-
     add(message, level)
 
     return flask.jsonify({"result": "success"})
