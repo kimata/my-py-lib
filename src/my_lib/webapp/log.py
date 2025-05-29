@@ -76,7 +76,7 @@ def init(config_, is_read_only=False):
         if log_queue is not None:
             log_queue.close()
 
-        log_lock = threading.Lock()
+        log_lock = threading.RLock()
         log_queue = multiprocessing.Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
 
@@ -207,6 +207,7 @@ def get(stop_day):
 
 def clear():
     global sqlite
+    global log_lock
 
     with log_lock:
         cur = sqlite.cursor()
@@ -232,11 +233,15 @@ def api_log_add():
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
+    global log_lock
+
     log = flask.request.args.get("log", True, type=json.loads)
 
-    clear()
-    if log:
-        info("🧹 ログがクリアされました。")
+    with log_lock:
+        # NOTE: ログの先頭にクリアメッセージが来るようにする
+        clear()
+        if log:
+            info("🧹 ログがクリアされました。")
 
     return flask.jsonify({"result": "success"})
 
