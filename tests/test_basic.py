@@ -62,8 +62,8 @@ def client(app):
 
 
 def app_log_clear(client):
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear")
-    assert response.status_code == 200
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear")
+    assert res.status_code == 200
 
 
 ######################################################################
@@ -74,39 +74,39 @@ def test_webapp_config():
 
 
 def test_webapp_base(client):
-    response = client.get("/")
+    res = client.get("/")
 
-    assert response.status_code == 302
-    assert re.search(rf"{data.sample_webapp.WEBAPP_URL_PREFIX}/$", response.location)
+    assert res.status_code == 302
+    assert re.search(rf"{data.sample_webapp.WEBAPP_URL_PREFIX}/$", res.location)
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/")
-    assert response.status_code == 200
-    assert "Test Data" in response.data.decode("utf-8")
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/")
+    assert res.status_code == 200
+    assert "Test Data" in res.data.decode("utf-8")
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/", headers={"Accept-Encoding": "gzip"})
-    assert response.status_code == 200
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/", headers={"Accept-Encoding": "gzip"})
+    assert res.status_code == 200
 
 
 def test_webapp_log(client):
-    response = client.get(
+    res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear",
         query_string={
             "log": "false",
         },
     )
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
-    assert response.status_code == 200
-    log_list = response.json["data"]
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
+    assert res.status_code == 200
+    log_list = res.json["data"]
 
     assert len(log_list) == 0
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/log_write")
-    assert response.status_code == 200
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/log_write")
+    assert res.status_code == 200
     time.sleep(2)
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
-    assert response.status_code == 200
-    log_list = response.json["data"]
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_view")
+    assert res.status_code == 200
+    log_list = res.json["data"]
 
     assert log_list[0]["message"] == "TEST WARN"
     assert log_list[1]["message"] == "TEST ERROR"
@@ -116,9 +116,9 @@ def test_webapp_event(client):
     import concurrent.futures
     import multiprocessing
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
-    assert response.status_code == 200
-    assert response.data.decode()
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
+    assert res.status_code == 200
+    assert res.data.decode()
 
     # NOTE: event に先にアクセスさせておいてから、ログに書き込む
     def log_write():
@@ -130,15 +130,13 @@ def test_webapp_event(client):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(log_write)
 
-        response = client.get(
-            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"}
-        )
-        assert response.data.decode().split("\n\n")[0] == "data: dummy"
-        assert response.data.decode().split("\n\n")[1] == "data: log"
+        res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
+        assert res.data.decode().split("\n\n")[0] == "data: dummy"
+        assert res.data.decode().split("\n\n")[1] == "data: log"
         future.result()
 
     queue = multiprocessing.Queue()
-    my_lib.webapp.event.notify_watch(queue)
+    my_lib.webapp.event.start(queue)
 
     def queue_put():
         time.sleep(3)
@@ -148,81 +146,75 @@ def test_webapp_event(client):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(queue_put)
 
-        response = client.get(
-            data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "2"}
-        )
-        assert response.data.decode().split("\n\n")[0] == "data: dummy"
-        assert (
-            response.data.decode().split("\n\n")[1] == f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}"
-        )
-        assert (
-            response.data.decode().split("\n\n")[2]
-            == f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}"
-        )
+        res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "2"})
+
+        assert res.data.decode().split("\n\n")[0] == "data: dummy"
+        assert res.data.decode().split("\n\n")[1] == f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}"
+        assert res.data.decode().split("\n\n")[2] == f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}"
         future.result()
 
-    my_lib.webapp.event.stop_watch()
+    my_lib.webapp.event.term()
 
 
 def test_webapp_util(client):
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/memory")
-    assert response.status_code == 200
-    assert "memory" in response.json
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/memory")
+    assert res.status_code == 200
+    assert "memory" in res.json
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
-    assert response.status_code == 200
-    assert response.json["msg"] == "taken snapshot"
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
+    assert res.status_code == 200
+    assert res.json["msg"] == "taken snapshot"
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
-    assert response.status_code == 200
-    assert type(response.json) is list
-    assert len(response.json) != 0
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/snapshot")
+    assert res.status_code == 200
+    assert type(res.json) is list
+    assert len(res.json) != 0
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/sysinfo")
-    assert response.status_code == 200
-    assert "loadAverage" in response.json
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/sysinfo")
+    assert res.status_code == 200
+    assert "load_average" in res.json
 
 
 def test_flask_util(client, mocker):
-    response = client.get(
+    res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/gzipped/through",
         headers={"Accept-Encoding": "gzip"},
     )
-    assert response.status_code == 302
+    assert res.status_code == 302
 
-    response = client.get(
+    res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/",
         headers={"Accept-Encoding": "gzip"},
     )
-    assert response.status_code == 200
-    assert response.headers["Cache-Control"] == "max-age=86400"
+    assert res.status_code == 200
+    assert res.headers["Cache-Control"] == "max-age=86400"
 
-    response = client.get(
+    res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/gzipped/disable_cache",
         headers={"Accept-Encoding": "gzip"},
     )
-    assert response.status_code == 200
-    assert response.headers["Cache-Control"] == "no-store, must-revalidate"
-    assert response.headers["Expires"] == "0"
+    assert res.status_code == 200
+    assert res.headers["Cache-Control"] == "no-store, must-revalidate"
+    assert res.headers["Expires"] == "0"
 
-    response = client.get(
+    res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/support_jsonp",
         query_string={
             "callback": "CALL",
         },
     )
-    assert response.status_code == 200
-    assert response.data.decode("utf-8") == """CALL({"status":"OK"})"""
+    assert res.status_code == 200
+    assert res.data.decode("utf-8") == """CALL({"status":"OK"})"""
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/remote_host")
-    assert response.status_code == 200
-    assert response.data.decode("utf-8") == "localhost, Unknown"
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/remote_host")
+    assert res.status_code == 200
+    assert res.data.decode("utf-8") == "localhost, Unknown"
 
     mocker.patch("socket.gethostbyaddr", side_effect=RuntimeError())
 
-    response = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/remote_host")
-    assert response.status_code == 200
-    assert response.data.decode("utf-8") == "127.0.0.1, Unknown"
+    res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/exec/remote_host")
+    assert res.status_code == 200
+    assert res.data.decode("utf-8") == "127.0.0.1, Unknown"
 
 
 def test_footprint():
