@@ -33,6 +33,7 @@ class FD_Q10C:  # noqa: N801
         self.lock_fd = None
         self.timeout = timeout
 
+    # NOTE: Pytest の並列実行ができるようにする
     @staticmethod
     def get_lock_path(lock_file):
         suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
@@ -128,7 +129,7 @@ class FD_Q10C:  # noqa: N801
             try:
                 fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
-                pass
+                logging.exception("Failed to acquire the lock")
             else:
                 return True
             time.sleep(0.5)
