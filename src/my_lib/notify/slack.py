@@ -11,9 +11,11 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+import collections
 import json
 import logging
 import math
+import os
 import pathlib
 import tempfile
 import threading
@@ -24,7 +26,7 @@ import slack_sdk
 
 # NOTE: テスト用
 thread_local = threading.local()
-notify_hist = []
+notify_hist = collections.defaultdict([])
 
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
@@ -170,18 +172,14 @@ def interval_clear():
 
 # NOTE: テスト用
 def hist_clear():
-    global notify_hist
-
-    hist_get().clear()
-    notify_hist.clear()
+    hist_get(True).clear()
+    hist_get(False).clear()
 
 
 # NOTE: テスト用
 def hist_add(message):
-    global notify_hist
-
-    hist_get().append(message)
-    notify_hist.append(message)
+    hist_get(True).append(message)
+    hist_get(False).append(message)
 
 
 # NOTE: テスト用
@@ -189,13 +187,15 @@ def hist_get(is_thread_local=True):
     global thread_local
     global notify_hist
 
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "0")
+
     if is_thread_local:
         if not hasattr(thread_local, "notify_hist"):
-            thread_local.notify_hist = []
+            thread_local.notify_hist = collections.defaultdict([])
 
-        return thread_local.notify_hist
+        return thread_local.notify_hist[worker]
     else:
-        return notify_hist
+        return notify_hist[worker]
 
 
 if __name__ == "__main__":

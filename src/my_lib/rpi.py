@@ -42,11 +42,20 @@ else:
         IS_DUMMY = True
         BCM = 0
         OUT = 0
-        state = collections.defaultdict(lambda: None)
-        time_start = collections.defaultdict(lambda: None)
-        time_stop = collections.defaultdict(lambda: None)
-        # NOTE: テスト用
-        gpio_hist = []
+
+        state = collections.defaultdict(
+            lambda: {
+                "state": collections.defaultdict(lambda: None),
+                "time_start": collections.defaultdict(lambda: None),
+                "time_stop": collections.defaultdict(lambda: None),
+                "gpio_hist": [],
+            }
+        )
+
+        def get_state():
+            # NOTE: Pytest を並列実行できるようにする
+            worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+            return gpio.state[worker]
 
         @staticmethod
         def setmode(mode):  # noqa: ARG004
@@ -58,38 +67,38 @@ else:
 
         @staticmethod
         def hist_get():
-            return gpio.gpio_hist
+            return gpio.get_state()["gpio_hist"]
 
         @staticmethod
         def hist_clear():
-            gpio.state = collections.defaultdict(lambda: None)
-            gpio.time_start = collections.defaultdict(lambda: None)
-            gpio.time_stop = collections.defaultdict(lambda: None)
-            gpio.gpio_hist = []
+            gpio.get_state()["state"] = collections.defaultdict(lambda: None)
+            gpio.get_state()["time_start"] = collections.defaultdict(lambda: None)
+            gpio.get_state()["time_stop"] = collections.defaultdict(lambda: None)
+            gpio.get_state()["gpio_hist"] = []
 
         @staticmethod
         def hist_add(hist):
-            gpio.gpio_hist.append(hist)
+            gpio.get_state()["gpio_hist"].append(hist)
 
         @staticmethod
         def output(pin_num, value):
             logging.debug("set gpio.output = %s", value)
             if value == 0:
-                if gpio.time_start[pin_num] is not None:
+                if gpio.get_state()["time_start"][pin_num] is not None:
                     gpio.hist_add(
                         {
                             "pin_num": pin_num,
                             "state": gpio.level.LOW.name,
-                            "high_period": max(int(gpio_time() - gpio.time_start[pin_num]), 1),
+                            "high_period": max(int(gpio_time() - gpio.get_state()["time_start"][pin_num]), 1),
                         }
                     )
                 else:
                     gpio.hist_add({"pin_num": pin_num, "state": gpio.level.LOW.name})
-                gpio.time_start[pin_num] = None
-                gpio.time_stop[pin_num] = gpio_time()
+                gpio.get_state()["time_start"][pin_num] = None
+                gpio.get_state()["time_stop"][pin_num] = gpio_time()
             else:
-                gpio.time_start[pin_num] = gpio_time()
-                gpio.time_stop[pin_num] = None
+                gpio.get_state()["time_start"][pin_num] = gpio_time()
+                gpio.get_state()["time_stop"][pin_num] = None
                 gpio.hist_add(
                     {
                         "pin_num": pin_num,
@@ -97,11 +106,11 @@ else:
                     }
                 )
 
-            gpio.state[pin_num] = value
+            gpio.get_state()["state"][pin_num] = value
 
         @staticmethod
         def input(pin_num):
-            return gpio.state[pin_num]
+            return gpio.get_state()["state"][pin_num]
 
         @staticmethod
         def setwarnings(warnings):  # noqa: ARG004
