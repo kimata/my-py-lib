@@ -29,11 +29,12 @@ class FD_Q10C:  # noqa: N801
 
     def __init__(self, lock_file=LOCK_FILE, timeout=TIMEOUT):  # noqa:D107
         self.dev_addr = None
-        self.lock_file = str(self.get_lock_path(lock_file))
+        self.lock_file = str(FD_Q10C.get_lock_path(lock_file))
         self.lock_fd = None
         self.timeout = timeout
 
-    def get_lock_path(self, lock_file):
+    @staticmethod
+    def get_lock_path(lock_file):
         suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
         path = pathlib.Path(lock_file)
 
@@ -41,6 +42,10 @@ class FD_Q10C:  # noqa: N801
             return path
         else:
             return path.with_name(path.name + "." + suffix)
+
+    @staticmethod
+    def clear_lock_file(lock_file=LOCK_FILE):
+        pathlib.Path(FD_Q10C.get_lock_path(lock_file)).unlink(missing_ok=True)
 
     def ping(self):
         try:
