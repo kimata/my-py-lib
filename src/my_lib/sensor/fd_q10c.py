@@ -66,8 +66,7 @@ class FD_Q10C:  # noqa: N801
             return None
 
     def get_state(self):
-        if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
+        self._acquire()
 
         try:
             spi = driver.com_open()
@@ -81,8 +80,7 @@ class FD_Q10C:  # noqa: N801
             self._release()
 
     def read_param(self, index, data_type, force_power_on=True):
-        if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
+        self._acquire()
 
         try:
             spi = driver.com_open()
@@ -102,8 +100,7 @@ class FD_Q10C:  # noqa: N801
             self._release()
 
     def stop(self):
-        if not self._acquire():
-            raise RuntimeError("Unable to acquire the lock.")  # noqa: EM101, TRY003
+        self._acquire()
 
         spi = None
         try:
@@ -134,7 +131,7 @@ class FD_Q10C:  # noqa: N801
         os.close(self.lock_fd)
         self.lock_fd = None
 
-        return False
+        raise RuntimeError(f"Unable to acquire the lock of {self.lock_file}")  # noqa: EM102, TRY003
 
     def _release(self):
         if self.lock_fd is None:
