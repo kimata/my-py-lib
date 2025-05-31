@@ -14,6 +14,7 @@ Options:
 import fcntl
 import logging
 import os
+import pathlib
 import time
 import traceback
 
@@ -28,9 +29,18 @@ class FD_Q10C:  # noqa: N801
 
     def __init__(self, lock_file=LOCK_FILE, timeout=TIMEOUT):  # noqa:D107
         self.dev_addr = None
-        self.lock_file = lock_file
+        self.lock_file = str(self.get_lock_path(lock_file))
         self.lock_fd = None
         self.timeout = timeout
+
+    def get_lock_path(self, lock_file):
+        suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+        path = pathlib.Path(lock_file)
+
+        if suffix is None:
+            return path
+        else:
+            return path.with_name(path.name + "." + suffix)
 
     def ping(self):
         try:
