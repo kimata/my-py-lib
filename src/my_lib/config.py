@@ -64,7 +64,7 @@ def load(config_path=CONFIG_PATH, schema_path=None):
 # NOTE: スキーマの雛形を生成
 def generate_schema(config_path):
     with pathlib.Path(config_path).open() as file:
-        builder = genson.SchemaBuilder()
+        builder = genson.SchemaBuilder("https://json-schema.org/draft/2020-12/schema")
         builder.add_object(yaml.load(file, Loader=yaml.SafeLoader))
 
         print(json.dumps(builder.to_schema(), indent=4))  # noqa: T201
