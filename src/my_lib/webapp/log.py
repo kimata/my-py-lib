@@ -37,6 +37,8 @@ class LOG_LEVEL(enum.Enum):  # noqa: N801
     ERROR = 2
 
 
+TABLE_NAME = "log"
+
 blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 sqlite = None
@@ -63,7 +65,8 @@ def init(config_, is_read_only=False):
     my_lib.webapp.config.LOG_DIR_PATH.parent.mkdir(parents=True, exist_ok=True)
     sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=False)
     sqlite.execute(
-        "CREATE TABLE IF NOT EXISTS log(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
+        f"CREATE TABLE IF NOT EXISTS {get_table_name()}"
+        "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
     sqlite.execute("PRAGMA journal_mode=WAL")
     sqlite.commit()
@@ -101,6 +104,16 @@ def term(is_read_only=False):
         log_thread = None
 
 
+def get_table_name():
+    # NOTE: Pytest を並列実行できるようにする
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+
+    if suffix is None:
+        return TABLE_NAME
+    else:
+        return TABLE_NAME + "_" + suffix
+
+
 def log_impl(message, level):
     global config
     global sqlite
@@ -109,10 +122,10 @@ def log_impl(message, level):
 
     with log_lock:
         sqlite.execute(
-            'INSERT INTO log VALUES (NULL, DATETIME("now"), ?)',
+            f'INSERT INTO {get_table_name()} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
             [message],
         )
-        sqlite.execute('DELETE FROM log WHERE date <= DATETIME("now", "-60 days")')
+        sqlite.execute(f'DELETE FROM {get_table_name()} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
         sqlite.commit()
 
         my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
@@ -190,7 +203,7 @@ def get(stop_day):
 
     cur = sqlite.cursor()
     cur.execute(
-        'SELECT * FROM log WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',
+        f'SELECT * FROM {get_table_name()} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
         # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
         [f"-{stop_day} days"],
     )
@@ -213,7 +226,7 @@ def clear():
 
     with log_lock:
         cur = sqlite.cursor()
-        cur.execute("DELETE FROM log")
+        cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
 
         while not log_queue.empty():  # NOTE: 信用できないけど、許容する
             log_queue.get_nowait()
