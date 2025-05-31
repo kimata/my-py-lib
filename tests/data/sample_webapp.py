@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import os
 
-import flask
 import my_lib.flask_util
+
+import flask
 
 WEBAPP_URL_PREFIX = "/test"
 
@@ -15,9 +16,10 @@ def create_app(config_file):
     import atexit
     import logging
 
-    import flask
     import flask_cors
     import my_lib.webapp.config
+
+    import flask
 
     config = my_lib.config.load(config_file)
 
