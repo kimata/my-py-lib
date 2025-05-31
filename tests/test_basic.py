@@ -36,7 +36,7 @@ def slack_mock():
         yield fixture
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def app():
     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
 

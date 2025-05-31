@@ -30,7 +30,7 @@ test-walk-through:
 
     script:
         - apt install --assume-yes smem
-        - rye run pytest --cov=flask --cov-report=html tests/test_basic.py
+        - rye run pytest --timeout=60 -v -n auto tests/test_basic.py
 
     cache:
         key: "${CI_JOB_NAME}"
