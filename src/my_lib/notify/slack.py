@@ -26,7 +26,7 @@ import slack_sdk
 
 # NOTE: テスト用
 thread_local = threading.local()
-notify_hist = collections.defaultdict([])
+notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
@@ -191,7 +191,7 @@ def hist_get(is_thread_local=True):
 
     if is_thread_local:
         if not hasattr(thread_local, "notify_hist"):
-            thread_local.notify_hist = collections.defaultdict([])
+            thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
         return thread_local.notify_hist[worker]
     else:
