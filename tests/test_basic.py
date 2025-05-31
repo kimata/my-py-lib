@@ -135,6 +135,7 @@ def test_webapp_event(client):
         assert res.data.decode().split("\n\n")[1] == "data: log"
         future.result()
 
+    my_lib.webapp.event.term()
     queue = multiprocessing.Queue()
     my_lib.webapp.event.start(queue)
 
