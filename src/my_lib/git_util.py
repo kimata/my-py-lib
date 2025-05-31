@@ -21,7 +21,7 @@ def get_revision_info():
 
     commit = repo.head.commit
     commit_time = datetime.datetime.fromtimestamp(commit.committed_date, tz=datetime.timezone.utc).astimezone(
-        my_lib.time.get_timezone()
+        my_lib.time.get_zoneinfo()
     )
 
     return {
