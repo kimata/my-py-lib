@@ -2,6 +2,7 @@
 import datetime
 import inspect
 import logging
+import os
 import random
 import subprocess
 import time
@@ -22,6 +23,11 @@ AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
+
+    # NOTE: Pytest を並列実行できるようにする
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    if suffix is not None:
+        profile_name += "." + suffix
 
     chrome_data_path.mkdir(parents=True, exist_ok=True)
     log_path.mkdir(parents=True, exist_ok=True)
