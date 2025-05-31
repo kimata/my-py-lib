@@ -6,7 +6,7 @@ import requests
 
 
 def check_liveness(name, liveness_file, interval):
-    if not liveness_file.exists():
+    if not my_lib.footprint.exists(liveness_file):
         logging.warning("%s is not executed.", name)
         return False
 
