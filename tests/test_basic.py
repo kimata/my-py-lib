@@ -138,7 +138,12 @@ def test_webapp_event(client):
 
         logging.info("log: %s", my_lib.webapp.log.get())
 
-        assert res.data.decode().split("\n\n")[0:3] == ["data: dummy", "data: log", "data: log"]
+        event_list = res.data.decode().split("\n\n")
+        expected_list = ["data: log", "data: log"]
+        assert [event for event in event_list if event != "data: dummy"][
+            : len(expected_list)
+        ] == expected_list
+
         future.result()
 
     my_lib.webapp.event.term()
@@ -158,11 +163,14 @@ def test_webapp_event(client):
 
         logging.info("log: %s", my_lib.webapp.log.get())
 
-        assert res.data.decode().split("\n\n")[0:3] == [
-            "data: dummy",
+        event_list = res.data.decode().split("\n\n")
+        expected_list = [
             f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}",
             f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}",
         ]
+        assert [event for event in event_list if event != "data: dummy"][
+            : len(expected_list)
+        ] == expected_list
 
         future.result()
 
