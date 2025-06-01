@@ -40,7 +40,9 @@ def abs_path(config_path=CONFIG_PATH):
 
 def load(config_path=CONFIG_PATH, schema_path=None):
     config_path = pathlib.Path(config_path).resolve()
-    schema_path = pathlib.Path(schema_path).resolve()
+
+    if schema_path is not None:
+        schema_path = pathlib.Path(schema_path).resolve()
 
     logging.info(
         "Load config: %s%s", config_path, f"(schema: {schema_path})" if schema_path is not None else ""
