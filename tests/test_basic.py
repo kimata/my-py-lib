@@ -87,6 +87,7 @@ def test_webapp_base(client):
     assert res.status_code == 200
 
 
+@pytest.mark.xdist_group(name="webapp")
 def test_webapp_log(client):
     res = client.get(
         data.sample_webapp.WEBAPP_URL_PREFIX + "/api/log_clear",
@@ -112,6 +113,7 @@ def test_webapp_log(client):
     assert log_list[1]["message"] == "TEST ERROR"
 
 
+@pytest.mark.xdist_group(name="webapp")
 def test_webapp_event(client):
     import concurrent.futures
     import multiprocessing
