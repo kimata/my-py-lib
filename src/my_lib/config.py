@@ -40,8 +40,11 @@ def abs_path(config_path=CONFIG_PATH):
 
 def load(config_path=CONFIG_PATH, schema_path=None):
     config_path = pathlib.Path(config_path).resolve()
+    schema_path = pathlib.Path(schema_path).resolve()
 
-    logging.info("Load config: %s", config_path)
+    logging.info(
+        "Load config: %s%s", config_path, f"(schema: {schema_path})" if schema_path is not None else ""
+    )
 
     with config_path.open() as file:
         yaml_data = yaml.load(file, Loader=yaml.SafeLoader)
