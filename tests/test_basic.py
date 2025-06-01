@@ -146,7 +146,7 @@ def test_webapp_event(client):
 
         future.result()
 
-    my_lib.webapp.event.term()
+    # my_lib.webapp.event.term()
     queue = multiprocessing.Queue()
     my_lib.webapp.event.start(queue)
 
