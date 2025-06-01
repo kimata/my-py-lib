@@ -24,10 +24,6 @@ import time
 import my_lib.footprint
 import slack_sdk
 
-# NOTE: テスト用
-thread_local = threading.local()
-notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
-
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
 
@@ -50,6 +46,10 @@ SIMPLE_TMPL = """\
     }}
 ]
 """
+
+# NOTE: テスト用
+thread_local = threading.local()
+notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
 
 def format_simple(title, message):

@@ -11,9 +11,14 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+import collections
 import logging
+import os
 
 import linebot.v3.messaging
+
+# NOTE: テスト用
+notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
 
 def get_msg_config(line_config):
@@ -23,6 +28,8 @@ def get_msg_config(line_config):
 
 
 def send_impl(line_config, message):
+    hist_add(message.alt_text)
+
     msg_config = get_msg_config(line_config)
 
     with linebot.v3.messaging.ApiClient(msg_config) as client:
@@ -123,6 +130,25 @@ def info(line_config, text):
     )
 
     send_impl(line_config, message)
+
+
+# NOTE: テスト用
+def hist_clear():
+    hist_get().clear()
+
+
+# NOTE: テスト用
+def hist_add(message):
+    hist_get().append(message)
+
+
+# NOTE: テスト用
+def hist_get():
+    global notify_hist
+
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "0")
+
+    return notify_hist[worker]
 
 
 if __name__ == "__main__":
