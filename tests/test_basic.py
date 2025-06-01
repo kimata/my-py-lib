@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 
+import logging
 import pathlib
 import re
 import time
@@ -133,14 +134,17 @@ def test_webapp_event(client):
         future = executor.submit(log_write)
 
         res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
-        assert res.data.decode().split("\n\n")[0] == "data: dummy"
-        assert res.data.decode().split("\n\n")[1] == "data: log"
+
+        logging.info("log: %s", my_lib.webapp.log.get())
+
+        assert res.data.decode().split("\n\n")[0:2] == ["data: dummy", "data: log"]
         future.result()
 
     my_lib.webapp.event.term()
     queue = multiprocessing.Queue()
     my_lib.webapp.event.start(queue)
 
+    # NOTE: event に先にアクセスさせておいてから、ログに書き込む
     def queue_put():
         time.sleep(3)
         queue.put(my_lib.webapp.event.EVENT_TYPE.SCHEDULE)
@@ -151,9 +155,14 @@ def test_webapp_event(client):
 
         res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "2"})
 
-        assert res.data.decode().split("\n\n")[0] == "data: dummy"
-        assert res.data.decode().split("\n\n")[1] == f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}"
-        assert res.data.decode().split("\n\n")[2] == f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}"
+        logging.info("log: %s", my_lib.webapp.log.get())
+
+        assert res.data.decode().split("\n\n")[0:3] == [
+            "data: dummy",
+            f"data: {my_lib.webapp.event.EVENT_TYPE.CONTROL.value}",
+            f"data: {my_lib.webapp.event.EVENT_TYPE.SCHEDULE.value}",
+        ]
+
         future.result()
 
     my_lib.webapp.event.term()

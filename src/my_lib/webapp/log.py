@@ -198,7 +198,7 @@ def info(message):
     add(message, LOG_LEVEL.INFO)
 
 
-def get(stop_day):
+def get(stop_day=0):
     global sqlite
 
     cur = sqlite.cursor()
