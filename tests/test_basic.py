@@ -133,11 +133,12 @@ def test_webapp_event(client):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(log_write)
 
-        res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "1"})
+        # NOTE: log_write は内部で 2 回ログ書き込みを行う
+        res = client.get(data.sample_webapp.WEBAPP_URL_PREFIX + "/api/event", query_string={"count": "2"})
 
         logging.info("log: %s", my_lib.webapp.log.get())
 
-        assert res.data.decode().split("\n\n")[0:2] == ["data: dummy", "data: log"]
+        assert res.data.decode().split("\n\n")[0:3] == ["data: dummy", "data: log", "data: log"]
         future.result()
 
     my_lib.webapp.event.term()

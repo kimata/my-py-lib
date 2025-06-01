@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 
 import my_lib.flask_util
 
@@ -70,6 +71,7 @@ def create_app(config_file):
 @my_lib.flask_util.support_jsonp
 def exec_log_write():
     my_lib.webapp.log.error("TEST ERROR")
+    time.sleep(0.5)
     my_lib.webapp.log.warning("TEST WARN")
 
     return "OK"
