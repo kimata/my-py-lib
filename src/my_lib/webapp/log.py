@@ -45,6 +45,7 @@ sqlite = None
 log_thread = None
 log_lock = None
 log_queue = None
+log_manager = None
 config = None
 should_terminate = False
 
@@ -54,6 +55,7 @@ def init(config_, is_read_only=False):
     global sqlite  # noqa: PLW0603
     global log_lock  # noqa: PLW0603
     global log_queue  # noqa: PLW0603
+    global log_manager  # noqa: PLW0603
     global log_thread  # noqa: PLW0603
     global should_terminate  # noqa: PLW0603
 
@@ -76,11 +78,12 @@ def init(config_, is_read_only=False):
         should_terminate = False
 
         # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-        if log_queue is not None:
-            log_queue.close()
+        if log_manager is not None:
+            log_manager.shutdown()
 
         log_lock = threading.RLock()
-        log_queue = multiprocessing.Queue()
+        log_manager = multiprocessing.Manager()
+        log_queue = log_manager.Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
 
         log_thread.start()
@@ -150,7 +153,7 @@ def log_impl(message, level):
 def worker(log_queue):
     global should_terminate
 
-    sleep_sec = 0.1
+    sleep_sec = 0.3
 
     while True:
         if should_terminate:
@@ -163,7 +166,7 @@ def worker(log_queue):
                     log = log_queue.get()
                     log_impl(log["message"], log["level"])
         except OverflowError:  # pragma: no cover
-            # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
+            # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
             logging.debug(traceback.format_exc())
         except ValueError:  # pragma: no cover
             # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
