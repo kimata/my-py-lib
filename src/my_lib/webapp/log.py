@@ -41,7 +41,6 @@ TABLE_NAME = "log"
 
 blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
-sqlite = None
 log_thread = None
 log_lock = None
 log_queue = None
@@ -52,7 +51,6 @@ should_terminate = False
 
 def init(config_, is_read_only=False):
     global config  # noqa: PLW0603
-    global sqlite  # noqa: PLW0603
     global log_lock  # noqa: PLW0603
     global log_queue  # noqa: PLW0603
     global log_manager  # noqa: PLW0603
@@ -61,18 +59,15 @@ def init(config_, is_read_only=False):
 
     config = config_
 
-    if sqlite is not None:
-        raise ValueError("sqlite should be None")  # noqa: TRY003, EM101
-
     my_lib.webapp.config.LOG_DIR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=False)
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
     sqlite.execute(
         f"CREATE TABLE IF NOT EXISTS {get_table_name()}"
         "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
     sqlite.execute("PRAGMA journal_mode=WAL")
     sqlite.commit()
-    sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+    sqlite.close()
 
     if not is_read_only:
         should_terminate = False
@@ -90,13 +85,8 @@ def init(config_, is_read_only=False):
 
 
 def term(is_read_only=False):
-    global sqlite  # noqa: PLW0603
     global log_thread  # noqa: PLW0603
     global should_terminate  # noqa: PLW0603
-
-    if sqlite is not None:
-        sqlite.close()
-        sqlite = None
 
     if not is_read_only:
         if log_thread is None:
@@ -117,9 +107,8 @@ def get_table_name():
         return TABLE_NAME + "_" + suffix
 
 
-def log_impl(message, level):
+def log_impl(sqlite, message, level):
     global config
-    global sqlite
 
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
@@ -155,6 +144,7 @@ def worker(log_queue):
 
     sleep_sec = 0.3
 
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
     while True:
         if should_terminate:
             break
@@ -164,7 +154,7 @@ def worker(log_queue):
                 logging.debug("Found %d log message(s)", log_queue.qsize())
                 with log_lock:  # NOTE: クリア処理と排他したい
                     log = log_queue.get()
-                    log_impl(log["message"], log["level"])
+                    log_impl(sqlite, log["message"], log["level"])
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
             logging.debug(traceback.format_exc())
@@ -174,6 +164,8 @@ def worker(log_queue):
             logging.warning(traceback.format_exc())
 
         time.sleep(sleep_sec)
+
+    sqlite.close()
 
 
 def add(message, level):
@@ -202,8 +194,9 @@ def info(message):
 
 
 def get(stop_day=0):
-    global sqlite
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
 
+    sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
     cur = sqlite.cursor()
     cur.execute(
         f'SELECT * FROM {get_table_name()} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
@@ -218,21 +211,24 @@ def get(stop_day=0):
             .astimezone(my_lib.time.get_zoneinfo())
             .strftime("%Y-%m-%d %H:%M:%S")
         )
+    sqlite.close()
 
     return log_list
 
 
 def clear():
-    global sqlite
     global log_lock
     global log_queue
 
     with log_lock:
+        sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
         cur = sqlite.cursor()
         cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
 
         while not log_queue.empty():  # NOTE: 信用できないけど、許容する
             log_queue.get_nowait()
+
+        sqlite.close()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
