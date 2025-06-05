@@ -42,7 +42,7 @@ TABLE_NAME = "log"
 blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
 log_thread = None
-log_lock = None
+queue_lock = None
 log_queue = None
 log_manager = None
 config = None
@@ -51,7 +51,7 @@ should_terminate = False
 
 def init(config_, is_read_only=False):
     global config  # noqa: PLW0603
-    global log_lock  # noqa: PLW0603
+    global queue_lock  # noqa: PLW0603
     global log_queue  # noqa: PLW0603
     global log_manager  # noqa: PLW0603
     global log_thread  # noqa: PLW0603
@@ -60,7 +60,7 @@ def init(config_, is_read_only=False):
     config = config_
 
     my_lib.webapp.config.LOG_DIR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
     sqlite.execute(
         f"CREATE TABLE IF NOT EXISTS {get_table_name()}"
         "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
@@ -76,7 +76,7 @@ def init(config_, is_read_only=False):
         if log_manager is not None:
             log_manager.shutdown()
 
-        log_lock = threading.RLock()
+        queue_lock = threading.Lock()
         log_manager = multiprocessing.Manager()
         log_queue = log_manager.Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
@@ -112,15 +112,14 @@ def log_impl(sqlite, message, level):
 
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
-    with log_lock:
-        sqlite.execute(
-            f'INSERT INTO {get_table_name()} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
-            [message],
-        )
-        sqlite.execute(f'DELETE FROM {get_table_name()} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
-        sqlite.commit()
+    sqlite.execute(
+        f'INSERT INTO {get_table_name()} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
+        [message],
+    )
+    sqlite.execute(f'DELETE FROM {get_table_name()} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
+    sqlite.commit()
 
-        my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
+    my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
     if level == LOG_LEVEL.ERROR:
         if "slack" in config:
@@ -144,15 +143,15 @@ def worker(log_queue):
 
     sleep_sec = 0.3
 
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
     while True:
         if should_terminate:
             break
 
         try:
-            while not log_queue.empty():
-                logging.debug("Found %d log message(s)", log_queue.qsize())
-                with log_lock:  # NOTE: クリア処理と排他したい
+            with queue_lock:  # NOTE: クリア処理と排他したい
+                while not log_queue.empty():
+                    logging.debug("Found %d log message(s)", log_queue.qsize())
                     log = log_queue.get()
                     log_impl(sqlite, log["message"], log["level"])
         except OverflowError:  # pragma: no cover
@@ -169,10 +168,12 @@ def worker(log_queue):
 
 
 def add(message, level):
+    global queue_lock
     global log_queue
 
-    # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-    log_queue.put({"message": message, "level": level})
+    with queue_lock:  # NOTE: クリア処理と排他したい
+        # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
+        log_queue.put({"message": message, "level": level})
 
 
 def error(message):
@@ -194,7 +195,7 @@ def info(message):
 
 
 def get(stop_day=0):
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
 
     sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
     cur = sqlite.cursor()
@@ -217,18 +218,16 @@ def get(stop_day=0):
 
 
 def clear():
-    global log_lock
     global log_queue
 
-    with log_lock:
-        sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH, check_same_thread=True)
-        cur = sqlite.cursor()
-        cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
+    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
+    cur = sqlite.cursor()
+    cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
 
-        while not log_queue.empty():  # NOTE: 信用できないけど、許容する
-            log_queue.get_nowait()
+    while not log_queue.empty():  # NOTE: 信用できないけど、許容する
+        log_queue.get_nowait()
 
-        sqlite.close()
+    sqlite.close()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
@@ -248,11 +247,11 @@ def api_log_add():
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
-    global log_lock
+    global queue_lock
 
     log = flask.request.args.get("log", True, type=json.loads)
 
-    with log_lock:
+    with queue_lock:
         # NOTE: ログの先頭にクリアメッセージが来るようにする
         clear()
         if log:
