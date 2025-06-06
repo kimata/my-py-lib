@@ -173,7 +173,7 @@ def fetch_price(driver, item, dump_path, loop=0):
         logging.info("Check %s", item["name"])
 
         return fetch_price_impl(driver, item, dump_path, loop)
-    except:
+    except Exception:
         logging.exception("Failed to check %s", driver.current_url)
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
         my_lib.selenium_util.clean_dump()

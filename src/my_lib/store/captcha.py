@@ -46,7 +46,7 @@ def recognize_audio(audio_url):
             audio = recognizer.record(source)
 
         return recognizer.recognize_google(audio, language="en-US")
-    except:
+    except Exception:
         logging.exception("Failed to recognize audio")
         raise
     finally:
