@@ -59,10 +59,11 @@ def init(config_, is_read_only=False):
 
     config = config_
 
-    my_lib.webapp.config.LOG_DIR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
+    db_path = get_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    sqlite = sqlite3.connect(db_path)
     sqlite.execute(
-        f"CREATE TABLE IF NOT EXISTS {get_table_name()}"
+        f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
         "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
     )
     sqlite.execute("PRAGMA journal_mode=WAL")
@@ -97,14 +98,18 @@ def term(is_read_only=False):
         log_thread = None
 
 
-def get_table_name():
+def get_db_path():
     # NOTE: Pytest を並列実行できるようにする
-    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", None)
+    base_path = my_lib.webapp.config.LOG_DIR_PATH
 
-    if suffix is None:
-        return TABLE_NAME
+    if worker_id is None:
+        return base_path
     else:
-        return TABLE_NAME + "_" + suffix
+        # ワーカー毎に別ディレクトリを作成
+        worker_dir = base_path.parent / f"test_worker_{worker_id}"
+        worker_dir.mkdir(parents=True, exist_ok=True)
+        return worker_dir / base_path.name
 
 
 def log_impl(sqlite, message, level):
@@ -113,10 +118,10 @@ def log_impl(sqlite, message, level):
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
     sqlite.execute(
-        f'INSERT INTO {get_table_name()} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
+        f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
         [message],
     )
-    sqlite.execute(f'DELETE FROM {get_table_name()} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
+    sqlite.execute(f'DELETE FROM {TABLE_NAME} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
     sqlite.commit()
 
     my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
@@ -143,7 +148,7 @@ def worker(log_queue):
 
     sleep_sec = 0.3
 
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
+    sqlite = sqlite3.connect(get_db_path())
     while True:
         if should_terminate:
             break
@@ -200,7 +205,7 @@ def get(stop_day=0):
     sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
     cur = sqlite.cursor()
     cur.execute(
-        f'SELECT * FROM {get_table_name()} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
+        f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
         # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
         [f"-{stop_day} days"],
     )
@@ -224,7 +229,7 @@ def clear():
     cur = sqlite.cursor()
 
     logging.debug("clear SQLite")
-    cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
+    cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
     sqlite.commit()
     sqlite.close()
 
