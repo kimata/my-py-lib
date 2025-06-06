@@ -16,7 +16,7 @@ jobs:
 
         strategy:
             matrix:
-                python-version: ["3.10"]
+                python-version: ["3.10", "3.11", "3.12"]
 
         steps:
             - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
                 cache-name: cache-python-modules
               with:
                 path: $HOME/.cache
-                key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('pyproject.toml') }}
+                key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('requirements.lock') }}
                 restore-keys: |
                     ${{ runner.os }}-build-${{ env.cache-name }}-
                     ${{ runner.os }}-build-
@@ -56,7 +56,7 @@ jobs:
                 sudo apt install --assume-yes smem
 
             - name: Run Tests
-              run: rye run pytest --cov=src --cov-report=html tests/test_basic.py
+              run: rye run pytest -n auto --timeout=300 --cov=src --cov-report=html tests/test_basic.py
 
             - name: Upload coverage file
               uses: actions/upload-artifact@v4
