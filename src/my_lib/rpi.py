@@ -43,6 +43,9 @@ else:
         BCM = 0
         OUT = 0
 
+        # Valid GPIO pin numbers for Raspberry Pi (BCM mode)
+        VALID_PINS = set(range(28))
+
         state = collections.defaultdict(
             lambda: {
                 "state": collections.defaultdict(lambda: None),
@@ -51,6 +54,11 @@ else:
                 "gpio_hist": [],
             }
         )
+
+        @staticmethod
+        def _validate_pin(pin_num):
+            if pin_num not in gpio.VALID_PINS:
+                raise ValueError(f"Pin {pin_num} is not a valid GPIO pin number")  # noqa: TRY003, EM102
 
         def get_state():
             # NOTE: Pytest を並列実行できるようにする
@@ -63,7 +71,7 @@ else:
 
         @staticmethod
         def setup(pin_num, direction):  # noqa: ARG004
-            return
+            gpio._validate_pin(pin_num)
 
         @staticmethod
         def hist_get():
@@ -82,6 +90,7 @@ else:
 
         @staticmethod
         def output(pin_num, value):
+            gpio._validate_pin(pin_num)
             logging.debug("set gpio.output = %s", value)
             if value == 0:
                 if gpio.get_state()["time_start"][pin_num] is not None:
@@ -110,6 +119,7 @@ else:
 
         @staticmethod
         def input(pin_num):
+            gpio._validate_pin(pin_num)
             return gpio.get_state()["state"][pin_num]
 
         @staticmethod
