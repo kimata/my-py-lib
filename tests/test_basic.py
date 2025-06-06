@@ -32,7 +32,7 @@ def env_mock():
 def slack_mock():
     with unittest.mock.patch(
         "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
-        retunr_value=True,
+        return_value=True,
     ) as fixture:
         yield fixture
 
