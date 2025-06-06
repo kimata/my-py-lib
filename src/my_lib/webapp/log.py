@@ -200,7 +200,7 @@ def info(message):
 
 
 def get(stop_day=0):
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
+    sqlite = sqlite3.connect(get_db_path())
 
     sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
     cur = sqlite.cursor()
@@ -225,7 +225,7 @@ def get(stop_day=0):
 def clear():
     global log_queue
 
-    sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
+    sqlite = sqlite3.connect(get_db_path())
     cur = sqlite.cursor()
 
     logging.debug("clear SQLite")
