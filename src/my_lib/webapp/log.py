@@ -76,7 +76,7 @@ def init(config_, is_read_only=False):
         if log_manager is not None:
             log_manager.shutdown()
 
-        queue_lock = threading.Lock()
+        queue_lock = threading.RLock()
         log_manager = multiprocessing.Manager()
         log_queue = log_manager.Queue()
         log_thread = threading.Thread(target=worker, args=(log_queue,))
@@ -222,12 +222,15 @@ def clear():
 
     sqlite = sqlite3.connect(my_lib.webapp.config.LOG_DIR_PATH)
     cur = sqlite.cursor()
-    cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
 
+    logging.debug("clear SQLite")
+    cur.execute(f"DELETE FROM {get_table_name()}")  # noqa: S608
+    sqlite.commit()
+    sqlite.close()
+
+    logging.debug("clear Queue")
     while not log_queue.empty():  # NOTE: 信用できないけど、許容する
         log_queue.get_nowait()
-
-    sqlite.close()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
