@@ -17,6 +17,7 @@ import io
 import json
 import logging
 import time
+import urllib.parse
 import urllib.request
 import wave
 
@@ -75,19 +76,41 @@ def convert_wav_data(wav_data_in):
 
 
 def synthesize(config, text, volume=2, speaker_id=3):
-    req = urllib.request.Request(get_query_url(config, text, speaker_id), method="POST")  # noqa: S310
-    res = urllib.request.urlopen(req)  # noqa: S310
-    query_json = json.loads(res.read().decode("utf-8"))
-    query_json["volumeScale"] = volume
-    query_json["speedScale"] = 0.9
+    if not isinstance(text, str) or len(text.strip()) == 0:
+        raise ValueError("Text must be a non-empty string")
+    if not isinstance(speaker_id, int) or speaker_id < 0:
+        raise ValueError("Speaker ID must be a non-negative integer")
+    if not isinstance(volume, (int, float)) or volume < 0:
+        raise ValueError("Volume must be a non-negative number")
 
-    req = urllib.request.Request(  # noqa: S310
-        get_synthesis_url(config, speaker_id), data=json.dumps(query_json).encode("utf-8"), method="POST"
-    )
-    req.add_header("Content-Type", "application/json")
-    res = urllib.request.urlopen(req)  # noqa: S310
+    server_url = config["voice"]["server"]["url"]
+    parsed_url = urllib.parse.urlparse(server_url)
+    if not parsed_url.scheme or not parsed_url.netloc:
+        raise ValueError("Invalid server URL in configuration")
 
-    return convert_wav_data(res.read())
+    try:
+        query_url = get_query_url(config, text, speaker_id)
+        req = urllib.request.Request(query_url, method="POST")
+
+        with urllib.request.urlopen(req, timeout=30) as res:
+            query_json = json.loads(res.read().decode("utf-8"))
+
+        query_json["volumeScale"] = volume
+        query_json["speedScale"] = 0.9
+
+        synthesis_url = get_synthesis_url(config, speaker_id)
+        req = urllib.request.Request(
+            synthesis_url, data=json.dumps(query_json).encode("utf-8"), method="POST"
+        )
+        req.add_header("Content-Type", "application/json")
+
+        with urllib.request.urlopen(req, timeout=30) as res:
+            return convert_wav_data(res.read())
+
+    except (urllib.error.URLError, urllib.error.HTTPError) as e:
+        raise RuntimeError(f"Failed to communicate with voice server: {e}") from e
+    except (json.JSONDecodeError, KeyError) as e:
+        raise RuntimeError(f"Invalid response from voice server: {e}") from e
 
 
 def play(wav_data, duration_sec=None):

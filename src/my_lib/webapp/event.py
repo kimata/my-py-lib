@@ -10,7 +10,7 @@ import my_lib.webapp.config
 
 import flask
 
-YEILD_TIMEOUT = 100
+YIELD_TIMEOUT = 100
 
 
 class EVENT_TYPE(enum.Enum):  # noqa: N801
@@ -118,7 +118,7 @@ def api_event():
 
             # NOTE: クライアントが切断された時にソケットを解放するため、定期的に yield を呼ぶ
             j += 1
-            if j == YEILD_TIMEOUT:
+            if j == YIELD_TIMEOUT:
                 yield "data: dummy\n\n"
                 j = 0
 
