@@ -18,6 +18,7 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+import asyncio
 import datetime
 import logging
 import os
@@ -78,6 +79,36 @@ from(bucket: "{bucket}")
 """
 
 
+def _process_query_results(table_list, create_empty, last, every_min, window_min):
+    """共通のクエリ結果処理ロジック"""
+    data_list = []
+    time_list = []
+    localtime_offset = datetime.timedelta(hours=9)
+
+    if len(table_list) != 0:
+        for record in table_list[0].records:
+            # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
+            # だとタイミングによって、先頭に None が入る
+            if record.get_value() is None:
+                logging.debug("DELETE %s", record.get_time() + localtime_offset)
+                continue
+
+            data_list.append(record.get_value())
+            time_list.append(record.get_time() + localtime_offset)
+
+    if create_empty and not last:
+        # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと、
+        # 末尾に余分なデータが入るので取り除く
+        every_min = int(every_min)
+        window_min = int(window_min)
+        if window_min > every_min:
+            data_list = data_list[: (every_min - window_min)]
+            time_list = time_list[: (every_min - window_min)]
+
+    logging.debug("data count = %s", len(time_list))
+    return {"value": data_list, "time": time_list, "valid": len(time_list) != 0}
+
+
 def fetch_data_impl(  # noqa: PLR0913
     db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
 ):
@@ -106,6 +137,28 @@ def fetch_data_impl(  # noqa: PLR0913
     except Exception:
         logging.exception("Failed to fetch data")
         raise
+
+
+async def fetch_data_impl_async(  # noqa: PLR0913
+    db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
+):
+    """非同期版のデータ取得実装"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        fetch_data_impl,
+        db_config,
+        template,
+        measure,
+        hostname,
+        field,
+        start,
+        stop,
+        every,
+        window,
+        create_empty,
+        last,
+    )
 
 
 def fetch_data(  # noqa: PLR0913
@@ -156,31 +209,7 @@ def fetch_data(  # noqa: PLR0913
         )
         time_fetched = time.time()
 
-        data_list = []
-        time_list = []
-        localtime_offset = datetime.timedelta(hours=9)
-
-        if len(table_list) != 0:
-            for record in table_list[0].records:
-                # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
-                # だとタイミングによって、先頭に None が入る
-                if record.get_value() is None:
-                    logging.debug("DELETE %s", record.get_time() + localtime_offset)
-                    continue
-
-                data_list.append(record.get_value())
-                time_list.append(record.get_time() + localtime_offset)
-
-        if create_empty and not last:
-            # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと、
-            # 末尾に余分なデータが入るので取り除く
-            every_min = int(every_min)
-            window_min = int(window_min)
-            if window_min > every_min:
-                data_list = data_list[: (every_min - window_min)]
-                time_list = time_list[: (every_min - window_min)]
-
-        logging.debug("data count = %s", len(time_list))
+        result = _process_query_results(table_list, create_empty, last, every_min, window_min)
 
         time_finish = time.time()
         if ((time_fetched - time_start) > 1) or ((time_finish - time_fetched) > 0.1):
@@ -190,11 +219,119 @@ def fetch_data(  # noqa: PLR0913
                 time_finish - time_fetched,
             )
 
-        return {"value": data_list, "time": time_list, "valid": len(time_list) != 0}
+        return result
     except Exception:
         logging.exception("Failed to fetch data")
 
         return {"value": [], "time": [], "valid": False}
+
+
+async def fetch_data_async(  # noqa: PLR0913
+    db_config,
+    measure,
+    hostname,
+    field,
+    start="-30h",
+    stop="now()",
+    every_min=1,
+    window_min=3,
+    create_empty=True,
+    last=False,
+):
+    """非同期版のfetch_data"""
+    time_start = time.time()
+    logging.debug(
+        (
+            "Fetch data async (measure: %s, host: %s, field: %s, "
+            "start: %s, stop: %s, every: %dmin, window: %dmin, "
+            "create_empty: %s, last: %s)"
+        ),
+        measure,
+        hostname,
+        field,
+        start,
+        stop,
+        every_min,
+        window_min,
+        create_empty,
+        last,
+    )
+
+    try:
+        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
+
+        table_list = await fetch_data_impl_async(
+            db_config,
+            template,
+            measure,
+            hostname,
+            field,
+            start,
+            stop,
+            every_min,
+            window_min,
+            create_empty,
+            last,
+        )
+        time_fetched = time.time()
+
+        result = _process_query_results(table_list, create_empty, last, every_min, window_min)
+
+        time_finish = time.time()
+        if ((time_fetched - time_start) > 1) or ((time_finish - time_fetched) > 0.1):
+            logging.warning(
+                "It's taking too long to retrieve the data. (fetch: %.2f sec, modify: %.2f sec)",
+                time_fetched - time_start,
+                time_finish - time_fetched,
+            )
+
+        return result
+    except Exception:
+        logging.exception("Failed to fetch data")
+
+        return {"value": [], "time": [], "valid": False}
+
+
+async def fetch_data_parallel(requests):
+    """
+    複数のデータ取得リクエストを並列実行
+
+    Args:
+    ----
+        requests: データ取得リクエストのリスト。各要素は以下のキーを含む辞書:
+            - db_config: InfluxDBの設定
+            - measure: メジャー名
+            - hostname: ホスト名
+            - field: フィールド名
+            - start: 開始時刻 (オプション、デフォルト: "-30h")
+            - stop: 終了時刻 (オプション、デフォルト: "now()")
+            - every_min: 間隔(分) (オプション、デフォルト: 1)
+            - window_min: ウィンドウ(分) (オプション、デフォルト: 3)
+            - create_empty: 空データ作成フラグ (オプション、デフォルト: True)
+            - last: 最新データのみ取得フラグ (オプション、デフォルト: False)
+
+    Returns:
+    -------
+        各リクエストの結果を含むリスト
+
+    """
+    tasks = []
+    for req in requests:
+        task = fetch_data_async(
+            req["db_config"],
+            req["measure"],
+            req["hostname"],
+            req["field"],
+            req.get("start", "-30h"),
+            req.get("stop", "now()"),
+            req.get("every_min", 1),
+            req.get("window_min", 3),
+            req.get("create_empty", True),
+            req.get("last", False),
+        )
+        tasks.append(task)
+
+    return await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def get_equip_on_minutes(  # noqa: PLR0913
