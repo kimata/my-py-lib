@@ -292,14 +292,14 @@ async def fetch_data_async(  # noqa: PLR0913
         return {"value": [], "time": [], "valid": False}
 
 
-async def fetch_data_parallel(requests):
+async def fetch_data_parallel(db_config, requests):
     """
     複数のデータ取得リクエストを並列実行
 
     Args:
     ----
+        db_config: InfluxDBの設定（全リクエスト共通）
         requests: データ取得リクエストのリスト。各要素は以下のキーを含む辞書:
-            - db_config: InfluxDBの設定
             - measure: メジャー名
             - hostname: ホスト名
             - field: フィールド名
@@ -318,7 +318,7 @@ async def fetch_data_parallel(requests):
     tasks = []
     for req in requests:
         task = fetch_data_async(
-            req["db_config"],
+            db_config,
             req["measure"],
             req["hostname"],
             req["field"],
