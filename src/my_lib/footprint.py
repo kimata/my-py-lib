@@ -51,6 +51,13 @@ def elapsed(path_str):
     return diff_sec
 
 
+def compare(path_str_a, path_str_b):
+    elapsed_a = elapsed(path_str_a)
+    elapsed_b = elapsed(path_str_b)
+
+    return elapsed_a < elapsed_b
+
+
 def clear(path_str):
     path = get_path(path_str)
 
