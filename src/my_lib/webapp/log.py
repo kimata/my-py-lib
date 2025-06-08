@@ -46,7 +46,7 @@ queue_lock = None
 log_queue = None
 log_manager = None
 config = None
-should_terminate = False
+should_terminate = threading.Event()
 
 
 def init(config_, is_read_only=False):
@@ -55,7 +55,7 @@ def init(config_, is_read_only=False):
     global log_queue  # noqa: PLW0603
     global log_manager  # noqa: PLW0603
     global log_thread  # noqa: PLW0603
-    global should_terminate  # noqa: PLW0603
+    global should_terminate
 
     config = config_
 
@@ -71,7 +71,7 @@ def init(config_, is_read_only=False):
     sqlite.close()
 
     if not is_read_only:
-        should_terminate = False
+        should_terminate.clear()
 
         # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
         if log_manager is not None:
@@ -87,15 +87,17 @@ def init(config_, is_read_only=False):
 
 def term(is_read_only=False):
     global log_thread  # noqa: PLW0603
-    global should_terminate  # noqa: PLW0603
+    global should_terminate
 
-    if not is_read_only:
-        if log_thread is None:
-            return
-        should_terminate = True
+    if is_read_only:
+        return
 
-        log_thread.join()
-        log_thread = None
+    if log_thread is None:
+        return
+    should_terminate.set()
+
+    log_thread.join()
+    log_thread = None
 
 
 def get_db_path():
@@ -150,7 +152,7 @@ def worker(log_queue):
 
     sqlite = sqlite3.connect(get_db_path())
     while True:
-        if should_terminate:
+        if should_terminate.is_set():
             break
 
         try:
