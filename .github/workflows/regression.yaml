@@ -62,7 +62,7 @@ jobs:
               uses: actions/upload-artifact@v4
               if: always()
               with:
-                name: pytest
+                name: pytest-${{ matrix.python-version }}
                 path: tests/evidence
 
             - name: Upload artifact
