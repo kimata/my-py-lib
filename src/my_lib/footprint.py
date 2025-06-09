@@ -21,7 +21,7 @@ def exists(path_str):
     return get_path(path_str).exists()
 
 
-def update(path_str, store_time=time.time()):  # noqa: B008
+def update(path_str, mtime=time.time()):  # noqa: B008
     path = get_path(path_str)
 
     logging.debug("update: %s", path)
@@ -29,10 +29,17 @@ def update(path_str, store_time=time.time()):  # noqa: B008
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile("w", delete=False, dir=pathlib.Path(path).parent) as tmp_file:
-        tmp_file.write(str(store_time))
+        tmp_file.write(str(mtime))
         temp_file_path = pathlib.Path(tmp_file.name)
 
     temp_file_path.rename(path)
+
+
+def mtime(path_str):
+    path = get_path(path_str)
+
+    with pathlib.Path(path).open() as f:
+        return float(f.read())
 
 
 def elapsed(path_str):
@@ -42,11 +49,7 @@ def elapsed(path_str):
     if not path.exists():
         return diff_sec
 
-    with pathlib.Path(path).open() as f:
-        last_update = f.read()
-
-        if last_update != "":
-            diff_sec -= float(last_update)
+    diff_sec -= mtime(path_str)
 
     return diff_sec
 
