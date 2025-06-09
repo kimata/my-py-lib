@@ -21,7 +21,7 @@ def exists(path_str):
     return get_path(path_str).exists()
 
 
-def update(path_str, offset_sec=0):
+def update(path_str, store_time=time.time()):  # noqa: B008
     path = get_path(path_str)
 
     logging.debug("update: %s", path)
@@ -29,7 +29,7 @@ def update(path_str, offset_sec=0):
     path.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile("w", delete=False, dir=pathlib.Path(path).parent) as tmp_file:
-        tmp_file.write(str(time.time() + offset_sec))
+        tmp_file.write(str(store_time))
         temp_file_path = pathlib.Path(tmp_file.name)
 
     temp_file_path.rename(path)
