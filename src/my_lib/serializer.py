@@ -28,12 +28,12 @@ def store(path_str, data):
     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     f.close()
 
-    if file_path.exists():
-        old_path = file_path.with_suffix(".old")
+    if path.exists():
+        old_path = path.with_suffix(".old")
 
-        shutil.copy(file_path, old_path)
+        shutil.copy(path, old_path)
 
-    pathlib.Path(f.name).replace(file_path)
+    pathlib.Path(f.name).replace(path)
 
 
 def load(path_str, init_value=None):
