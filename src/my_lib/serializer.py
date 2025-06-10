@@ -37,7 +37,7 @@ def store(path_str, data):
 
 
 def load(path_str, init_value=None):
-    logging.debug("Load %s", file_path)
+    logging.debug("Load %s", path_str)
 
     path = my_lib.pytest_util.get_path(path_str)
     if not path.exists():
