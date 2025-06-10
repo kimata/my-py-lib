@@ -38,6 +38,7 @@ class LOG_LEVEL(enum.Enum):  # noqa: N801
 
 
 TABLE_NAME = "log"
+CHECK_INTERVAL_SEC = 10
 
 blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
@@ -46,6 +47,7 @@ queue_lock = None
 log_queue = None
 log_manager = None
 config = None
+log_event = threading.Event()
 should_terminate = threading.Event()
 
 
@@ -147,13 +149,16 @@ def log_impl(sqlite, message, level):
 
 def worker(log_queue):
     global should_terminate
-
-    sleep_sec = 0.3
+    global log_event
 
     sqlite = sqlite3.connect(get_db_path())
     while True:
         if should_terminate.is_set():
             break
+
+        # NOTE: とりあえず、イベントを待つ
+        log_event.wait(CHECK_INTERVAL_SEC)
+        log_event.clear()
 
         try:
             with queue_lock:  # NOTE: クリア処理と排他したい
@@ -169,18 +174,18 @@ def worker(log_queue):
             # 発生する。
             logging.warning(traceback.format_exc())
 
-        time.sleep(sleep_sec)
-
     sqlite.close()
 
 
 def add(message, level):
     global queue_lock
     global log_queue
+    global log_event
 
     with queue_lock:  # NOTE: クリア処理と排他したい
         # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
         log_queue.put({"message": message, "level": level})
+        log_event.set()
 
 
 def error(message):
