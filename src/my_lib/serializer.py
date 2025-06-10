@@ -15,14 +15,16 @@ import pickle
 import shutil
 import tempfile
 
+import my_lib.pytest_util
 
-def store(file_path_str, data):
-    logging.debug("Store %s", file_path_str)
 
-    file_path = pathlib.Path(file_path_str)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
+def store(path_str, data):
+    logging.debug("Store %s", path_str)
 
-    f = tempfile.NamedTemporaryFile("wb", dir=str(file_path.parent), delete=False)
+    path = my_lib.pytest_util.get_path(path_str)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    f = tempfile.NamedTemporaryFile("wb", dir=str(path.parent), delete=False)
     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     f.close()
 
@@ -34,13 +36,14 @@ def store(file_path_str, data):
     pathlib.Path(f.name).replace(file_path)
 
 
-def load(file_path, init_value=None):
+def load(path_str, init_value=None):
     logging.debug("Load %s", file_path)
 
-    if not file_path.exists():
+    path = my_lib.pytest_util.get_path(path_str)
+    if not path.exists():
         return {} if init_value is None else init_value
 
-    with pathlib.Path(file_path).open("rb") as f:
+    with path.open("rb") as f:
         if isinstance(init_value, dict):
             # NOTE: dict の場合は、プログラムの更新でキーが追加された場合にも自動的に追従させる
             data = init_value.copy()
@@ -50,8 +53,9 @@ def load(file_path, init_value=None):
             return pickle.load(f)  # noqa: S301
 
 
-def get_size_str(file_path):
-    size = file_path.stat().st_size
+def get_size_str(path_str):
+    path = my_lib.pytest_util.get_path(path_str)
+    size = path.stat().st_size
 
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024:

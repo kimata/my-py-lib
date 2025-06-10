@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
 import logging
-import os
 import pathlib
 import tempfile
 import time
 
-
-def get_path(path_str):
-    # NOTE: Pytest を並列実行できるようにする
-    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
-    path = pathlib.Path(path_str)
-
-    if suffix is None:
-        return path
-    else:
-        return path.with_name(path.name + "." + suffix)
+import my_lib.pytest_util
 
 
 def exists(path_str):
-    return get_path(path_str).exists()
+    return my_lib.pytest_util.get_path(path_str).exists()
 
 
 def update(path_str, mtime=time.time()):  # noqa: B008
-    path = get_path(path_str)
+    path = my_lib.pytest_util.get_path(path_str)
 
     logging.debug("update: %s", path)
 
@@ -36,14 +26,14 @@ def update(path_str, mtime=time.time()):  # noqa: B008
 
 
 def mtime(path_str):
-    path = get_path(path_str)
+    path = my_lib.pytest_util.get_path(path_str)
 
     with pathlib.Path(path).open() as f:
         return float(f.read())
 
 
 def elapsed(path_str):
-    path = get_path(path_str)
+    path = my_lib.pytest_util.get_path(path_str)
 
     diff_sec = time.time()
     if not path.exists():
@@ -62,7 +52,7 @@ def compare(path_str_a, path_str_b):
 
 
 def clear(path_str):
-    path = get_path(path_str)
+    path = my_lib.pytest_util.get_path(path_str)
 
     logging.debug("clear: %s", path)
     path.unlink(missing_ok=True)
