@@ -11,8 +11,11 @@ def exists(path_str):
     return my_lib.pytest_util.get_path(path_str).exists()
 
 
-def update(path_str, mtime=time.time()):  # noqa: B008
+def update(path_str, mtime=None):
     path = my_lib.pytest_util.get_path(path_str)
+
+    if mtime is None:
+        mtime = time.time()
 
     logging.debug("update: %s", path)
 
