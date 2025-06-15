@@ -49,30 +49,31 @@ def convert_wav_data(wav_data_in):
         sampwidth = wav_in.getsampwidth()
         framerate = wav_in.getframerate()
         n_frames = wav_in.getnframes()
-        comptype = wav_in.getcomptype()
-        compname = wav_in.getcompname()
-
         audio_data = wav_in.readframes(n_frames)
 
-        if framerate != 44100:
-            audio_data = np.frombuffer(audio_data, dtype=np.int16)
-            resampled_data = scipy.signal.resample(audio_data, int(len(audio_data) * 44100 / framerate))
-            audio_data = resampled_data.astype(np.int16).tobytes()
+    # WAV の sample dtype を推定（ここでは 16bit 限定）
+    dtype = {1: np.int8, 2: np.int16, 4: np.int32}[sampwidth]
+    audio = np.frombuffer(audio_data, dtype=dtype)
 
-        if n_channels == 2:
-            audio_data = np.frombuffer(audio_data, dtype=np.int16)
-            resampled_data = audio_data[::2] // 2 + audio_data[1::2] // 2
-            audio_data = resampled_data.astype(np.int16).tobytes()
+    # ステレオ → モノラル（加算ではなく平均にする）
+    if n_channels == 2:
+        audio = audio.reshape(-1, 2)
+        audio = audio.mean(axis=1).astype(dtype)
 
-        with io.BytesIO() as wav_data_out:
-            with wave.open(wav_data_out, "wb") as wav_out:
-                wav_out.setnchannels(1)
-                wav_out.setsampwidth(sampwidth)
-                wav_out.setframerate(44100)
-                wav_out.setcomptype(comptype, compname)
-                wav_out.writeframes(audio_data)
+    # リサンプリング
+    if framerate != 44100:
+        num_samples = int(len(audio) * 44100 / framerate)
+        audio = scipy.signal.resample(audio, num_samples).astype(dtype)
 
-            return wav_data_out.getvalue()
+    # 書き出し
+    out_buf = io.BytesIO()
+    with wave.open(out_buf, "wb") as wav_out:
+        wav_out.setnchannels(1)
+        wav_out.setsampwidth(sampwidth)
+        wav_out.setframerate(44100)
+        wav_out.writeframes(audio.tobytes())
+
+    return out_buf.getvalue()
 
 
 def synthesize(config, text, volume=2, speaker_id=3):
