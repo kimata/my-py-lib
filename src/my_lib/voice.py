@@ -154,16 +154,22 @@ def play(wav_data, duration_sec=None):
         else:
             audio_float = audio_data.astype(np.float32)
 
+        # CRITICAL: Ensure array owns its data and is C-contiguous
+        # This prevents segmentation faults caused by garbage collection
+        audio_float = np.array(audio_float, dtype=np.float32, order="C", copy=True)
+
         # Play audio
         if duration_sec is None:
-            # Play entire audio and wait
-            sounddevice.play(audio_float, framerate)
-            sounddevice.wait()
+            # Use blocking=True to ensure proper completion
+            sounddevice.play(audio_float, framerate, blocking=True)
         else:
             # Play for specified duration
             sounddevice.play(audio_float, framerate)
             time.sleep(duration_sec)
             sounddevice.stop()
+
+        # Ensure playback is stopped
+        sounddevice.stop()
 
 
 if __name__ == "__main__":
