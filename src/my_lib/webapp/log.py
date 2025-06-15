@@ -90,12 +90,15 @@ def init(config_, is_read_only=False):
 def term(is_read_only=False):
     global log_thread  # noqa: PLW0603
     global should_terminate
+    global log_manager
 
     if is_read_only:
         return
 
     if log_thread is None:
+        logging.warning("Worked is not running")
         return
+
     should_terminate.set()
 
     log_thread.join()
@@ -175,6 +178,8 @@ def worker(log_queue):
             logging.warning(traceback.format_exc())
 
     sqlite.close()
+
+    logging.info("Terminate worker")
 
 
 def add(message, level):
