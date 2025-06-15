@@ -58,12 +58,26 @@ def convert_wav_data(wav_data_in):
     # ステレオ → モノラル（加算ではなく平均にする）
     if n_channels == 2:
         audio = audio.reshape(-1, 2)
-        audio = audio.mean(axis=1).astype(dtype)
+        audio = audio.mean(axis=1)
+        # 平均後に適切な範囲にクリッピングしてから型変換
+        if dtype == np.int16:
+            audio = np.clip(audio, -32768, 32767).astype(dtype)
+        elif dtype == np.int8:
+            audio = np.clip(audio, -128, 127).astype(dtype)
+        elif dtype == np.int32:
+            audio = np.clip(audio, -2147483648, 2147483647).astype(dtype)
 
     # リサンプリング
     if framerate != 44100:
         num_samples = int(len(audio) * 44100 / framerate)
-        audio = scipy.signal.resample(audio, num_samples).astype(dtype)
+        audio_resampled = scipy.signal.resample(audio, num_samples)
+        # リサンプリング後に適切な範囲にクリッピングしてから型変換
+        if dtype == np.int16:
+            audio = np.clip(audio_resampled, -32768, 32767).astype(dtype)
+        elif dtype == np.int8:
+            audio = np.clip(audio_resampled, -128, 127).astype(dtype)
+        elif dtype == np.int32:
+            audio = np.clip(audio_resampled, -2147483648, 2147483647).astype(dtype)
 
     # 書き出し
     out_buf = io.BytesIO()
@@ -119,24 +133,35 @@ def play(wav_data, duration_sec=None):
         # Get audio parameters
         channels = wav_file.getnchannels()
         framerate = wav_file.getframerate()
+        sampwidth = wav_file.getsampwidth()
         frames = wav_file.readframes(wav_file.getnframes())
 
         # Convert bytes to numpy array
-        dtype = np.int16  # Assuming 16-bit audio
+        dtype = {1: np.int8, 2: np.int16, 4: np.int32}.get(sampwidth, np.int16)
         audio_data = np.frombuffer(frames, dtype=dtype)
 
         # Reshape for stereo if needed
         if channels > 1:
             audio_data = audio_data.reshape(-1, channels)
 
+        # Normalize to float32 (-1.0 to 1.0) for sounddevice
+        if dtype == np.int16:
+            audio_float = audio_data.astype(np.float32) / 32768.0
+        elif dtype == np.int8:
+            audio_float = audio_data.astype(np.float32) / 128.0
+        elif dtype == np.int32:
+            audio_float = audio_data.astype(np.float32) / 2147483648.0
+        else:
+            audio_float = audio_data.astype(np.float32)
+
         # Play audio
         if duration_sec is None:
             # Play entire audio and wait
-            sounddevice.play(audio_data, framerate)
+            sounddevice.play(audio_float, framerate)
             sounddevice.wait()
         else:
             # Play for specified duration
-            sounddevice.play(audio_data, framerate)
+            sounddevice.play(audio_float, framerate)
             time.sleep(duration_sec)
             sounddevice.stop()
 
