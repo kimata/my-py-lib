@@ -23,7 +23,7 @@ import wave
 
 import numpy as np
 import scipy.signal
-import simpleaudio
+import sounddevice
 
 
 def get_query_url(config, text, speaker_id):
@@ -115,11 +115,30 @@ def synthesize(config, text, volume=2, speaker_id=3):
 
 
 def play(wav_data, duration_sec=None):
-    if duration_sec is None:
-        simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play().wait_done()
-    else:
-        simpleaudio.WaveObject.from_wave_file(io.BytesIO(wav_data)).play()
-        time.sleep(duration_sec)
+    with wave.open(io.BytesIO(wav_data), "rb") as wav_file:
+        # Get audio parameters
+        channels = wav_file.getnchannels()
+        framerate = wav_file.getframerate()
+        frames = wav_file.readframes(wav_file.getnframes())
+
+        # Convert bytes to numpy array
+        dtype = np.int16  # Assuming 16-bit audio
+        audio_data = np.frombuffer(frames, dtype=dtype)
+
+        # Reshape for stereo if needed
+        if channels > 1:
+            audio_data = audio_data.reshape(-1, channels)
+
+        # Play audio
+        if duration_sec is None:
+            # Play entire audio and wait
+            sounddevice.play(audio_data, framerate)
+            sounddevice.wait()
+        else:
+            # Play for specified duration
+            sounddevice.play(audio_data, framerate)
+            time.sleep(duration_sec)
+            sounddevice.stop()
 
 
 if __name__ == "__main__":
