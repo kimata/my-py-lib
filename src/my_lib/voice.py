@@ -22,8 +22,8 @@ import urllib.request
 import wave
 
 import numpy as np
+import pyaudio
 import scipy.signal
-import sounddevice
 
 
 def get_query_url(config, text, speaker_id):
@@ -129,47 +129,50 @@ def synthesize(config, text, volume=2, speaker_id=3):
 
 
 def play(wav_data, duration_sec=None):
-    with wave.open(io.BytesIO(wav_data), "rb") as wav_file:
-        # Get audio parameters
-        channels = wav_file.getnchannels()
-        framerate = wav_file.getframerate()
-        sampwidth = wav_file.getsampwidth()
-        frames = wav_file.readframes(wav_file.getnframes())
+    # Convert to standard format (mono, 44.1kHz) if needed
+    wav_data = convert_wav_data(wav_data)
 
-        # Convert bytes to numpy array
-        dtype = {1: np.int8, 2: np.int16, 4: np.int32}.get(sampwidth, np.int16)
-        audio_data = np.frombuffer(frames, dtype=dtype)
+    # PyAudio instance
+    p = pyaudio.PyAudio()
+    stream = None
 
-        # Reshape for stereo if needed
-        if channels > 1:
-            audio_data = audio_data.reshape(-1, channels)
+    try:
+        with wave.open(io.BytesIO(wav_data), "rb") as wav_file:
+            # Get audio parameters (already standardized by convert_wav_data)
+            channels = wav_file.getnchannels()
+            framerate = wav_file.getframerate()
+            sampwidth = wav_file.getsampwidth()
 
-        # Normalize to float32 (-1.0 to 1.0) for sounddevice
-        if dtype == np.int16:
-            audio_float = audio_data.astype(np.float32) / 32768.0
-        elif dtype == np.int8:
-            audio_float = audio_data.astype(np.float32) / 128.0
-        elif dtype == np.int32:
-            audio_float = audio_data.astype(np.float32) / 2147483648.0
-        else:
-            audio_float = audio_data.astype(np.float32)
+            # Get format from sample width
+            audio_format_map = {1: pyaudio.paInt8, 2: pyaudio.paInt16, 4: pyaudio.paInt32}
+            audio_format = audio_format_map.get(sampwidth, pyaudio.paInt16)
 
-        # CRITICAL: Ensure array owns its data and is C-contiguous
-        # This prevents segmentation faults caused by garbage collection
-        audio_float = np.array(audio_float, dtype=np.float32, order="C", copy=True)
+            # Open stream
+            stream = p.open(
+                format=audio_format, channels=channels, rate=framerate, output=True, frames_per_buffer=1024
+            )
 
-        # Play audio
-        if duration_sec is None:
-            # Use blocking=True to ensure proper completion
-            sounddevice.play(audio_float, framerate, blocking=True)
-        else:
-            # Play for specified duration
-            sounddevice.play(audio_float, framerate)
-            time.sleep(duration_sec)
-            sounddevice.stop()
+            # Play audio in chunks
+            chunk_size = 1024
+            start_time = time.time() if duration_sec else None
 
-        # Ensure playback is stopped
-        sounddevice.stop()
+            while True:
+                data = wav_file.readframes(chunk_size)
+                if not data:
+                    break
+
+                # Check duration limit
+                if duration_sec and (time.time() - start_time) >= duration_sec:
+                    break
+
+                stream.write(data)
+
+    finally:
+        # Clean up
+        if stream:
+            stream.stop_stream()
+            stream.close()
+        p.terminate()
 
 
 if __name__ == "__main__":
