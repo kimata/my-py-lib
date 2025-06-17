@@ -54,7 +54,7 @@ def parse_date_yahoo(content, index):
     date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
     date_text = re.search(r"\d{1,2}月\d{1,2}日", date_text).group(0)
 
-    return datetime.datetime.strptime(date_text, "%m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
+    return datetime.datetime.strptime(date_text, "%m月%d日", default=datetime.datetime.now())  # noqa: DTZ005, DTZ007
 
 
 def parse_table_yahoo(content, index):
