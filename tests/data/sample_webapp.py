@@ -56,8 +56,8 @@ def create_app(config_file):
 
     app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
 
-    app.register_blueprint(my_lib.webapp.base.get_blueprint())
-    app.register_blueprint(my_lib.webapp.base.get_blueprint_default())
+    app.register_blueprint(my_lib.webapp.base.blueprint)
+    app.register_blueprint(my_lib.webapp.base.blueprint_default)
     app.register_blueprint(my_lib.webapp.event.blueprint)
     app.register_blueprint(my_lib.webapp.log.blueprint)
     app.register_blueprint(my_lib.webapp.util.blueprint)
