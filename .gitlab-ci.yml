@@ -45,7 +45,7 @@ test-walk-through:
 
     script:
         - apt update
-        - apt install --assume-yes smem
+        - apt install --no-install-recommends --assume-yes smem
 
         - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/test_basic.py
 
