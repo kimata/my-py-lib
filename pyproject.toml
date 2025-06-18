@@ -41,7 +41,7 @@ packages = ["src/my_lib"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
-[tool.rye]
+[tool.uv]
 managed = true
 dev-dependencies = [
     "amazon-paapi5>=1.1.2",

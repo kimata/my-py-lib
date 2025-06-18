@@ -1,4 +1,8 @@
-image: registry.green-rabbit.net:5000/kimata/local_ubuntu:240831A
+image: registry.green-rabbit.net:5000/kimata/local_ubuntu:250615_38f4fdb9
+
+variables:
+    UV_LINK_MODE: copy
+    UV_PYTHON_INSTALL_DIR: ${CI_PROJECT_DIR}/.uv_python
 
 stages:
     - pre-test
@@ -9,18 +13,29 @@ test-prepare:
     stage: pre-test
 
     script:
-        - rye sync
+        - uv sync
 
     artifacts:
         paths:
             - .venv
-            - /root/.cache
+            - .uv_python
+        expire_in: 1 hour
 
     cache:
-        key: "${CI_JOB_NAME}"
-        paths:
+        - key:
+            files:
+                - pyproject.toml
+                - .gitlab-ci.yml
+            prefix: ${CI_COMMIT_REF_SLUG}-venv
+          paths:
             - .venv
-            - /root/.cache
+          policy: pull-push
+
+        - key: ${CI_COMMIT_REF_SLUG}-uv-toolchain
+          paths:
+            - .uv_python
+          policy: pull-push
+
 
 test-walk-through:
     stage: test
@@ -30,17 +45,29 @@ test-walk-through:
 
     script:
         - apt install --assume-yes smem
-        - rye run pytest --timeout=60 --numprocesses=auto --verbosity=1 tests/test_basic.py
+        - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/test_basic.py
 
     cache:
-        key: "${CI_JOB_NAME}"
-        paths:
+        - key:
+            files:
+                - pyproject.toml
+                - .gitlab-ci.yml
+            prefix: ${CI_COMMIT_REF_SLUG}-venv
+          paths:
             - .venv
+          policy: pull
+
+        - key: ${CI_COMMIT_REF_SLUG}-uv-toolchain
+          paths:
+            - .uv_python
+          policy: pull
 
     artifacts:
         when: always
         paths:
             - tests/evidence/**
+        reports:
+            junit: tests/evidence/junit-report.xml
 
 renovate:
     stage: renovate
