@@ -256,17 +256,16 @@ my-py-lib/
 - **サービス**: InfluxDB（データストレージ用）
 - **システム**: I2C/SPI有効化済みLinux
 
-## ライセンス
+## 📄 ライセンス
 
-個人用ユーティリティライブラリです。ライセンス情報についてはリポジトリオーナーにお問い合わせください。
+**Apache License 2.0** - 詳細は [LICENSE](LICENSE) ファイルをご覧ください。
 
-## 貢献
+---
 
-個人プロジェクトですが、提案やバグ報告は歓迎します。問題や機能リクエストがある場合はIssueを作成してください。
+<div align="center">
 
-## 謝辞
+**⭐ このプロジェクトが役に立った場合は、Star をお願いします！**
 
-このライブラリは以下のサードパーティサービスとハードウェアを統合しています：
-- 時系列データストレージ用のInfluxDB
-- 通知用のSlack、LINE
-- ハードウェアサポート用の各種センサーメーカー
+[🐛 Issue 報告](https://github.com/kimata/my-py-lib/issues) | [💡 Feature Request](https://github.com/kimata/my-py-lib/issues/new?template=feature_request.md) | [📖 Wiki](https://github.com/kimata/my-py-lib/wiki)
+
+</div>
