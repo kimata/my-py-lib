@@ -44,7 +44,9 @@ test-walk-through:
         - test-prepare
 
     script:
+        - apt update
         - apt install --assume-yes smem
+
         - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/test_basic.py
 
     cache:
