@@ -12,57 +12,68 @@ import selenium.webdriver.support
 import selenium.webdriver.support.ui
 
 RETRY_COUNT = 3
-ITEM_LIST_XPATH = '//div[@data-testid="listed-item-list"]//div[contains(@class, "merListItem")]'
+ITEM_LIST_XPATH = '//ul[@data-testid="listed-item-list"]//li'
 
 
 def parse_item(driver, index):
     time.sleep(5)
-    item_xpath = ITEM_LIST_XPATH + "[" + str(index) + "]"
-    item_url_xpath = item_xpath + "//a"
-    item_name_xpath = item_xpath + '//span[contains(@class, "itemLabel")]'
-    item_price_xpath = item_xpath + '//span[@class="merPrice"]/span[contains(@class, "number")]'
-
-    # item_price_xpath = (
-    #     item_xpath
-    #     + '//div[@data-testid="price"]/span[contains(@class, "currency")]/following-sibling::span[1]'
-    # )
-
-    item_view_xpath = (
-        item_xpath + '//mer-icon-eye-outline/following-sibling::span[contains(@class, "iconText")]'
-    )
-    item_private_xpath = item_xpath + '//span[contains(@class, "informationLabel")]'
-
-    item_url = driver.find_element(selenium.webdriver.common.by.By.XPATH, item_url_xpath).get_attribute(
-        "href"
-    )
+    item_xpath = f"{ITEM_LIST_XPATH}[{index}]"
+    
+    # 親要素を最初に取得
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+    item_element = driver.find_element(by_xpath, item_xpath)
+    
+    # 子要素用の相対XPath
+    relative_xpaths = {
+        "url": ".//a",
+        "name": ".//p[@data-testid='item-label']",
+        "price": ".//p[@data-testid='item-label']/following-sibling::span/span[2]",
+        "favorite": ".//p[@data-testid='item-label']/following-sibling::div/div[1]/span",
+        "view": ".//p[@data-testid='item-label']/following-sibling::div/div[3]/span",
+        "private": ".//span[contains(text(), '公開停止中')]"
+    }
+    
+    # 必須要素の取得
+    item_url = item_element.find_element(by_xpath, relative_xpaths["url"]).get_attribute("href")
     item_id = item_url.split("/")[-1]
-
-    name = driver.find_element(selenium.webdriver.common.by.By.XPATH, item_name_xpath).text
-
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, item_price_xpath)) == 0:
+    name = item_element.find_element(by_xpath, relative_xpaths["name"]).text
+    
+    # 価格要素の存在確認
+    if not item_element.find_elements(by_xpath, relative_xpaths["price"]):
         driver.refresh()
         time.sleep(5)
         return parse_item(driver, index)
-
-    price = int(
-        driver.find_element(selenium.webdriver.common.by.By.XPATH, item_price_xpath).text.replace(",", "")
-    )
-    is_stop = 0
-
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, item_private_xpath)) != 0:
-        is_stop = 1
-
-    try:
-        view = int(driver.find_element(selenium.webdriver.common.by.By.XPATH, item_view_xpath).text)
-    except Exception:
-        view = 0
-
+    
+    price = int(item_element.find_element(by_xpath, relative_xpaths["price"]).text.replace(",", ""))
+    
+    # 公開停止フラグ
+    is_stop = 1 if item_element.find_elements(by_xpath, relative_xpaths["private"]) else 0
+    
+    # オプション要素の取得（エラーハンドリング付き）
+    view = 0
+    favorite = 0
+    
+    view_elements = item_element.find_elements(by_xpath, relative_xpaths["view"])
+    if view_elements:
+        try:
+            view = int(view_elements[0].text)
+        except (ValueError, AttributeError):
+            pass
+    
+    favorite_elements = item_element.find_elements(by_xpath, relative_xpaths["favorite"])
+    if favorite_elements:
+        try:
+            favorite = int(favorite_elements[0].text)
+        except (ValueError, AttributeError):
+            pass
+    
     return {
         "id": item_id,
         "url": item_url,
         "name": name,
         "price": price,
         "view": view,
+        "favorite": favorite,
         "is_stop": is_stop,
     }
 
@@ -71,11 +82,12 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
     item = parse_item(driver, index)
 
     logging.info(
-        "%s [%s] [%s円] [%s view] を処理します。",
+        "%s [%s] [%s円] [%s view] [%s favorite] を処理します。",
         item["name"],
         item["id"],
         f"{item['price']:,}",
         f"{item['view']:,}",
+        f"{item['favorite']:,}",
     )
 
     driver.execute_script("window.scrollTo(0, 0);")
@@ -133,7 +145,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
         '//button[@data-testid="account-button"]',
         wait,
     )
-    my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品中")]', wait)
+    my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品した商品")]', wait)
 
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
