@@ -5,6 +5,8 @@ build/
 dist/
 wheels/
 *.egg-info
-
+requirements-dev.lock
+requirements.lock
+config.yaml
 # venv
 .venv
