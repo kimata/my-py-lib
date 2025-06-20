@@ -16,6 +16,7 @@ import pathlib
 import tempfile
 import time
 import urllib
+import warnings
 
 import my_lib.notify.mail
 import my_lib.notify.slack
@@ -26,6 +27,10 @@ import selenium.webdriver.common.keys
 import selenium.webdriver.support
 import slack_sdk
 import speech_recognition
+
+# pydubの警告を抑制
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub")
+
 
 RESPONSE_WAIT_SEC = 5
 RESPONSE_TIMEOUT_SEC = 300
