@@ -133,7 +133,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
         '//button[@data-testid="account-button"]',
         wait,
     )
-    my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品した商品")]', wait)
+    my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品中")]', wait)
 
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
