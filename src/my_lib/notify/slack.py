@@ -80,7 +80,7 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
     message_lines = message.splitlines()
     total = math.ceil(len(message_lines) / LINE_SPLIT)
     for i in range(0, len(message_lines), LINE_SPLIT):
-        split_title = title if total == 1 else f"{title} ({i + 1}/{total})"
+        split_title = title if total == 1 else f"{title} ({(i // LINE_SPLIT) + 1}/{total})"
 
         send(
             token,
