@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import contextlib
 import logging
 import re
 import time
@@ -11,18 +12,18 @@ import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.ui
 
-RETRY_COUNT = 3
+TRY_COUNT = 3
 ITEM_LIST_XPATH = '//ul[@data-testid="listed-item-list"]//li'
 
 
 def parse_item(driver, index):
     time.sleep(5)
     item_xpath = f"{ITEM_LIST_XPATH}[{index}]"
-    
+
     # 親要素を最初に取得
     by_xpath = selenium.webdriver.common.by.By.XPATH
     item_element = driver.find_element(by_xpath, item_xpath)
-    
+
     # 子要素用の相対XPath
     relative_xpaths = {
         "url": ".//a",
@@ -30,43 +31,39 @@ def parse_item(driver, index):
         "price": ".//p[@data-testid='item-label']/following-sibling::span/span[2]",
         "favorite": ".//p[@data-testid='item-label']/following-sibling::div/div[1]/span",
         "view": ".//p[@data-testid='item-label']/following-sibling::div/div[3]/span",
-        "private": ".//span[contains(text(), '公開停止中')]"
+        "private": ".//span[contains(text(), '公開停止中')]",
     }
-    
+
     # 必須要素の取得
     item_url = item_element.find_element(by_xpath, relative_xpaths["url"]).get_attribute("href")
     item_id = item_url.split("/")[-1]
     name = item_element.find_element(by_xpath, relative_xpaths["name"]).text
-    
+
     # 価格要素の存在確認
     if not item_element.find_elements(by_xpath, relative_xpaths["price"]):
         driver.refresh()
         time.sleep(5)
         return parse_item(driver, index)
-    
+
     price = int(item_element.find_element(by_xpath, relative_xpaths["price"]).text.replace(",", ""))
-    
+
     # 公開停止フラグ
     is_stop = 1 if item_element.find_elements(by_xpath, relative_xpaths["private"]) else 0
-    
+
     # オプション要素の取得（エラーハンドリング付き）
     view = 0
     favorite = 0
-    
+
     view_elements = item_element.find_elements(by_xpath, relative_xpaths["view"])
     if view_elements:
-        try:
+        with contextlib.suppress(ValueError, AttributeError):
             view = int(view_elements[0].text)
-        except (ValueError, AttributeError):
-            pass
-    
+
     favorite_elements = item_element.find_elements(by_xpath, relative_xpaths["favorite"])
     if favorite_elements:
-        try:
+        with contextlib.suppress(ValueError, AttributeError):
             favorite = int(favorite_elements[0].text)
-        except (ValueError, AttributeError):
-            pass
-    
+
     return {
         "id": item_id,
         "url": item_url,
@@ -111,13 +108,16 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
                 item_func(driver, wait, scrape_config, item, debug_mode)
                 fail_count = 0
                 break
-            except selenium.common.exceptions.TimeoutException:
+            except (
+                selenium.common.exceptions.TimeoutException,
+                selenium.common.exceptions.ElementNotInteractableException,
+            ):
+                logging.exception("エラーが発生しました")
                 fail_count += 1
 
-                if fail_count > RETRY_COUNT:
+                if fail_count >= TRY_COUNT:
+                    logging.warning("エラーが %d 回続いたので諦めます。")
                     raise
-
-                logging.warning("タイムアウトしたので、リトライします。")
 
                 if driver.current_url != item_url:
                     driver.back()
