@@ -97,7 +97,13 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
     driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
     item_link.click()
 
-    wait.until(selenium.webdriver.support.expected_conditions.title_contains(re.sub(" +", " ", item["name"])))
+    try:
+        wait.until(
+            selenium.webdriver.support.expected_conditions.title_contains(re.sub(" +", " ", item["name"]))
+        )
+    except selenium.common.exceptions.TimeoutException:
+        logging.exception("Invalid title: %s", driver.title)
+        raise
 
     item_url = driver.current_url
 
@@ -124,7 +130,8 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
                     time.sleep(1)
                 if driver.current_url != item_url:
                     driver.get(item_url)
-                my_lib.selenium_util.random_sleep(5)
+
+                my_lib.selenium_util.random_sleep(10)
 
         time.sleep(10)
 
