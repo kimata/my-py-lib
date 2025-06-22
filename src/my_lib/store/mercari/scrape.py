@@ -122,7 +122,7 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
                 fail_count += 1
 
                 if fail_count >= TRY_COUNT:
-                    logging.warning("エラーが %d 回続いたので諦めます。")
+                    logging.warning("エラーが %d 回続いたので諦めます。", fail_count)
                     raise
 
                 if driver.current_url != item_url:
@@ -144,6 +144,26 @@ def expand_all(driver, wait):
 
         wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
         time.sleep(2)
+
+
+def load_url(driver, wait, url):
+    for i in range(TRY_COUNT):
+        driver.execute_script(f'window.location.href = "{url}";')
+        try:
+            wait.until(
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (selenium.webdriver.common.by.By.XPATH, ITEM_LIST_XPATH)
+                )
+            )
+        except selenium.common.exceptions.TimeoutException:
+            logging.exception("Failed to load %s", url)
+
+            if i == TRY_COUNT - 1:
+                logging.warning("エラーが %d 回続いたので諦めます。", i + 1)
+                raise
+
+        expand_all(driver, wait)
+        return
 
 
 def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
@@ -184,11 +204,5 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
             break
 
         my_lib.selenium_util.random_sleep(10)
-        driver.get(list_url)
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, ITEM_LIST_XPATH)
-            )
-        )
 
-        expand_all(driver, wait)
+        load_url(driver, wait, list_url)
