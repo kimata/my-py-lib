@@ -24,47 +24,61 @@ def parse_item(driver, index):
     by_xpath = selenium.webdriver.common.by.By.XPATH
     item_element = driver.find_element(by_xpath, item_xpath)
 
-    # 子要素用の相対XPath
-    relative_xpaths = {
-        "url": ".//a",
-        "name": ".//p[@data-testid='item-label']",
-        "price": ".//p[@data-testid='item-label']/following-sibling::span/span[2]",
-        "favorite": ".//p[@data-testid='item-label']/following-sibling::div/div[1]/span",
-        "view": ".//p[@data-testid='item-label']/following-sibling::div/div[3]/span",
-        "private": ".//span[contains(text(), '公開停止中')]",
-    }
+    # 全ての子要素を一度に取得してキャッシュ
+    elements_cache = {}
 
-    # 必須要素の取得
-    item_url = item_element.find_element(by_xpath, relative_xpaths["url"]).get_attribute("href")
-    item_id = item_url.split("/")[-1]
-    name = item_element.find_element(by_xpath, relative_xpaths["name"]).text
+    try:
+        # 必須要素を一括取得
+        elements_cache["link"] = item_element.find_element(by_xpath, ".//a")
+        elements_cache["name"] = item_element.find_element(by_xpath, ".//p[@data-testid='item-label']")
 
-    # 価格要素の存在確認
-    if not item_element.find_elements(by_xpath, relative_xpaths["price"]):
+        # 価格要素を取得（存在しない場合はリトライ）
+        price_elements = item_element.find_elements(
+            by_xpath, ".//p[@data-testid='item-label']/following-sibling::span/span[2]"
+        )
+        if not price_elements:
+            driver.refresh()
+            time.sleep(5)
+            return parse_item(driver, index)
+        elements_cache["price"] = price_elements[0]
+
+        # オプション要素を一括取得
+        elements_cache["favorite"] = item_element.find_elements(
+            by_xpath, ".//p[@data-testid='item-label']/following-sibling::div/div[1]/span"
+        )
+        elements_cache["view"] = item_element.find_elements(
+            by_xpath, ".//p[@data-testid='item-label']/following-sibling::div/div[3]/span"
+        )
+        elements_cache["private"] = item_element.find_elements(
+            by_xpath, ".//span[contains(text(), '公開停止中')]"
+        )
+
+    except selenium.common.exceptions.NoSuchElementException:
         driver.refresh()
         time.sleep(5)
         return parse_item(driver, index)
 
-    price = int(item_element.find_element(by_xpath, relative_xpaths["price"]).text.replace(",", ""))
+    # キャッシュした要素から値を抽出
+    item_url = elements_cache["link"].get_attribute("href")
+    item_id = item_url.split("/")[-1]
+    name = elements_cache["name"].text
+    price = int(elements_cache["price"].text.replace(",", ""))
 
-    # 公開停止フラグ
-    is_stop = 1 if item_element.find_elements(by_xpath, relative_xpaths["private"]) else 0
-
-    # オプション要素の取得（エラーハンドリング付き）
+    # オプション値の取得（デフォルト値で初期化）
     view = 0
     favorite = 0
 
-    view_elements = item_element.find_elements(by_xpath, relative_xpaths["view"])
-    if view_elements:
+    if elements_cache["view"]:
         with contextlib.suppress(ValueError, AttributeError):
-            view = int(view_elements[0].text)
+            view = int(elements_cache["view"][0].text)
 
-    favorite_elements = item_element.find_elements(by_xpath, relative_xpaths["favorite"])
-    if favorite_elements:
+    if elements_cache["favorite"]:
         with contextlib.suppress(ValueError, AttributeError):
-            favorite = int(favorite_elements[0].text)
+            favorite = int(elements_cache["favorite"][0].text)
 
-    return {
+    is_stop = 1 if elements_cache["private"] else 0
+
+    item = {
         "id": item_id,
         "url": item_url,
         "name": name,
@@ -74,9 +88,11 @@ def parse_item(driver, index):
         "is_stop": is_stop,
     }
 
+    return item, item_element, elements_cache["link"]
+
 
 def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list):  # noqa: PLR0913
-    item = parse_item(driver, index)
+    item, item_element, item_link = parse_item(driver, index)
 
     logging.info(
         "%s [%s] [%s円] [%s view] [%s favorite] を処理します。",
@@ -88,10 +104,6 @@ def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list)
     )
 
     driver.execute_script("window.scrollTo(0, 0);")
-    item_link = driver.find_element(
-        selenium.webdriver.common.by.By.XPATH,
-        ITEM_LIST_XPATH + "[" + str(index) + "]//a",
-    )
     # NOTE: アイテムにスクロールしてから、ヘッダーに隠れないようちょっと前に戻す
     item_link.location_once_scrolled_into_view  # noqa: B018
     driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
