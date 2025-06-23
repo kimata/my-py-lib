@@ -91,11 +91,13 @@ def parse_item(driver, index):
     return item, item_element, elements_cache["link"]
 
 
-def execute_item(driver, wait, scrape_config, debug_mode, index, item_func_list):  # noqa: PLR0913
+def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, item_func_list):  # noqa: PLR0913
     item, item_element, item_link = parse_item(driver, index)
 
     logging.info(
-        "%s [%s] [%s円] [%s view] [%s favorite] を処理します。",
+        "[%d/%d] %s [%s] [%s円] [%s view] [%s favorite] を処理します。",
+        index,
+        item_count,
         item["name"],
         item["id"],
         f"{item['price']:,}",
@@ -210,7 +212,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
 
     list_url = driver.current_url
     for i in range(1, item_count + 1):
-        execute_item(driver, wait, scrape_config, debug_mode, i, item_func_list)
+        execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
 
         if debug_mode:
             break
