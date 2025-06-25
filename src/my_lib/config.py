@@ -61,7 +61,8 @@ def load(config_path=CONFIG_PATH, schema_path=None):
                 logging.error("設定ファイルのフォーマットに問題があります。")  # noqa: TRY400
                 raise
 
-    yaml_data["base_dir"] = abs_path(config_path).parent
+    if isinstance(yaml_data, dict):
+        yaml_data["base_dir"] = abs_path(config_path).parent
 
     return yaml_data
 
