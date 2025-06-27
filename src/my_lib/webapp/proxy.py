@@ -17,11 +17,12 @@ import os
 import time
 import wsgiref.handlers
 
+import requests
+import sseclient  # 使うのは sseclient、sseclient-py ではない
+
 import flask
 import my_lib.flask_util
 import my_lib.webapp.config
-import requests
-import sseclient  # 使うのは sseclient、sseclient-py ではない
 
 blueprint = flask.Blueprint("webapp-proxy", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
 
@@ -47,7 +48,7 @@ def api_proxy_event(subpath):
     def event_stream():
         logging.debug("SSEClient start")
 
-        url = "{base_url}/{subpath}".format(base_url=api_base_url, subpath=subpath)
+        url = f"{api_base_url}/{subpath}"
 
         # リクエストパラメータを構築
         if flask.request.method == "GET":
@@ -101,7 +102,7 @@ def api_proxy_json(subpath):
     flask.g.disable_cache = True
 
     try:
-        url = "{base_url}/{subpath}".format(base_url=api_base_url, subpath=subpath)
+        url = f"{api_base_url}/{subpath}"
 
         if flask.request.method == "GET":
             # GETの場合はクエリパラメータを転送
@@ -135,7 +136,7 @@ def api_proxy_json(subpath):
         return flask.jsonify(error_response if error_response else {"error": "Proxy request failed"}), 500
 
 
-def test_run(api_base_url, port, debug_mode, error_response=None):
+def test_run(api_base_url, port, debug_mode, error_response):
     import flask_cors
 
     app = flask.Flask("test")
@@ -161,10 +162,11 @@ if __name__ == "__main__":
     import signal
 
     import docopt
+    import requests
+
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty
-    import requests
 
     def watch_event(base_url, count):
         # 新しいプロキシエンドポイントを使用
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     logging.info("Testing new proxy endpoints...")
 
     # /api/proxy/json/api/log_view のテスト (GET)
-    proxy_json_url = f'{base_url["proxy"]}/api/proxy/json/api/log_view'
+    proxy_json_url = f"{base_url['proxy']}/api/proxy/json/api/log_view"
     logging.info("Testing GET %s", proxy_json_url)
     test_res = requests.get(proxy_json_url, params={"test_param": "value"})  # noqa: S113
     logging.info("Response: %s", my_lib.pretty.format(json.loads(test_res.text)))
@@ -229,10 +231,10 @@ if __name__ == "__main__":
     watch_proc = multiprocessing.Process(target=lambda: watch_event(base_url["proxy"], 3))
     watch_proc.start()
 
-    logging.info(my_lib.pretty.format(requests.get(f'{base_url["log"]}/api/log_clear').text))  # noqa: S113
+    logging.info(my_lib.pretty.format(requests.get(f"{base_url['log']}/api/log_clear").text))  # noqa: S113
 
     # POSTリクエストのテスト（プロキシ経由）
-    proxy_post_url = f'{base_url["proxy"]}/api/proxy/json/api/log_add'
+    proxy_post_url = f"{base_url['proxy']}/api/proxy/json/api/log_add"
     logging.info("Testing POST %s", proxy_post_url)
 
     my_lib.pretty.format(
@@ -250,7 +252,7 @@ if __name__ == "__main__":
     watch_proc.join()
 
     # 古いエンドポイントのテスト
-    logging.info(my_lib.pretty.format(json.loads(requests.get(f'{base_url["proxy"]}/api/log_view').text)))  # noqa: S113
+    logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url['proxy']}/api/log_view").text)))  # noqa: S113
 
     # 新しいエンドポイントのテスト
     logging.info("Testing new endpoint: %s", proxy_json_url)

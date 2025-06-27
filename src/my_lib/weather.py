@@ -17,6 +17,7 @@ import ssl
 import urllib.request
 
 import lxml.html
+
 import my_lib.time
 
 TIMEOUT_SEC = 5
@@ -63,7 +64,7 @@ def parse_table_yahoo(content, index):
     day_info_by_type = {}
     table_xpath = f'(//table[@class="yjw_table2"])[{index}]'
     for row, label in enumerate(ROW_LIST):
-        td_content_list = content.xpath(table_xpath + f"//tr[{row+1}]/td")
+        td_content_list = content.xpath(table_xpath + f"//tr[{row + 1}]/td")
         td_content_list.pop(0)
         match row:
             case 0:
@@ -259,7 +260,7 @@ def parse_table_tenki(content, index):
     day_info_by_type = {}
     table_xpath = f'(//table[@class="forecast-point-1h"])[{index}]'
     for row_info in ROW_LIST:
-        td_content_list = content.xpath(table_xpath + f'//tr[{row_info["index"]}]/td')
+        td_content_list = content.xpath(table_xpath + f"//tr[{row_info['index']}]/td")
 
         match row_info["type"]:
             case "int":
@@ -302,6 +303,7 @@ def get_precip_by_hour_tenki(tenki_config):
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty

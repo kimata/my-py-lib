@@ -161,6 +161,7 @@ class EchonetEnergy:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

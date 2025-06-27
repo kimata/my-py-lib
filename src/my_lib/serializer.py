@@ -24,16 +24,16 @@ def store(path_str, data):
     path = my_lib.pytest_util.get_path(path_str)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    f = tempfile.NamedTemporaryFile("wb", dir=str(path.parent), delete=False)
-    pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
-    f.close()
+    with tempfile.NamedTemporaryFile("wb", dir=str(path.parent), delete=False) as f:
+        pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        temp_name = f.name
 
     if path.exists():
         old_path = path.with_suffix(".old")
 
         shutil.copy(path, old_path)
 
-    pathlib.Path(f.name).replace(path)
+    pathlib.Path(temp_name).replace(path)
 
 
 def load(path_str, init_value=None):
@@ -69,6 +69,7 @@ def get_size_str(path_str):
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
 
     args = docopt.docopt(__doc__)
@@ -79,10 +80,10 @@ if __name__ == "__main__":
 
     data = {"a": 1.0}
 
-    f = tempfile.NamedTemporaryFile()
-    file_path = pathlib.Path(f.name)
-    store(file_path, data)
-    f.flush()
+    with tempfile.NamedTemporaryFile() as f:
+        file_path = pathlib.Path(f.name)
+        store(file_path, data)
+        f.flush()
 
     assert load(file_path) == data  # noqa: S101
 

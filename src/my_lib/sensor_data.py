@@ -25,6 +25,7 @@ import os
 import time
 
 import influxdb_client
+
 import my_lib.time
 
 # NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
@@ -529,25 +530,25 @@ def get_day_sum(  # noqa:  PLR0913
     now = my_lib.time.now()
 
     if day_before == 0:
-        start = f"-{day_offset+days-1}d{now.hour}h{now.minute}m"
+        start = f"-{day_offset + days - 1}d{now.hour}h{now.minute}m"
         stop = f"-{day_offset}d"
     else:
-        start = f"-{day_before+ day_offset + days - 1 }d{now.hour}h{now.minute}m"
+        start = f"-{day_before + day_offset + days - 1}d{now.hour}h{now.minute}m"
         stop = f"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
 def get_hour_sum(config, measure, hostname, field, hours, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
-    start = f"-{day_offset*24 + hours}h"
-    stop = f"-{day_offset*24}h"
+    start = f"-{day_offset * 24 + hours}h"
+    stop = f"-{day_offset * 24}h"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
 def get_minute_sum(config, measure, hostname, field, minutes, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
-    start = f"-{day_offset*24*60 + minutes}m"
-    stop = f"-{day_offset*24*60}m"
+    start = f"-{day_offset * 24 * 60 + minutes}m"
+    stop = f"-{day_offset * 24 * 60}m"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
@@ -577,6 +578,7 @@ def dump_data(data):
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty

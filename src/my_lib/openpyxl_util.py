@@ -29,7 +29,7 @@ def insert_table_header(sheet, row, sheet_def, base_style):
                     sheet,
                     row,
                     col + i,
-                    sheet_def["TABLE_HEADER"]["col"][key]["label"] + f" ({i+1})",
+                    sheet_def["TABLE_HEADER"]["col"][key]["label"] + f" ({i + 1})",
                     width,
                     base_style,
                 )

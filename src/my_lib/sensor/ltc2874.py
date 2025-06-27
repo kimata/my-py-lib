@@ -5,9 +5,10 @@ import logging
 import pprint
 import time
 
-import my_lib.sensor
 import serial
 import spidev
+
+import my_lib.sensor
 
 DEBUG = True
 

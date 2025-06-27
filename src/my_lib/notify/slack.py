@@ -21,8 +21,9 @@ import tempfile
 import threading
 import time
 
-import my_lib.footprint
 import slack_sdk
+
+import my_lib.footprint
 
 NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 INTERVAL_MIN = 60
@@ -203,6 +204,7 @@ if __name__ == "__main__":
     import sys
 
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

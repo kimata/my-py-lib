@@ -23,19 +23,18 @@ test-prepare:
 
     cache:
         - key:
-            files:
-                - pyproject.toml
-                - .gitlab-ci.yml
-            prefix: ${CI_COMMIT_REF_SLUG}-venv
+              files:
+                  - pyproject.toml
+                  - .gitlab-ci.yml
+              prefix: ${CI_COMMIT_REF_SLUG}-venv
           paths:
-            - .venv
+              - .venv
           policy: pull-push
 
         - key: ${CI_COMMIT_REF_SLUG}-uv-toolchain
           paths:
-            - .uv_python
+              - .uv_python
           policy: pull-push
-
 
 test-walk-through:
     stage: test
@@ -51,17 +50,17 @@ test-walk-through:
 
     cache:
         - key:
-            files:
-                - pyproject.toml
-                - .gitlab-ci.yml
-            prefix: ${CI_COMMIT_REF_SLUG}-venv
+              files:
+                  - pyproject.toml
+                  - .gitlab-ci.yml
+              prefix: ${CI_COMMIT_REF_SLUG}-venv
           paths:
-            - .venv
+              - .venv
           policy: pull
 
         - key: ${CI_COMMIT_REF_SLUG}-uv-toolchain
           paths:
-            - .uv_python
+              - .uv_python
           policy: pull
 
     artifacts:
@@ -84,4 +83,4 @@ renovate:
           when: never
         - if: '$CI_PIPELINE_SOURCE == "schedule"'
         - changes:
-            - renovate.json
+              - renovate.json

@@ -67,7 +67,7 @@ class SCD4X:
 
     def __decode_response(self, data):
         resp = []
-        for word in zip(*[iter(data)] * 3):
+        for word in zip(*[iter(data)] * 3, strict=False):
             if self.__crc(word[0:2]) != word[2]:
                 raise OSError("CRC unmatch")  # noqa: EM101, TRY003
             resp.extend(word[0:2])
@@ -120,6 +120,7 @@ class SCD4X:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
 
     args = docopt.docopt(__doc__)

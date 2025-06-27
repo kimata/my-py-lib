@@ -180,6 +180,7 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

@@ -11,9 +11,9 @@ Options:
 
 import datetime
 import os
+import zoneinfo
 
 import pytz
-import zoneinfo
 
 TIMEZONE_DEFAULT = "Asia/Tokyo"
 
@@ -40,6 +40,7 @@ if __name__ == "__main__":
     import logging
 
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

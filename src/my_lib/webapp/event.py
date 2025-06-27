@@ -6,9 +6,8 @@ import threading
 import time
 import traceback
 
-import my_lib.webapp.config
-
 import flask
+import my_lib.webapp.config
 
 YIELD_TIMEOUT = 100
 

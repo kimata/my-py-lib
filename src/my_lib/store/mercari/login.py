@@ -3,13 +3,14 @@ import logging
 import random
 import time
 
-import my_lib.notify.slack
-import my_lib.selenium_util
-import my_lib.store.captcha
 import selenium.common.exceptions
 import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.ui
+
+import my_lib.notify.slack
+import my_lib.selenium_util
+import my_lib.store.captcha
 
 LINE_LOGIN_TIMEOUT = 30
 

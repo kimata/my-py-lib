@@ -8,10 +8,11 @@ import time
 import unittest
 
 import data.sample_webapp
+import pytest
+
 import my_lib.config
 import my_lib.notify.slack
 import my_lib.webapp.config
-import pytest
 
 CONFIG_FILE = "tests/data/config.example.yaml"
 
@@ -37,7 +38,7 @@ def slack_mock():
         yield fixture
 
 
-@pytest.fixture()
+@pytest.fixture
 def app():
     my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
 
@@ -50,7 +51,7 @@ def app():
         test_webapp_log_term()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(app):
     test_client = app.test_client()
 
@@ -400,8 +401,9 @@ def test_notify_slack(mocker):
 
 def test_pil_util():
     TEST_IMAGE_PATH = "tests/data/a.png"
-    import my_lib.pil_util
     import PIL.Image
+
+    import my_lib.pil_util
 
     font = my_lib.pil_util.get_font(
         {"path": "tests/data", "map": {"test": "migmix-1p-regular.ttf"}}, "test", 12
@@ -465,10 +467,11 @@ def test_panel_util():
 def test_selenium_util(mocker):
     import os
 
-    import my_lib.selenium_util
     import selenium.webdriver.common.by
     import selenium.webdriver.support.expected_conditions
     import selenium.webdriver.support.wait
+
+    import my_lib.selenium_util
 
     TEST_URL = "https://example.com/"
     DUMP_PATH = pathlib.Path("tests/data/dump")

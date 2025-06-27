@@ -15,11 +15,12 @@ import pathlib
 import random
 import time
 
-import my_lib.selenium_util
-import my_lib.store.amazon.captcha
 import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
+
+import my_lib.selenium_util
+import my_lib.store.amazon.captcha
 
 LOGIN_URL = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
@@ -150,6 +151,7 @@ def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MA
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

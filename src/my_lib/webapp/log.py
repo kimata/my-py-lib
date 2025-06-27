@@ -23,12 +23,11 @@ import time
 import traceback
 import wsgiref.handlers
 
+import flask
 import my_lib.flask_util
 import my_lib.notify.slack
 import my_lib.webapp.config
 import my_lib.webapp.event
-
-import flask
 
 
 class LOG_LEVEL(enum.Enum):  # noqa: N801
@@ -214,7 +213,7 @@ def info(message):
 def get(stop_day=0):
     sqlite = sqlite3.connect(get_db_path())
 
-    sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+    sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
     cur = sqlite.cursor()
     cur.execute(
         f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
@@ -335,10 +334,11 @@ if __name__ == "__main__":
     import signal
 
     import docopt
+    import requests
+
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty
-    import requests
 
     args = docopt.docopt(__doc__)
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import io
 
-import my_lib.notify.slack
-import my_lib.store.captcha
 import PIL.Image
 import selenium.webdriver.common.by
 import selenium.webdriver.support
+
+import my_lib.notify.slack
+import my_lib.store.captcha
 
 
 def resolve(driver, wait, config, xpath):  # noqa: ARG001

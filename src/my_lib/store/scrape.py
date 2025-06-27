@@ -19,11 +19,12 @@ import string
 import time
 import urllib
 
-import my_lib.selenium_util
-import my_lib.store.captcha
 import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
+
+import my_lib.selenium_util
+import my_lib.store.captcha
 
 TIMEOUT_SEC = 4
 
@@ -183,6 +184,7 @@ def fetch_price(driver, item, dump_path, loop=0):
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.config
     import my_lib.logger
 

@@ -81,6 +81,7 @@ if __name__ == "__main__":
     import pprint
 
     import docopt
+
     import my_lib.logger
 
     args = docopt.docopt(__doc__)

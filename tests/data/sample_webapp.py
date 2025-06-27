@@ -2,9 +2,8 @@
 import os
 import time
 
-import my_lib.flask_util
-
 import flask
+import my_lib.flask_util
 
 WEBAPP_URL_PREFIX = "/test"
 
@@ -18,9 +17,9 @@ def create_app(config_file):
     import logging
 
     import flask_cors
-    import my_lib.webapp.config
 
     import flask
+    import my_lib.webapp.config
 
     config = my_lib.config.load(config_file)
 
@@ -28,6 +27,7 @@ def create_app(config_file):
     my_lib.webapp.config.init(config)
 
     import data.sample_webapp
+
     import my_lib.webapp.base
     import my_lib.webapp.event
     import my_lib.webapp.log

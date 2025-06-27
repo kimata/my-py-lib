@@ -4,10 +4,11 @@ import textwrap
 import time
 import traceback
 
-import my_lib.notify.slack
-import my_lib.pil_util
 import PIL.Image
 import PIL.ImageDraw
+
+import my_lib.notify.slack
+import my_lib.pil_util
 
 
 def notify_error(config, message):

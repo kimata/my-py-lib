@@ -196,7 +196,7 @@ class SM9561:
         length = data[2]
         data = self.read_bytes(length + 2)
 
-        crc = self.calc_crc([dev_addr, 0x03, length] + data[0:length])
+        crc = self.calc_crc([dev_addr, 0x03, length, *data[0:length]])
 
         if crc != data[length:]:
             raise OSError("CRC mismatch")  # noqa: EM101, TRY003
@@ -221,6 +221,7 @@ class SM9561:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
     import my_lib.sensor.sm9561
 

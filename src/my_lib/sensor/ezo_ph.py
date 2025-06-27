@@ -78,6 +78,7 @@ if __name__ == "__main__":
     import logging
 
     import docopt
+
     import my_lib.logger
 
     args = docopt.docopt(__doc__)

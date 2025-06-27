@@ -13,6 +13,7 @@ import datetime
 import logging
 
 import git
+
 import my_lib.time
 
 
@@ -35,13 +36,14 @@ def get_revision_str():
     revision_info = get_revision_info()
 
     return (
-        f'Git hash: {revision_info["hash"]}{" (dirty)" if revision_info["is_dirty"] else ""}\n'
-        f'Git date: {revision_info["date"].strftime("%Y-%m-%d %H:%M:%S %Z")}'
+        f"Git hash: {revision_info['hash']}{' (dirty)' if revision_info['is_dirty'] else ''}\n"
+        f"Git date: {revision_info['date'].strftime('%Y-%m-%d %H:%M:%S %Z')}"
     )
 
 
 if __name__ == "__main__":
     import docopt
+
     import my_lib.logger
 
     args = docopt.docopt(__doc__)

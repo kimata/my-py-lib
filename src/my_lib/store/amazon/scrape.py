@@ -20,11 +20,12 @@ import re
 import time
 import traceback
 
-import my_lib.notify.slack
-import my_lib.store.amazon.captcha
 import PIL.Image
 import selenium.webdriver.common.by
 import selenium.webdriver.support
+
+import my_lib.notify.slack
+import my_lib.store.amazon.captcha
 
 
 def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
@@ -195,11 +196,12 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
+    import selenium.webdriver.support.wait
+
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty
     import my_lib.selenium_util
-    import selenium.webdriver.support.wait
 
     args = docopt.docopt(__doc__)
 

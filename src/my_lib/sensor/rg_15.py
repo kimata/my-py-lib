@@ -117,6 +117,7 @@ class RG_15:  # noqa: N801
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
     import my_lib.sensor.rg_15
 

@@ -17,9 +17,6 @@ import tempfile
 import time
 import urllib
 
-import my_lib.notify.mail
-import my_lib.notify.slack
-import my_lib.selenium_util
 import pydub
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
@@ -27,21 +24,27 @@ import selenium.webdriver.support
 import slack_sdk
 import speech_recognition
 
+import my_lib.notify.mail
+import my_lib.notify.slack
+import my_lib.selenium_util
+
 RESPONSE_WAIT_SEC = 5
 RESPONSE_TIMEOUT_SEC = 300
 
 
 def recognize_audio(audio_url):
-    mp3_file = tempfile.NamedTemporaryFile(mode="wb", delete=False)
-    wav_file = tempfile.NamedTemporaryFile(mode="wb", delete=False)
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False) as mp3_file:
+        mp3_file_name = mp3_file.name
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False) as wav_file:
+        wav_file_name = wav_file.name
 
     try:
-        urllib.request.urlretrieve(audio_url, mp3_file.name)  # noqa: S310
+        urllib.request.urlretrieve(audio_url, mp3_file_name)  # noqa: S310
 
-        pydub.AudioSegment.from_mp3(mp3_file.name).export(wav_file.name, format="wav")
+        pydub.AudioSegment.from_mp3(mp3_file_name).export(wav_file_name, format="wav")
 
         recognizer = speech_recognition.Recognizer()
-        recaptcha_audio = speech_recognition.AudioFile(wav_file.name)
+        recaptcha_audio = speech_recognition.AudioFile(wav_file_name)
         with recaptcha_audio as source:
             audio = recognizer.record(source)
 
@@ -50,8 +53,8 @@ def recognize_audio(audio_url):
         logging.exception("Failed to recognize audio")
         raise
     finally:
-        pathlib.Path(mp3_file.name).unlink(missing_ok=True)
-        pathlib.Path(wav_file.name).unlink(missing_ok=True)
+        pathlib.Path(mp3_file_name).unlink(missing_ok=True)
+        pathlib.Path(wav_file_name).unlink(missing_ok=True)
 
 
 def resolve_recaptcha_auto(driver, wait):
@@ -275,9 +278,10 @@ def recv_response_image_slack(token, ch_id, file_id, timeout_sec=RESPONSE_TIMEOU
 if __name__ == "__main__":
     # TEST Code
     import docopt
+    import PIL.Image
+
     import my_lib.config
     import my_lib.logger
-    import PIL.Image
 
     args = docopt.docopt(__doc__)
 

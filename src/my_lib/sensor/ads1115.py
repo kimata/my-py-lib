@@ -87,6 +87,7 @@ class ADS1115:
 if __name__ == "__main__":
     # TEST Code
     import docopt
+
     import my_lib.logger
     import my_lib.sensor.ads1115
 
