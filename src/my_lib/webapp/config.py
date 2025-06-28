@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import logging
+import os
 import pathlib
 
 import my_lib.time
@@ -40,6 +41,9 @@ def init(config):
 
 
 def show_handler_list(app):
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+
     with app.app_context():
         for rule in app.url_map.iter_rules():
             logging.info("path: %s %s → %s", rule.rule, rule.methods, rule.endpoint)
