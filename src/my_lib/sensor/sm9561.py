@@ -223,7 +223,6 @@ if __name__ == "__main__":
     import docopt
 
     import my_lib.logger
-    import my_lib.sensor.sm9561
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)

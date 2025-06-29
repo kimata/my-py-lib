@@ -119,7 +119,6 @@ if __name__ == "__main__":
     import docopt
 
     import my_lib.logger
-    import my_lib.sensor.rg_15
 
     args = docopt.docopt(__doc__)
     dev = args["-d"]
