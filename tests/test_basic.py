@@ -577,3 +577,46 @@ def test_webapp_log_term():
 
     # NOTE: 二重に呼んでもエラーにならないことを確認
     my_lib.webapp.log.term()
+
+
+def test_json_util():
+    import datetime
+
+    import my_lib.json_util
+    import my_lib.time
+
+    # datetime オブジェクトのシリアライズ・デシリアライズテスト
+    now = my_lib.time.now()
+    json_str = my_lib.json_util.dumps(now)
+    assert isinstance(json_str, str)
+    assert now.isoformat() in json_str
+
+    # JSON文字列からdatetimeオブジェクトへの復元テスト
+    restored_now = my_lib.json_util.loads(json_str)
+    assert isinstance(restored_now, datetime.datetime)
+    assert restored_now == now
+
+    # 複合オブジェクトのテスト
+    data = {
+        "timestamp": now,
+        "name": "test",
+        "count": 123,
+        "nested": {"created_at": now, "items": [now, "string", 456]},
+    }
+
+    json_str = my_lib.json_util.dumps(data)
+    restored_data = my_lib.json_util.loads(json_str)
+
+    assert restored_data["timestamp"] == now
+    assert restored_data["name"] == "test"
+    assert restored_data["count"] == 123
+    assert restored_data["nested"]["created_at"] == now
+    assert restored_data["nested"]["items"][0] == now
+    assert restored_data["nested"]["items"][1] == "string"
+    assert restored_data["nested"]["items"][2] == 456
+
+    # 通常のJSONデータのテスト（datetimeが含まれない場合）
+    simple_data = {"name": "test", "value": 123}
+    json_str = my_lib.json_util.dumps(simple_data)
+    restored_simple = my_lib.json_util.loads(json_str)
+    assert restored_simple == simple_data

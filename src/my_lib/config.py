@@ -45,7 +45,7 @@ def load(config_path=CONFIG_PATH, schema_path=None):
         schema_path = pathlib.Path(schema_path).resolve()
 
     logging.info(
-        "Load config: %s%s", config_path, f"(schema: {schema_path})" if schema_path is not None else ""
+        "Load config: %s%s", config_path, f" (schema: {schema_path})" if schema_path is not None else ""
     )
 
     with config_path.open() as file:
@@ -78,11 +78,10 @@ def generate_schema(config_path):
 
 if __name__ == "__main__":
     # TEST Code
-    import pprint
-
     import docopt
 
     import my_lib.logger
+    import my_lib.pretty
 
     args = docopt.docopt(__doc__)
 
@@ -95,4 +94,4 @@ if __name__ == "__main__":
     if schema_mode:
         generate_schema(config_file)
     else:
-        pprint.pprint(load(config_file))  # noqa: T203
+        logging.info(my_lib.pretty.format(load(config_file)))
