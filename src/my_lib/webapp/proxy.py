@@ -90,11 +90,35 @@ def api_proxy_event(subpath):
     return res
 
 
+def _make_proxy_request(subpath):
+    """プロキシリクエストの共通処理"""
+    global api_base_url
+
+    url = f"{api_base_url}/{subpath}"
+
+    if flask.request.method == "GET":
+        # GETの場合はクエリパラメータを転送
+        params = dict(flask.request.args)
+        res = requests.get(url, params=params)  # noqa: S113
+    else:
+        # POSTの場合はフォームデータとクエリパラメータの両方を転送
+        params = dict(flask.request.args)
+        data = dict(flask.request.form)
+        # JSONデータの場合も対応
+        if flask.request.is_json:
+            data = flask.request.get_json()
+            res = requests.post(url, params=params, json=data)  # noqa: S113
+        else:
+            res = requests.post(url, params=params, data=data)  # noqa: S113
+
+    res.raise_for_status()
+    return res
+
+
 @blueprint.route("/api/proxy/json/<path:subpath>", methods=["GET", "POST"])
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
 def api_proxy_json(subpath):
-    global api_base_url
     global error_response
 
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
@@ -102,24 +126,7 @@ def api_proxy_json(subpath):
     flask.g.disable_cache = True
 
     try:
-        url = f"{api_base_url}/{subpath}"
-
-        if flask.request.method == "GET":
-            # GETの場合はクエリパラメータを転送
-            params = dict(flask.request.args)
-            res = requests.get(url, params=params)  # noqa: S113
-        else:
-            # POSTの場合はフォームデータとクエリパラメータの両方を転送
-            params = dict(flask.request.args)
-            data = dict(flask.request.form)
-            # JSONデータの場合も対応
-            if flask.request.is_json:
-                data = flask.request.get_json()
-                res = requests.post(url, params=params, json=data)  # noqa: S113
-            else:
-                res = requests.post(url, params=params, data=data)  # noqa: S113
-
-        res.raise_for_status()
+        res = _make_proxy_request(subpath)
 
         # NOTE: JSON として解析してから返す
         data = json.loads(res.text)
@@ -132,8 +139,35 @@ def api_proxy_json(subpath):
 
         return response
     except Exception:
-        logging.exception("Unable to fetch data from %s", url)
+        logging.exception("Unable to fetch data from %s", f"{api_base_url}/{subpath}")
         return flask.jsonify(error_response if error_response else {"error": "Proxy request failed"}), 500
+
+
+@blueprint.route("/api/proxy/html/<path:subpath>", methods=["GET", "POST"])
+@my_lib.flask_util.gzipped
+def api_proxy_html(subpath):
+    global error_response
+
+    # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
+    # 無効化する。
+    flask.g.disable_cache = True
+
+    try:
+        res = _make_proxy_request(subpath)
+
+        # HTMLとして返す
+        response = flask.Response(res.text, content_type="text/html; charset=utf-8")
+
+        # last-modified ヘッダがあれば設定
+        if "last-modified" in res.headers:
+            response.headers["Last-Modified"] = res.headers["last-modified"]
+            response.make_conditional(flask.request)
+
+        return response
+    except Exception:
+        logging.exception("Unable to fetch data from %s", f"{api_base_url}/{subpath}")
+        error_html = "<html><body><h1>Proxy request failed</h1></body></html>"
+        return flask.Response(error_html, status=500, content_type="text/html; charset=utf-8")
 
 
 def test_run(api_base_url, port, debug_mode, error_response):
