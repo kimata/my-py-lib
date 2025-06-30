@@ -40,8 +40,8 @@ def init(config):
     logging.info("STAT_DIR_PATH = %s", STAT_DIR_PATH)
 
 
-def show_handler_list(app):
-    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+def show_handler_list(app, is_force=False):
+    if (os.environ.get("WERKZEUG_RUN_MAIN") != "true") and not is_force:
         return
 
     with app.app_context():
