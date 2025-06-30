@@ -80,14 +80,41 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
 
     message_lines = message.splitlines()
     total = math.ceil(len(message_lines) / LINE_SPLIT)
+    thread_ts = None
+
     for i in range(0, len(message_lines), LINE_SPLIT):
         split_title = title if total == 1 else f"{title} ({(i // LINE_SPLIT) + 1}/{total})"
 
-        send(
-            token,
-            ch_name,
-            formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
-        )
+        # 最初のメッセージを送信
+        if i == 0:
+            response = send(
+                token,
+                ch_name,
+                formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
+            )
+            # 2つ以上に分割される場合、最初のメッセージのタイムスタンプを保存
+            if total >= 2 and response:
+                thread_ts = response.get("ts")
+        elif thread_ts:
+            # 2つ以上に分割される場合は、2番目以降をスレッドへの返信として送信
+            try:
+                client = slack_sdk.WebClient(token=token)
+                formatted_msg = formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT]))
+                client.chat_postMessage(
+                    channel=ch_name,
+                    text=formatted_msg["text"],
+                    blocks=formatted_msg["json"],
+                    thread_ts=thread_ts,
+                )
+            except slack_sdk.errors.SlackClientError:
+                logging.exception("Failed to send Slack message in thread")
+        else:
+            # フォールバック: thread_tsが取得できなかった場合は通常通り送信
+            send(
+                token,
+                ch_name,
+                formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
+            )
 
         time.sleep(1)
 
