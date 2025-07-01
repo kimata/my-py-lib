@@ -95,7 +95,6 @@ def term(is_read_only=False):
         return
 
     if log_thread is None:
-        logging.warning("Worked is not running")
         return
 
     should_terminate.set()
