@@ -24,18 +24,16 @@ import flask
 import my_lib.flask_util
 import my_lib.webapp.config
 
-blueprint = flask.Blueprint("webapp-proxy", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-proxy", __name__)
 
 api_base_url = None
-error_response = None
 
 
-def init(api_base_url_, error_response_=None):
+def init(api_base_url_):
     global api_base_url  # noqa: PLW0603
-    global error_response  # noqa: PLW0603
+    global error_response
 
     api_base_url = api_base_url_
-    error_response = error_response_ if error_response_ else {"data": [], "last_time": time.time()}
 
 
 # NOTE: リバースプロキシの場合は、webapp_event ではなく、
@@ -119,8 +117,6 @@ def _make_proxy_request(subpath):
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
 def api_proxy_json(subpath):
-    global error_response
-
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
     # 無効化する。
     flask.g.disable_cache = True
@@ -140,14 +136,12 @@ def api_proxy_json(subpath):
         return response
     except Exception:
         logging.exception("Unable to fetch data from %s", f"{api_base_url}/{subpath}")
-        return flask.jsonify(error_response if error_response else {"error": "Proxy request failed"}), 500
+        return flask.jsonify({"error": "Proxy request failed"}), 500
 
 
 @blueprint.route("/api/proxy/html/<path:subpath>", methods=["GET", "POST"])
 @my_lib.flask_util.gzipped
 def api_proxy_html(subpath):
-    global error_response
-
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
     # 無効化する。
     flask.g.disable_cache = True
@@ -170,7 +164,7 @@ def api_proxy_html(subpath):
         return flask.Response(error_html, status=500, content_type="text/html; charset=utf-8")
 
 
-def test_run(api_base_url, port, debug_mode, error_response):
+def test_run(api_base_url, port, debug_mode):
     import flask_cors
 
     app = flask.Flask("test")
@@ -178,7 +172,7 @@ def test_run(api_base_url, port, debug_mode, error_response):
     # NOTE: アクセスログは無効にする
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    init(api_base_url, error_response)
+    init(api_base_url)
 
     flask_cors.CORS(app)
 

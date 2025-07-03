@@ -92,8 +92,8 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
                 ch_name,
                 formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
             )
-            # 2つ以上に分割される場合、最初のメッセージのタイムスタンプを保存
-            if total >= 2 and response:
+            # 最初のメッセージのタイムスタンプを保存（スレッドがない場合でも画像投稿で使用）
+            if response:
                 thread_ts = response.get("ts")
         elif thread_ts:
             # 2つ以上に分割される場合は、2番目以降をスレッドへの返信として送信
@@ -118,13 +118,15 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
 
         time.sleep(1)
 
+    return thread_ts
+
 
 def info(token, ch_name, title, message, formatter=format_simple):
     title = "Info: " + title
     split_send(token, ch_name, title, message, formatter)
 
 
-def upload_image(token, ch_id, title, img, text):
+def upload_image(token, ch_id, title, img, text, thread_ts=None):  # noqa: PLR0913
     client = slack_sdk.WebClient(token=token)
 
     with tempfile.TemporaryDirectory() as dname:
@@ -132,9 +134,16 @@ def upload_image(token, ch_id, title, img, text):
         img.save(img_path)
 
         try:
-            resp = client.files_upload_v2(
-                channel=ch_id, file=str(img_path), title=title, initial_comment=text
-            )
+            kwargs = {
+                "channel": ch_id,
+                "file": str(img_path),
+                "title": title,
+                "initial_comment": text,
+            }
+            if thread_ts:
+                kwargs["thread_ts"] = thread_ts
+
+            resp = client.files_upload_v2(**kwargs)
 
             return resp["files"][0]["id"]
         except slack_sdk.errors.SlackApiError:
@@ -182,13 +191,13 @@ def error_with_image(  # noqa: PLR0913
         logging.warning("Interval is too short. Skipping.")
         return
 
-    split_send(token, ch_name, title, message, formatter)
+    thread_ts = split_send(token, ch_name, title, message, formatter)
 
     if attatch_img is not None:
         if ch_id is None:
             raise ValueError("ch_id is None")  # noqa: TRY003, EM101
 
-        upload_image(token, ch_id, title, attatch_img["data"], attatch_img["text"])
+        upload_image(token, ch_id, title, attatch_img["data"], attatch_img["text"], thread_ts)
 
     my_lib.footprint.update(NOTIFY_FOOTPRINT)
 

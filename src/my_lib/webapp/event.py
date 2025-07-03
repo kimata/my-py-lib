@@ -7,7 +7,6 @@ import time
 import traceback
 
 import flask
-import my_lib.webapp.config
 
 YIELD_TIMEOUT = 100
 
@@ -18,7 +17,7 @@ class EVENT_TYPE(enum.Enum):  # noqa: N801
     LOG = "log"
 
 
-blueprint = flask.Blueprint("webapp-event", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-event", __name__)
 
 
 # NOTE: サイズは上の Enum の個数+1 にしておく

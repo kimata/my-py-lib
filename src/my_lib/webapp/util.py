@@ -12,7 +12,7 @@ import my_lib.flask_util
 import my_lib.time
 import my_lib.webapp.config
 
-blueprint = flask.Blueprint("webapp-util", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-util", __name__)
 
 snapshot_prev = None
 

@@ -39,7 +39,7 @@ class LOG_LEVEL(enum.Enum):  # noqa: N801
 TABLE_NAME = "log"
 CHECK_INTERVAL_SEC = 10
 
-blueprint = flask.Blueprint("webapp-log", __name__, url_prefix=my_lib.webapp.config.URL_PREFIX)
+blueprint = flask.Blueprint("webapp-log", __name__)
 
 log_thread = None
 queue_lock = None
