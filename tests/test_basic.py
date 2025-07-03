@@ -31,9 +31,13 @@ def env_mock():
 
 @pytest.fixture(scope="session", autouse=True)
 def slack_mock():
+    # Create a mock response object that has a .get() method
+    mock_response = unittest.mock.MagicMock()
+    mock_response.get.return_value = "test_timestamp"
+
     with unittest.mock.patch(
         "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
-        return_value=True,
+        return_value=mock_response,
     ) as fixture:
         yield fixture
 
@@ -337,7 +341,7 @@ def test_notify_slack(mocker):
 
     mocker.patch(
         "my_lib.notify.slack.slack_sdk.web.client.WebClient.chat_postMessage",
-        retunr_value=True,
+        return_value=True,
     )
 
     mocker.patch(
