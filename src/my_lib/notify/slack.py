@@ -51,6 +51,7 @@ SIMPLE_TMPL = """\
 # NOTE: テスト用
 thread_local = threading.local()
 notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+_hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 
 def format_simple(title, message):
@@ -223,12 +224,16 @@ def hist_add(message):
 def hist_get(is_thread_local=True):
     global thread_local
     global notify_hist
+    global _hist_lock
 
     worker = os.environ.get("PYTEST_XDIST_WORKER", "0")
 
     if is_thread_local:
+        # スレッドセーフな初期化（Double-checked locking パターン）
         if not hasattr(thread_local, "notify_hist"):
-            thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+            with _hist_lock:
+                if not hasattr(thread_local, "notify_hist"):
+                    thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
         return thread_local.notify_hist[worker]
     else:
