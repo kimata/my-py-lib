@@ -113,6 +113,7 @@ def _process_query_results(table_list, create_empty, last, every_min, window_min
 def fetch_data_impl(  # noqa: PLR0913
     db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
 ):
+    client = None
     try:
         token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
 
@@ -138,6 +139,9 @@ def fetch_data_impl(  # noqa: PLR0913
     except Exception:
         logging.exception("Failed to fetch data")
         raise
+    finally:
+        if client is not None:
+            client.close()
 
 
 async def fetch_data_impl_async(  # noqa: PLR0913
