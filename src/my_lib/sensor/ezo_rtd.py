@@ -25,7 +25,7 @@ class EZO_RTD:  # noqa: N801
     def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
-        self.i2cbus = i2cbus(bus_id)
+        self.i2cbus = i2cbus.I2CBUS(bus_id)
 
     def ping(self):
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)

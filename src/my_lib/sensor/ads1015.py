@@ -34,7 +34,7 @@ class ADS1015:
     def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
         self.bus_id = bus_id
         self.dev_addr = dev_addr
-        self.i2cbus = i2cbus(bus_id)
+        self.i2cbus = i2cbus.I2CBUS(bus_id)
 
         self.mux = self.REG_CONFIG_MUX_01
         self.pga = self.REG_CONFIG_FSR_0256
