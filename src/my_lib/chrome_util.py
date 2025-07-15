@@ -78,26 +78,85 @@ def cleanup_orphaned_chrome_processes():
         import psutil
 
         orphaned_processes = []
-        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        chrome_processes = []
+
+        # 全てのChromeプロセスを収集
+        for proc in psutil.process_iter(["pid", "name", "cmdline", "ppid", "status"]):
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
                 if proc.info["name"] and "chrome" in proc.info["name"].lower():
-                    # Chromeプロセスの親プロセスが存在しない場合は孤立プロセスと判定
-                    parent = proc.parent()
-                    if parent is None or not parent.is_running():
-                        orphaned_processes.append(proc)
+                    chrome_processes.append(proc)
 
+                    # ゾンビプロセスまたは孤立プロセスをチェック
+                    if proc.info["status"] == psutil.STATUS_ZOMBIE:
+                        orphaned_processes.append(proc)
+                    else:
+                        # 親プロセスが存在しない場合は孤立プロセスと判定
+                        parent = proc.parent()
+                        if parent is None or not parent.is_running():
+                            orphaned_processes.append(proc)
+
+        logging.info("Found %d Chrome processes, %d orphaned", len(chrome_processes), len(orphaned_processes))
+
+        # 段階的にプロセスを終了
         for proc in orphaned_processes:
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-                logging.info("Terminating orphaned Chrome process: %s", proc.pid)
+                if proc.info["status"] == psutil.STATUS_ZOMBIE:
+                    logging.info("Found zombie Chrome process: %s", proc.pid)
+                    continue  # ゾンビプロセスは親プロセスが回収する必要がある
+
+                logging.info("Terminating orphaned Chrome process: %s (PID: %s)", proc.info["name"], proc.pid)
                 try:
+                    # 最初はSIGTERMで優雅に終了を試行
                     proc.terminate()
-                    proc.wait(timeout=5)
+                    proc.wait(timeout=3)
+                    logging.info("Successfully terminated Chrome process: %s", proc.pid)
                 except psutil.TimeoutExpired:
+                    # タイムアウトした場合はSIGKILLで強制終了
                     with contextlib.suppress(psutil.NoSuchProcess):
+                        logging.info("Force killing Chrome process: %s", proc.pid)
                         proc.kill()
+                        proc.wait(timeout=2)
+
+        # プロセスグループでの終了も試行
+        _cleanup_chrome_process_groups()
 
     except ImportError:
         logging.warning("psutil not available, skipping orphaned process cleanup")
+
+
+def _cleanup_chrome_process_groups():
+    """Chromeプロセスグループの強制終了"""
+    try:
+        import shutil
+        import subprocess
+
+        # pkillが利用可能かチェック
+        if not shutil.which("pkill"):
+            logging.warning("pkill not available, skipping process group cleanup")
+            return
+
+        # pkillでChromeプロセス全体を終了
+        pkill_path = shutil.which("pkill")
+        result = subprocess.run(  # noqa: S603
+            [pkill_path, "-f", "chrome"], capture_output=True, text=True, timeout=5, check=False
+        )
+
+        if result.returncode == 0:
+            logging.info("Successfully cleaned up Chrome processes with pkill")
+
+        # Chrome crashpadプロセスも終了
+        subprocess.run(  # noqa: S603
+            [pkill_path, "-f", "chrome_crashpad"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        logging.warning("Failed to cleanup Chrome process groups")
+    except Exception as e:
+        logging.warning("Error during Chrome process group cleanup: %s", e)
 
 
 def get_chrome_profile_stats(data_path: pathlib.Path) -> dict:

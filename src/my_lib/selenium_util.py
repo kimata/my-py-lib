@@ -47,6 +47,15 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
 
     options.add_argument("--disable-crash-reporter")
 
+    # ゾンビプロセス対策のオプション
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-component-update")
+
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1200")
 
@@ -54,12 +63,11 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
 
     # options.add_argument(f'--user-agent="{agent_name}"')
 
-    driver = selenium.webdriver.Chrome(
-        service=selenium.webdriver.chrome.service.Service(
-            service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
-        ),
-        options=options,
+    service = selenium.webdriver.chrome.service.Service(
+        service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
+
+    driver = selenium.webdriver.Chrome(service=service, options=options)
 
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     # driver.execute_cdp_cmd(
@@ -287,3 +295,45 @@ class browser_tab:  # noqa: N801
         self.driver.close()
         self.driver.switch_to.window(self.driver.window_handles[-1])
         time.sleep(0.5)
+
+
+def quit_driver_gracefully(driver):
+    """Chrome WebDriverを確実に終了する"""
+    if driver is None:
+        return
+
+    # 全てのタブを明示的に閉じる
+    try:
+        handles = driver.window_handles
+    except Exception:
+        logging.exception("Failed to access window handles")
+        handles = []
+
+    for handle in handles:
+        try:
+            driver.switch_to.window(handle)
+            driver.close()
+        except Exception:  # noqa: PERF203
+            logging.exception("Failed to close window handle")
+
+    try:
+        # WebDriverプロセスを終了
+        driver.quit()
+    except Exception:
+        logging.exception("Failed to quit driver normally")
+
+    # プロセス終了を待機
+    time.sleep(0.5)
+
+    # ChromeDriverサービスの明示的な停止
+    try:
+        if (
+            hasattr(driver, "service")
+            and driver.service
+            and hasattr(driver.service, "process")
+            and driver.service.process
+            and driver.service.process.poll() is None
+        ):
+            driver.service.stop()
+    except Exception:
+        logging.exception("Failed to stop Chrome service")
