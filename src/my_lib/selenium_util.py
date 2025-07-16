@@ -346,10 +346,10 @@ def _send_signal_to_processes(pids, sig, signal_name):
                 os.kill(pid, 0)  # シグナル0は存在確認
             os.kill(pid, sig)
             logging.info("Sent %s to process: PID %d", signal_name, pid)
-        except (ProcessLookupError, OSError) as e:
+        except (ProcessLookupError, OSError) as e:  # noqa: PERF203
             # プロセスが既に終了している場合は無視
             errors.append((pid, e))
-    
+
     # エラーが発生した場合はまとめてログ出力
     if errors:
         logging.debug("Failed to send %s to some processes: %s", signal_name, errors)
@@ -391,8 +391,7 @@ def _reap_single_process(pid):
         # 子プロセスでない場合は無視
         pass
     except OSError:
-        # その他のエラーは無視
-        pass
+        logging.execption("Failed to reap Chrome process")
 
 
 def reap_chrome_processes(chrome_pids):
