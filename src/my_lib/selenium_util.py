@@ -312,24 +312,22 @@ def get_chrome_related_processes(driver):
     chrome_pids = []
 
     try:
-        if (
-            hasattr(driver, "service")
-            and driver.service
-            and hasattr(driver.service, "process")
-            and driver.service.process
-        ):
-            # ChromeDriverプロセスを起点に子プロセスを検索
-            chromedriver_pid = driver.service.process.pid
-            chrome_pids.append(chromedriver_pid)
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):
+            process = driver.service.process
+            if process and hasattr(process, "pid"):
+                chromedriver_pid = process.pid
+                chrome_pids.append(chromedriver_pid)
 
-            # psutilでプロセス階層を取得
-            parent_process = psutil.Process(chromedriver_pid)
-            children = parent_process.children(recursive=True)
+                # psutilでプロセス階層を取得
+                parent_process = psutil.Process(chromedriver_pid)
+                children = parent_process.children(recursive=True)
 
-            for child in children:
-                if _is_chrome_related_process(child):
-                    chrome_pids.append(child.pid)
-                    logging.info("Found Chrome-related process: PID %d, name: %s", child.pid, child.name())
+                for child in children:
+                    if _is_chrome_related_process(child):
+                        chrome_pids.append(child.pid)
+                        logging.debug(
+                            "Found Chrome-related process: PID %d, name: %s", child.pid, child.name()
+                        )
     except Exception:
         logging.exception("Failed to get Chrome-related processes")
 
@@ -360,13 +358,11 @@ def terminate_chrome_processes(chrome_pids):
     if not chrome_pids:
         return
 
-    # 1. 優雅な終了（SIGTERM）
+    # 優雅な終了（SIGTERM）
     _send_signal_to_processes(chrome_pids, signal.SIGTERM, "SIGTERM")
 
-    # 2. 少し待機
-    time.sleep(1)
-
-    # 3. 強制終了（SIGKILL）
+    # 少し待機してから強制終了（SIGKILL）
+    time.sleep(0.5)
     _send_signal_to_processes(chrome_pids, signal.SIGKILL, "SIGKILL")
 
 
@@ -376,22 +372,10 @@ def _reap_single_process(pid):
         # ノンブロッキングでwaitpid
         result_pid, status = os.waitpid(pid, os.WNOHANG)
         if result_pid == pid:
-            logging.info("Reaped Chrome process: PID %d", pid)
-        elif result_pid == 0:
-            # まだ終了していない場合は少し待ってから再試行
-            time.sleep(0.1)
-            try:
-                result_pid, status = os.waitpid(pid, os.WNOHANG)
-                if result_pid == pid:
-                    logging.info("Reaped Chrome process (retry): PID %d", pid)
-            except ChildProcessError:
-                # 子プロセスでない場合は無視
-                pass
-    except ChildProcessError:
-        # 子プロセスでない場合は無視
+            logging.debug("Reaped Chrome process: PID %d", pid)
+    except (ChildProcessError, OSError):
+        # 子プロセスでない場合や既に回収済みの場合は無視
         pass
-    except OSError:
-        logging.execption("Failed to reap Chrome process")
 
 
 def reap_chrome_processes(chrome_pids):
@@ -405,48 +389,26 @@ def quit_driver_gracefully(driver):
     if driver is None:
         return
 
-    # Chrome関連プロセスを事前に取得
-    chrome_pids = get_chrome_related_processes(driver)
-
-    # 全てのタブを明示的に閉じる
     try:
-        handles = driver.window_handles
-    except Exception:
-        logging.exception("Failed to access window handles")
-        handles = []
-
-    for handle in handles:
-        try:
-            driver.switch_to.window(handle)
-            driver.close()
-        except Exception:  # noqa: PERF203
-            logging.exception("Failed to close window handle")
-
-    try:
-        # WebDriverプロセスを終了
+        # WebDriverの正常終了を試行（これがタブのクローズも含む）
         driver.quit()
+        logging.info("WebDriver quit successfully")
     except Exception:
         logging.exception("Failed to quit driver normally")
 
-    # ChromeDriverサービスの明示的な停止
-    try:
-        if (
-            hasattr(driver, "service")
-            and driver.service
-            and hasattr(driver.service, "process")
-            and driver.service.process
-            and driver.service.process.poll() is None
-        ):
-            driver.service.stop()
-    except Exception:
-        logging.exception("Failed to stop Chrome service")
+        # quit()が失敗した場合のみ、強制終了を実行
+        chrome_pids = get_chrome_related_processes(driver)
 
-    # プロセス終了を待機
-    time.sleep(0.5)
+        # ChromeDriverサービスの停止を試行
+        try:
+            if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):
+                driver.service.stop()
+        except Exception:
+            logging.exception("Failed to stop Chrome service")
 
-    # Chrome関連プロセスを強制終了
-    terminate_chrome_processes(chrome_pids)
+        # プロセスの強制終了
+        terminate_chrome_processes(chrome_pids)
 
-    # 少し待機してからプロセス回収
-    time.sleep(0.5)
-    reap_chrome_processes(chrome_pids)
+        # プロセス回収
+        time.sleep(0.5)
+        reap_chrome_processes(chrome_pids)
