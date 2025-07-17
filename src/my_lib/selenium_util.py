@@ -366,11 +366,18 @@ def _send_signal_to_processes(pids, sig, signal_name):
     errors = []
     for pid in pids:
         try:
+            # プロセス名を取得
+            try:
+                process = psutil.Process(pid)
+                process_name = process.name()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                process_name = "unknown"
+
             if sig == signal.SIGKILL:
                 # プロセスがまだ存在するかチェック
                 os.kill(pid, 0)  # シグナル0は存在確認
             os.kill(pid, sig)
-            logging.info("Sent %s to process: PID %d", signal_name, pid)
+            logging.info("Sent %s to process: PID %d (%s)", signal_name, pid, process_name)
         except (ProcessLookupError, OSError) as e:  # noqa: PERF203
             # プロセスが既に終了している場合は無視
             errors.append((pid, e))
@@ -399,7 +406,13 @@ def _reap_single_process(pid):
         # ノンブロッキングでwaitpid
         result_pid, status = os.waitpid(pid, os.WNOHANG)
         if result_pid == pid:
-            logging.debug("Reaped Chrome process: PID %d", pid)
+            # プロセス名を取得
+            try:
+                process = psutil.Process(pid)
+                process_name = process.name()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                process_name = "unknown"
+            logging.debug("Reaped Chrome process: PID %d (%s)", pid, process_name)
     except (ChildProcessError, OSError):
         # 子プロセスでない場合や既に回収済みの場合は無視
         pass
