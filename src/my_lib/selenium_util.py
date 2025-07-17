@@ -341,7 +341,6 @@ def get_chrome_related_processes(driver):
             process = driver.service.process
             if process and hasattr(process, "pid"):
                 chromedriver_pid = process.pid
-                chrome_pids.append(chromedriver_pid)
 
                 # psutilでプロセス階層を取得
                 parent_process = psutil.Process(chromedriver_pid)
