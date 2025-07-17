@@ -384,10 +384,13 @@ def reap_chrome_processes(chrome_pids):
         _reap_single_process(pid)
 
 
-def quit_driver_gracefully(driver):
+def quit_driver_gracefully(driver):  # noqa: C901, PLR0912
     """Chrome WebDriverを確実に終了する"""
     if driver is None:
         return
+
+    # quit前にChrome関連プロセスを記録
+    chrome_pids_before = get_chrome_related_processes(driver)
 
     try:
         # WebDriverの正常終了を試行（これがタブのクローズも含む）
@@ -396,8 +399,24 @@ def quit_driver_gracefully(driver):
     except Exception:
         logging.exception("Failed to quit driver normally")
 
-        # quit()が失敗した場合のみ、強制終了を実行
-        chrome_pids = get_chrome_related_processes(driver)
+    # quit後に残存プロセスをチェック
+    time.sleep(0.5)
+    remaining_pids = []
+    for pid in chrome_pids_before:
+        try:
+            if psutil.pid_exists(pid):
+                process = psutil.Process(pid)
+                if _is_chrome_related_process(process):
+                    remaining_pids.append(pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):  # noqa: PERF203
+            # プロセスが既に終了している場合は無視
+            pass
+
+    # 残存プロセスがある場合は強化した終了処理を実行
+    if remaining_pids:
+        logging.info(
+            "Found %d remaining Chrome processes after quit, attempting cleanup", len(remaining_pids)
+        )
 
         # ChromeDriverサービスの停止を試行
         try:
@@ -407,8 +426,24 @@ def quit_driver_gracefully(driver):
             logging.exception("Failed to stop Chrome service")
 
         # プロセスの強制終了
-        terminate_chrome_processes(chrome_pids)
+        terminate_chrome_processes(remaining_pids)
 
         # プロセス回収
         time.sleep(0.5)
-        reap_chrome_processes(chrome_pids)
+        reap_chrome_processes(remaining_pids)
+
+        # 最終チェック：まだ残っているプロセスがあるか確認
+        still_remaining = []
+        for pid in remaining_pids:
+            try:
+                if psutil.pid_exists(pid):
+                    process = psutil.Process(pid)
+                    if _is_chrome_related_process(process):
+                        still_remaining.append((pid, process.name()))
+            except (psutil.NoSuchProcess, psutil.AccessDenied):  # noqa: PERF203
+                pass
+
+        # 回収できなかったプロセスについて警告
+        if still_remaining:
+            for pid, name in still_remaining:
+                logging.warning("Failed to collect Chrome-related process: PID %d (%s)", pid, name)
