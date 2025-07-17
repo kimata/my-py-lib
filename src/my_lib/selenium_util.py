@@ -302,9 +302,34 @@ class browser_tab:  # noqa: N801
 def _is_chrome_related_process(process):
     """プロセスがChrome関連かどうかを判定"""
     try:
-        return any(name in process.name().lower() for name in ("chrome", "cat"))
+        return any(name in process.name().lower() for name in ("chrome", "chrome_crashpad", "cat"))
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return False
+
+
+def _get_chrome_processes_by_pgid(chromedriver_pid, existing_pids):
+    """プロセスグループIDで追加のChrome関連プロセスを取得"""
+    additional_pids = []
+    try:
+        pgid = os.getpgid(chromedriver_pid)
+        for proc in psutil.process_iter(["pid", "name", "ppid"]):
+            if proc.info["pid"] in existing_pids:
+                continue
+            try:
+                if os.getpgid(proc.info["pid"]) == pgid:
+                    proc_obj = psutil.Process(proc.info["pid"])
+                    if _is_chrome_related_process(proc_obj):
+                        additional_pids.append(proc.info["pid"])
+                        logging.debug(
+                            "Found Chrome-related process by pgid: PID %d, name: %s",
+                            proc.info["pid"],
+                            proc.info["name"],
+                        )
+            except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+                pass
+    except (OSError, psutil.NoSuchProcess):
+        logging.debug("Failed to get process group ID for chromedriver")
+    return additional_pids
 
 
 def get_chrome_related_processes(driver):
@@ -323,11 +348,13 @@ def get_chrome_related_processes(driver):
                 children = parent_process.children(recursive=True)
 
                 for child in children:
-                    if _is_chrome_related_process(child):
-                        chrome_pids.append(child.pid)
-                        logging.debug(
-                            "Found Chrome-related process: PID %d, name: %s", child.pid, child.name()
-                        )
+                    chrome_pids.append(child.pid)
+                    logging.debug("Found Chrome-related process: PID %d, name: %s", child.pid, child.name())
+
+                # プロセスグループIDでの検索を追加
+                additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
+                chrome_pids.extend(additional_pids)
+
     except Exception:
         logging.exception("Failed to get Chrome-related processes")
 
