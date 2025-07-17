@@ -15,7 +15,7 @@ import re
 
 
 class DateTimeJSONEncoder(json.JSONEncoder):
-    """datetime オブジェクトを ISO format 文字列に変換する JSON エンコーダー"""  # noqa: D203
+    """datetime オブジェクトを ISO format 文字列に変換する JSON エンコーダー"""
 
     def default(self, obj):
         if isinstance(obj, datetime.datetime):
