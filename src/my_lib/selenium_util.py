@@ -358,8 +358,6 @@ def get_chrome_related_processes(driver):
                 additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
                 chrome_pids.extend(additional_pids)
 
-                chrome_pids.remove(chromedriver_pid)
-
     except Exception:
         logging.exception("Failed to get Chrome-related processes")
 
