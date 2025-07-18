@@ -483,7 +483,7 @@ def test_selenium_util(mocker):
     driver = my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
 
-    my_lib.selenium_util.warmup(driver, "Yaoo.co.jp", "yahoo")
+    my_lib.selenium_util.warmup(driver, "yahoo.co.jp", "yahoo")
 
     driver.get(TEST_URL)
     my_lib.selenium_util.wait_patiently(
