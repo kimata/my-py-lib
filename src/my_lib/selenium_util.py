@@ -318,7 +318,12 @@ def _get_chrome_processes_by_pgid(chromedriver_pid, existing_pids):
             try:
                 if os.getpgid(proc.info["pid"]) == pgid:
                     proc_obj = psutil.Process(proc.info["pid"])
-                    if _is_chrome_related_process(proc_obj):
+                    # chrome_driverプロセスは除外
+                    if (
+                        _is_chrome_related_process(proc_obj)
+                        and "chrome_driver" not in proc.info["name"].lower()
+                        and "chromedriver" not in proc.info["name"].lower()
+                    ):
                         additional_pids.append(proc.info["pid"])
                         logging.debug(
                             "Found Chrome-related process by pgid: PID %d, name: %s",
@@ -347,14 +352,19 @@ def get_chrome_related_processes(driver):
                 children = parent_process.children(recursive=True)
 
                 for child in children:
-                    chrome_pids.append(child.pid)
-                    logging.debug("Found Chrome-related process: PID %d, name: %s", child.pid, child.name())
+                    # chrome_driverプロセスは除外
+                    if (
+                        "chrome_driver" not in child.name().lower()
+                        and "chromedriver" not in child.name().lower()
+                    ):
+                        chrome_pids.append(child.pid)
+                        logging.debug(
+                            "Found Chrome-related process: PID %d, name: %s", child.pid, child.name()
+                        )
 
                 # プロセスグループIDでの検索を追加
                 additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
                 chrome_pids.extend(additional_pids)
-
-                chrome_pids.remove(chromedriver_pid)
 
     except Exception:
         logging.exception("Failed to get Chrome-related processes")
