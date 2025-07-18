@@ -304,9 +304,7 @@ def _is_chrome_related_process(process):
     try:
         process_name = process.name().lower()
         # chromedriverは除外
-        if "chromedriver" in process_name:
-            return False
-        return any(name in process_name for name in ("chrome", "chrome_crashpad", "cat"))
+        return "chromedriver" not in process_name
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return False
 
@@ -354,9 +352,9 @@ def get_chrome_related_processes(driver):
                     chrome_pids.append(child.pid)
                     logging.debug("Found Chrome-related process: PID %d, name: %s", child.pid, child.name())
 
-                # プロセスグループIDでの検索を追加
-                additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
-                chrome_pids.extend(additional_pids)
+                # # プロセスグループIDでの検索を追加
+                # additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
+                # chrome_pids.extend(additional_pids)
 
     except Exception:
         logging.exception("Failed to get Chrome-related processes")
