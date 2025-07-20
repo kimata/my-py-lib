@@ -74,10 +74,6 @@ def init(config_, is_read_only=False):
     if not is_read_only:
         should_terminate.clear()
 
-        # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-        if log_manager is not None:
-            log_manager.shutdown()
-
         queue_lock = threading.RLock()
         log_manager = multiprocessing.Manager()
         log_queue = log_manager.Queue()
@@ -89,20 +85,22 @@ def init(config_, is_read_only=False):
 def term(is_read_only=False):
     global log_thread  # noqa: PLW0603
     global should_terminate
-    global log_manager
+    global log_manager  # noqa: PLW0603
     global log_event
 
     if is_read_only:
         return
 
-    if log_thread is None:
-        return
-
     should_terminate.set()
     log_event.set()
 
-    log_thread.join()
-    log_thread = None
+    if log_thread is not None:
+        log_thread.join()
+        log_thread = None
+
+    if log_manager is not None:
+        log_manager.shutdown()
+        log_manager = None
 
 
 def get_db_path():
