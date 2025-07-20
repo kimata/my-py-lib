@@ -158,14 +158,13 @@ def worker(log_queue):
             break
 
         # NOTE: とりあえず、イベントを待つ
-        with queue_lock:
-            if not log_event.wait(CHECK_INTERVAL_SEC):
-                continue
-
-            log_event.clear()
+        if not log_event.wait(CHECK_INTERVAL_SEC):
+            continue
 
         try:
             with queue_lock:  # NOTE: クリア処理と排他したい
+                log_event.clear()
+
                 while not log_queue.empty():
                     logging.debug("Found %d log message(s)", log_queue.qsize())
                     log = log_queue.get()
