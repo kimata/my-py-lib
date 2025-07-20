@@ -98,6 +98,7 @@ def term(is_read_only=False):
     log_event.set()
 
     if log_thread is not None:
+        time.sleep(1)
         log_thread.join()
         log_thread = None
 
