@@ -477,7 +477,7 @@ def test_selenium_util(mocker):
 
     import my_lib.selenium_util
 
-    TEST_URL = "https://example.com/"
+    TEST_URL = "https://example.net/"
     DUMP_PATH = pathlib.Path("tests/data/dump")
 
     driver = my_lib.selenium_util.create_driver("test", pathlib.Path("tests/data"))
