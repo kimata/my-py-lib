@@ -90,6 +90,7 @@ def term(is_read_only=False):
     global log_thread  # noqa: PLW0603
     global should_terminate
     global log_manager
+    global log_eventw
 
     if is_read_only:
         return
@@ -98,6 +99,7 @@ def term(is_read_only=False):
         return
 
     should_terminate.set()
+    log_event.set()
 
     log_thread.join()
     log_thread = None
