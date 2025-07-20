@@ -158,7 +158,9 @@ def worker(log_queue):
             break
 
         # NOTE: とりあえず、イベントを待つ
-        log_event.wait(CHECK_INTERVAL_SEC)
+        if not log_event.wait(CHECK_INTERVAL_SEC):
+            continue
+
         log_event.clear()
 
         try:
