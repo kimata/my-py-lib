@@ -75,13 +75,15 @@ def term(is_read_only=False):
     if is_read_only:
         return
 
+    if get_log_thread() is None:
+        return
+
     get_should_terminate().set()
     get_log_event().set()
 
-    if get_log_thread() is not None:
-        time.sleep(1)
-        get_log_thread().join()
-        del _log_thread[get_worker_id()]
+    time.sleep(1)
+    get_log_thread().join()
+    del _log_thread[get_worker_id()]
 
 
 def get_worker_id():
