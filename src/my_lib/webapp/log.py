@@ -178,7 +178,7 @@ def log_impl(sqlite, message, level):
             os._exit(-1)
 
 
-def worker(log_queue):  # noqa: ARG001
+def worker(log_queue):
     sqlite = sqlite3.connect(get_db_path())
     while True:
         if get_should_terminate().is_set():
@@ -192,9 +192,9 @@ def worker(log_queue):  # noqa: ARG001
             with get_queue_lock():  # NOTE: クリア処理と排他したい
                 get_log_event().clear()
 
-                while not get_log_queue().empty():
-                    logging.debug("Found %d log message(s)", get_log_queue().qsize())
-                    log = get_log_queue().get()
+                while not log_queue.empty():
+                    logging.debug("Found %d log message(s)", log_queue.qsize())
+                    log = log_queue.get()
                     log_impl(sqlite, log["message"], log["level"])
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
