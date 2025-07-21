@@ -577,6 +577,8 @@ def test_git_util():
 def test_webapp_log_term():
     import my_lib.webapp.log
 
+    my_lib.webapp.config.init(my_lib.config.load(CONFIG_FILE))
+
     my_lib.webapp.log.term()
 
     # NOTE: 二重に呼んでもエラーにならないことを確認

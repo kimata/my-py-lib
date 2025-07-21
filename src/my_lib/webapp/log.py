@@ -41,22 +41,18 @@ CHECK_INTERVAL_SEC = 10
 
 blueprint = flask.Blueprint("webapp-log", __name__)
 
-log_thread = None
-queue_lock = None
-log_queue = None
-log_manager = None
 config = None
-log_event = threading.Event()
-should_terminate = threading.Event()
+
+_log_thread = {}
+_queue_lock = {}
+_log_queue = {}
+_log_manager = {}
+_log_event = {}
+_should_terminate = {}
 
 
 def init(config_, is_read_only=False):
     global config  # noqa: PLW0603
-    global queue_lock  # noqa: PLW0603
-    global log_queue  # noqa: PLW0603
-    global log_manager  # noqa: PLW0603
-    global log_thread  # noqa: PLW0603
-    global should_terminate
 
     config = config_
 
@@ -72,40 +68,74 @@ def init(config_, is_read_only=False):
     sqlite.close()
 
     if not is_read_only:
-        should_terminate.clear()
-
-        # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-        if log_manager is not None:
-            log_manager.shutdown()
-
-        queue_lock = threading.RLock()
-        log_manager = multiprocessing.Manager()
-        log_queue = log_manager.Queue()
-        log_thread = threading.Thread(target=worker, args=(log_queue,))
-
-        log_thread.start()
+        init_impl()
 
 
 def term(is_read_only=False):
-    global log_thread  # noqa: PLW0603
-    global should_terminate
-    global log_event
-
     if is_read_only:
         return
 
-    should_terminate.set()
-    log_event.set()
+    get_should_terminate().set()
+    get_log_event().set()
 
-    if log_thread is not None:
+    if get_log_thread() is not None:
         time.sleep(1)
-        log_thread.join()
-        log_thread = None
+        get_log_thread().join()
+        del _log_thread[get_worker_id()]
+
+
+def get_worker_id():
+    return os.environ.get("PYTEST_XDIST_WORKER", "")
+
+
+def init_impl():
+    # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
+    if get_log_manager() is not None:
+        get_log_manager().shutdown()
+
+    if get_should_terminate() is not None:
+        get_should_terminate().clear()
+
+    worker_id = get_worker_id()
+    manager = multiprocessing.Manager()
+
+    _queue_lock[worker_id] = threading.RLock()
+    _log_manager[worker_id] = manager
+    _log_queue[worker_id] = manager.Queue()
+    _log_event[worker_id] = threading.Event()
+    _log_thread[worker_id] = threading.Thread(target=worker, args=(get_log_queue(),))
+    _should_terminate[worker_id] = threading.Event()
+
+    _log_thread[worker_id].start()
+
+
+def get_log_thread():
+    return _log_thread.get(get_worker_id(), None)
+
+
+def get_queue_lock():
+    return _queue_lock.get(get_worker_id(), None)
+
+
+def get_log_manager():
+    return _log_manager.get(get_worker_id(), None)
+
+
+def get_log_queue():
+    return _log_queue.get(get_worker_id(), None)
+
+
+def get_log_event():
+    return _log_event.get(get_worker_id(), None)
+
+
+def get_should_terminate():
+    return _should_terminate.get(get_worker_id(), None)
 
 
 def get_db_path():
     # NOTE: Pytest を並列実行できるようにする
-    worker_id = os.environ.get("PYTEST_XDIST_WORKER", None)
+    worker_id = get_worker_id()
     base_path = my_lib.webapp.config.LOG_DIR_PATH
 
     if worker_id is None:
@@ -148,26 +178,23 @@ def log_impl(sqlite, message, level):
             os._exit(-1)
 
 
-def worker(log_queue):
-    global should_terminate
-    global log_event
-
+def worker(log_queue):  # noqa: ARG001
     sqlite = sqlite3.connect(get_db_path())
     while True:
-        if should_terminate.is_set():
+        if get_should_terminate().is_set():
             break
 
         # NOTE: とりあえず、イベントを待つ
-        if not log_event.wait(CHECK_INTERVAL_SEC):
+        if not get_log_event().wait(CHECK_INTERVAL_SEC):
             continue
 
         try:
-            with queue_lock:  # NOTE: クリア処理と排他したい
-                log_event.clear()
+            with get_queue_lock():  # NOTE: クリア処理と排他したい
+                get_log_event().clear()
 
-                while not log_queue.empty():
-                    logging.debug("Found %d log message(s)", log_queue.qsize())
-                    log = log_queue.get()
+                while not get_log_queue().empty():
+                    logging.debug("Found %d log message(s)", get_log_queue().qsize())
+                    log = get_log_queue().get()
                     log_impl(sqlite, log["message"], log["level"])
         except OverflowError:  # pragma: no cover
             # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
@@ -183,14 +210,10 @@ def worker(log_queue):
 
 
 def add(message, level):
-    global queue_lock
-    global log_queue
-    global log_event
-
-    with queue_lock:  # NOTE: クリア処理と排他したい
+    with get_queue_lock():  # NOTE: クリア処理と排他したい
         # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-        log_queue.put({"message": message, "level": level})
-        log_event.set()
+        get_log_queue().put({"message": message, "level": level})
+        get_log_event().set()
 
 
 def error(message):
@@ -235,8 +258,6 @@ def get(stop_day=0):
 
 
 def clear():
-    global log_queue
-
     sqlite = sqlite3.connect(get_db_path())
     cur = sqlite.cursor()
 
@@ -246,8 +267,8 @@ def clear():
     sqlite.close()
 
     logging.debug("clear Queue")
-    while not log_queue.empty():  # NOTE: 信用できないけど、許容する
-        log_queue.get_nowait()
+    while not get_log_queue().empty():  # NOTE: 信用できないけど、許容する
+        get_log_queue().get_nowait()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
@@ -267,11 +288,9 @@ def api_log_add():
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear():
-    global queue_lock
-
     log = flask.request.args.get("log", True, type=json.loads)
 
-    with queue_lock:
+    with get_queue_lock():
         # NOTE: ログの先頭にクリアメッセージが来るようにする
         clear()
         if log:
