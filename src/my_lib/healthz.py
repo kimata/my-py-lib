@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import logging
+import socket
 
 import requests
 
@@ -21,11 +22,23 @@ def check_liveness(name, liveness_file, interval):
         return True
 
 
-def check_port(port, address="127.0.0.1"):
+def check_tcp_port(port, address="127.0.0.1"):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((address, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        logging.exception("Failed to check TCP port")
+        return False
+
+
+def check_http_port(port, address="127.0.0.1"):
     try:
         if requests.get(f"http://{address}:{port}/", timeout=5).status_code == 200:
             return True
     except Exception:
-        logging.exception("Failed to access Flask web server")
+        logging.exception("Failed to access Web server")
 
     return False

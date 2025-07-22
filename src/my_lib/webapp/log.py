@@ -82,6 +82,7 @@ def term(is_read_only=False):
     get_log_event().set()
 
     time.sleep(1)
+
     get_log_thread().join()
     del _log_thread[get_worker_id()]
 
@@ -95,19 +96,21 @@ def init_impl():
     if get_log_manager() is not None:
         get_log_manager().shutdown()
 
+    worker_id = get_worker_id()
+
     if get_should_terminate() is not None:
         get_should_terminate().clear()
+    else:
+        _queue_lock[worker_id] = threading.RLock()
+        _should_terminate[worker_id] = threading.Event()
+        _log_event[worker_id] = threading.Event()
 
-    worker_id = get_worker_id()
     manager = multiprocessing.Manager()
 
-    _queue_lock[worker_id] = threading.RLock()
     _log_manager[worker_id] = manager
     _log_queue[worker_id] = manager.Queue()
-    _log_event[worker_id] = threading.Event()
-    _log_thread[worker_id] = threading.Thread(target=worker, args=(get_log_queue(),))
-    _should_terminate[worker_id] = threading.Event()
 
+    _log_thread[worker_id] = threading.Thread(target=worker, args=(get_log_queue(),))
     _log_thread[worker_id].start()
 
 
