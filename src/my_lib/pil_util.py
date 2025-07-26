@@ -39,13 +39,13 @@ def draw_text(  # noqa: PLR0913
 ):
     text_line_list = text.split("\n")
 
-    pos_x, pos_y = pos
+    pos_x, next_pos_y = pos
     next_pos_x = pos_x
     for text_line in text_line_list:
         next_pos = draw_text_line(
             img,
             text_line,
-            (pos_x, pos_y),
+            (pos_x, next_pos_y),
             font,
             align,
             color,
