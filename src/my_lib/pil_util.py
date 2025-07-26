@@ -51,7 +51,7 @@ def draw_text(  # noqa: PLR0913
             color,
             stroke_width,
             stroke_fill,
-        )[1]
+        )
 
         next_pos_x = max(next_pos[0], next_pos_x)
         next_pos_y = next_pos[1]
