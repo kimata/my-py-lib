@@ -27,9 +27,39 @@ def text_size(img, font, text):
     return (right - left, bottom - top)
 
 
-# NOTE: 詳細追えてないものの、英語フォントでボディサイズがおかしいものがあったので、
-# font_height_scale で補正できるようにしている。FuturaStd とかだと 0.75 が良さそう。
 def draw_text(  # noqa: PLR0913
+    img,
+    text,
+    pos,
+    font,
+    align="left",
+    color="#000",
+    stroke_width=0,
+    stroke_fill=None,
+):
+    text_line_list = text.split("\n")
+
+    pos_x, pos_y = pos
+    next_pos_x = pos_x
+    for text_line in text_line_list:
+        next_pos = draw_text_line(
+            img,
+            text_line,
+            (pos_x, pos_y),
+            font,
+            align,
+            color,
+            stroke_width,
+            stroke_fill,
+        )[1]
+
+        next_pos_x = max(next_pos[0], next_pos_x)
+        next_pos_y = next_pos[1]
+
+    return (next_pos_x, next_pos_y)
+
+
+def draw_text_line(  # noqa: PLR0913
     img,
     text,
     pos,
