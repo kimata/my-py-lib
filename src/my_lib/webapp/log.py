@@ -24,8 +24,11 @@ import traceback
 import wsgiref.handlers
 
 import flask
+
 import my_lib.flask_util
 import my_lib.notify.slack
+import my_lib.sqlite_util
+import my_lib.time
 import my_lib.webapp.config
 import my_lib.webapp.event
 
@@ -38,6 +41,9 @@ class LOG_LEVEL(enum.Enum):  # noqa: N801
 
 TABLE_NAME = "log"
 CHECK_INTERVAL_SEC = 10
+MAX_RETRY_COUNT = 5
+INITIAL_RETRY_DELAY_SEC = 0.1
+MAX_RETRY_DELAY_SEC = 5.0
 
 blueprint = flask.Blueprint("webapp-log", __name__)
 
@@ -152,17 +158,55 @@ def get_db_path():
         return worker_dir / base_path.name
 
 
+def execute_with_retry(func, *args, **kwargs):
+    """リトライ機能付きで関数を実行する"""
+    retry_count = 0
+    delay = INITIAL_RETRY_DELAY_SEC
+    last_exception = None
+
+    while retry_count < MAX_RETRY_COUNT:
+        try:
+            return func(*args, **kwargs)
+        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:  # noqa: PERF203
+            last_exception = e
+            error_msg = str(e).lower()
+
+            if "database is locked" in error_msg or "unable to open database file" in error_msg:
+                retry_count += 1
+
+                if retry_count >= MAX_RETRY_COUNT:
+                    logging.exception("最大リトライ回数 %d に達しました", MAX_RETRY_COUNT)
+                    # データベースの復旧を試みる
+                    db_path = get_db_path()
+                    my_lib.sqlite_util.recover(db_path)
+                    raise
+
+                logging.warning("データベースエラー (リトライ %d/%d): %s", retry_count, MAX_RETRY_COUNT, e)
+                time.sleep(delay)
+                delay = min(delay * 2, MAX_RETRY_DELAY_SEC)  # 指数バックオフ
+            else:
+                raise
+
+    if last_exception:
+        raise last_exception
+    return None
+
+
 def log_impl(sqlite, message, level):
     global config
 
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
-    sqlite.execute(
-        f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
-        [message],
-    )
-    sqlite.execute(f'DELETE FROM {TABLE_NAME} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
-    sqlite.commit()
+    def _execute_log():
+        sqlite.execute(
+            f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
+            [message],
+        )
+        sqlite.execute(f'DELETE FROM {TABLE_NAME} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
+        sqlite.commit()
+
+    # リトライ機能付きでログを記録
+    execute_with_retry(_execute_log)
 
     my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
