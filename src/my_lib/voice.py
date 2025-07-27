@@ -90,7 +90,7 @@ def convert_wav_data(wav_data_in):
     return out_buf.getvalue()
 
 
-def synthesize(config, text, volume=2, speaker_id=3):
+def synthesize(config, text, speaker_id=3, volume=2):
     if not isinstance(text, str) or len(text.strip()) == 0:
         raise ValueError("Text must be a non-empty string")  # noqa: EM101, TRY003
     if not isinstance(speaker_id, int) or speaker_id < 0:
