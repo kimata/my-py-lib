@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     message = args["-m"]
-    speaker_id = args["-s"]
+    speaker_id = int(args["-s"])
     out_file = args["-o"]
     debug_mode = args["-D"]
 
