@@ -94,7 +94,7 @@ def term(is_read_only=False):
 
 
 def get_worker_id():
-    return os.environ.get("PYTEST_XDIST_WORKER", "")
+    return os.environ.get("PYTEST_XDIST_WORKER", None)
 
 
 def init_impl():
