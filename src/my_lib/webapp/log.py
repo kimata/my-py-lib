@@ -229,33 +229,33 @@ def log_impl(sqlite, message, level):
 
 def worker(log_queue):
     sqlite = sqlite3.connect(get_db_path())
-    while True:
-        if get_should_terminate().is_set():
-            break
+    try:
+        while True:
+            if get_should_terminate().is_set():
+                break
 
-        # NOTE: とりあえず、イベントを待つ
-        if not get_log_event().wait(CHECK_INTERVAL_SEC):
-            continue
+            # NOTE: とりあえず、イベントを待つ
+            if not get_log_event().wait(CHECK_INTERVAL_SEC):
+                continue
 
-        try:
-            with get_queue_lock():  # NOTE: クリア処理と排他したい
-                get_log_event().clear()
+            try:
+                with get_queue_lock():  # NOTE: クリア処理と排他したい
+                    get_log_event().clear()
 
-                while not log_queue.empty():
-                    logging.debug("Found %d log message(s)", log_queue.qsize())
-                    log = log_queue.get()
-                    log_impl(sqlite, log["message"], log["level"])
-        except OverflowError:  # pragma: no cover
-            # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
-            logging.debug(traceback.format_exc())
-        except ValueError:  # pragma: no cover
-            # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
-            # 発生する。
-            logging.warning(traceback.format_exc())
-
-    sqlite.close()
-
-    logging.info("Terminate worker")
+                    while not log_queue.empty():
+                        logging.debug("Found %d log message(s)", log_queue.qsize())
+                        log = log_queue.get()
+                        log_impl(sqlite, log["message"], log["level"])
+            except OverflowError:  # pragma: no cover
+                # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
+                logging.debug(traceback.format_exc())
+            except ValueError:  # pragma: no cover
+                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
+                # 発生する。
+                logging.warning(traceback.format_exc())
+    finally:
+        sqlite.close()
+        logging.info("Terminate worker")
 
 
 def add(message, level):
@@ -285,25 +285,25 @@ def info(message):
 
 def get(stop_day=0):
     sqlite = sqlite3.connect(get_db_path())
-
-    sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
-    cur = sqlite.cursor()
-    cur.execute(
-        f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
-        # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
-        [f"-{stop_day} days"],
-    )
-    log_list = [dict(log) for log in cur.fetchall()]
-    for log in log_list:
-        log["date"] = (
-            datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
-            .replace(tzinfo=datetime.timezone.utc)
-            .astimezone(my_lib.time.get_zoneinfo())
-            .strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
+        cur = sqlite.cursor()
+        cur.execute(
+            f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
+            # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
+            [f"-{stop_day} days"],
         )
-    sqlite.close()
-
-    return log_list
+        log_list = [dict(log) for log in cur.fetchall()]
+        for log in log_list:
+            log["date"] = (
+                datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
+                .replace(tzinfo=datetime.timezone.utc)
+                .astimezone(my_lib.time.get_zoneinfo())
+                .strftime("%Y-%m-%d %H:%M:%S")
+            )
+        return log_list
+    finally:
+        sqlite.close()
 
 
 def clear():
