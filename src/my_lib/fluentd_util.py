@@ -10,7 +10,7 @@ def get_handle(tag, host):
 
 def send(handle, label, data):
     if not handle.emit(label, data):
-        logging.error(fluent.sender.last_error)
+        logging.error(handle.last_error)
         return False
 
     return True
