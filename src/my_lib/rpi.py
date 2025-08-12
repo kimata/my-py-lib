@@ -58,7 +58,7 @@ else:
         @staticmethod
         def _validate_pin(pin_num):
             if pin_num not in gpio.VALID_PINS:
-                raise ValueError(f"Pin {pin_num} is not a valid GPIO pin number")  # noqa: TRY003, EM102
+                raise ValueError(f"Pin {pin_num} is not a valid GPIO pin number")
 
         def get_state():
             # NOTE: Pytest を並列実行できるようにする

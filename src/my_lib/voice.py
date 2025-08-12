@@ -92,16 +92,16 @@ def convert_wav_data(wav_data_in):
 
 def synthesize(config, text, speaker_id=3, volume=2):
     if not isinstance(text, str) or len(text.strip()) == 0:
-        raise ValueError("Text must be a non-empty string")  # noqa: EM101, TRY003
+        raise ValueError("Text must be a non-empty string")
     if not isinstance(speaker_id, int) or speaker_id < 0:
-        raise ValueError("Speaker ID must be a non-negative integer")  # noqa: EM101, TRY003
+        raise ValueError("Speaker ID must be a non-negative integer")
     if not isinstance(volume, (int, float)) or volume < 0:
-        raise ValueError("Volume must be a non-negative number")  # noqa: EM101, TRY003
+        raise ValueError("Volume must be a non-negative number")
 
     server_url = config["voice"]["server"]["url"]
     parsed_url = urllib.parse.urlparse(server_url)
     if not parsed_url.scheme or not parsed_url.netloc:
-        raise ValueError("Invalid server URL in configuration")  # noqa: EM101, TRY003
+        raise ValueError("Invalid server URL in configuration")
 
     try:
         query_url = get_query_url(config, text, speaker_id)
@@ -123,9 +123,9 @@ def synthesize(config, text, speaker_id=3, volume=2):
             return convert_wav_data(res.read())
 
     except (urllib.error.URLError, urllib.error.HTTPError) as e:
-        raise RuntimeError(f"Failed to communicate with voice server: {e}") from e  # noqa: EM102, TRY003
+        raise RuntimeError(f"Failed to communicate with voice server: {e}") from e
     except (json.JSONDecodeError, KeyError) as e:
-        raise RuntimeError(f"Invalid response from voice server: {e}") from e  # noqa: EM102, TRY003
+        raise RuntimeError(f"Invalid response from voice server: {e}") from e
 
 
 def play(wav_data, duration_sec=None):

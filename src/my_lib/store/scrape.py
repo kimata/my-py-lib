@@ -77,7 +77,7 @@ def process_action(driver, wait, item, action_list, name="action"):  # noqa:C901
                     selenium.webdriver.common.by.By.XPATH, '//input[@data-id="' + str(i) + '"]'
                 ).send_keys(code)
         else:
-            raise ValueError("Unknown action")  # noqa: EM101, TRY003
+            raise ValueError("Unknown action")
 
         time.sleep(4)
 

@@ -69,7 +69,7 @@ class SCD4X:
         resp = []
         for word in zip(*[iter(data)] * 3, strict=False):
             if self.__crc(word[0:2]) != word[2]:
-                raise OSError("CRC unmatch")  # noqa: EM101, TRY003
+                raise OSError("CRC unmatch")
             resp.extend(word[0:2])
         return resp
 

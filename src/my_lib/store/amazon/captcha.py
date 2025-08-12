@@ -27,6 +27,6 @@ def resolve(driver, wait, config, xpath):  # noqa: ARG001
     )
 
     if captcha is None:
-        raise RuntimeError("CAPTCHA を解決できませんでした。")  # noqa: TRY003, EM101
+        raise RuntimeError("CAPTCHA を解決できませんでした。")
 
     driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath["text"]).send_keys(captcha)

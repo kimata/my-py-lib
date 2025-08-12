@@ -44,11 +44,11 @@ class Lock:
         os.close(self.lock_fd)
         self.lock_fd = None
 
-        raise RuntimeError(f"Unable to acquire the lock of {self.lock_file}")  # noqa: EM102, TRY003
+        raise RuntimeError(f"Unable to acquire the lock of {self.lock_file}")
 
     def __exit__(self, exc_type, exc_value, traceback):  # noqa: D105
         if self.lock_fd is None:
-            raise RuntimeError("Not Locked")  # noqa: EM101, TRY003
+            raise RuntimeError("Not Locked")
 
         fcntl.flock(self.lock_fd, fcntl.LOCK_UN)
         os.close(self.lock_fd)

@@ -153,7 +153,7 @@ class BP35A1:
             line = self.read()
 
             if not line.startswith("  "):
-                raise Exception(f"Line does not start with space.\nrst: {line}")  # noqa: EM102, TRY002, TRY003
+                raise Exception(f"Line does not start with space.\nrst: {line}")
 
             line = line.strip().split(":")
             pan_desc[line[0]] = line[1]
@@ -182,7 +182,7 @@ class BP35A1:
         ret = ret.split(" ", 1)
 
         if ret[0] != "OK":
-            raise Exception(f"Status is not OK.\nrst: {ret[0]}")  # noqa: EM102, TRY002, TRY003
+            raise Exception(f"Status is not OK.\nrst: {ret[0]}")
 
         return None if len(ret) == 1 else ret[1]
 
@@ -195,4 +195,4 @@ class BP35A1:
                 break
 
         if line != text:
-            raise Exception(f"Echo back is wrong.\nexp: [{text}]\nrst: [{line.rstrip()}]")  # noqa: EM102, TRY002, TRY003
+            raise Exception(f"Echo back is wrong.\nexp: [{text}]\nrst: [{line.rstrip()}]")

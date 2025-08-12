@@ -64,7 +64,7 @@ class ECHONETLite:
         frame = {}
 
         if (packet is None) or (len(packet) < 10):
-            raise Exception("Invalid Packet: too short")  # noqa: EM101, TRY002, TRY003
+            raise Exception("Invalid Packet: too short")
 
         # ヘッダ
         frame["EHD1"] = struct.unpack("B", packet[0:1])[0]
@@ -80,9 +80,9 @@ class ECHONETLite:
     @classmethod
     def validate_header(cls, frame):
         if frame["EHD1"] != cls.EHD1:
-            raise Exception("Invalid EHD1: {frame['EHD1']}")  # noqa: EM101, TRY002, TRY003
+            raise Exception("Invalid EHD1: {frame['EHD1']}")
         if (frame["EHD2"] != cls.EHD2.FORMAT1) and (frame["EHD2"] != cls.EHD2.FORMAT2):
-            raise Exception("Invalid EHD2: {frame['HD2']}")  # noqa: EM101, TRY002, TRY003
+            raise Exception("Invalid EHD2: {frame['HD2']}")
 
     @classmethod
     def parse_data(cls, packet):

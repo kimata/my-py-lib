@@ -456,7 +456,7 @@ def test_panel_util():
         return
 
     def draw_panel_fail(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config):  # noqa: ARG001, PLR0913
-        raise Exception("Test")  # noqa: EM101, TRY002
+        raise Exception("Test")
 
     my_lib.panel_util.draw_panel_patiently(draw_panel_pass, {}, {}, {}, False)
     my_lib.panel_util.draw_panel_patiently(

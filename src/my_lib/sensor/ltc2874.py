@@ -167,9 +167,9 @@ def dir_param_read(spi, ser, addr):
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise OSError("response is too short")  # noqa: EM101, TRY003
+        raise OSError("response is too short")
     elif data[1] != msq_checksum([data[0]]):  # noqa:RET506
-        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
+        raise OSError("checksum unmatch")
 
     return data[0]
 
@@ -189,9 +189,9 @@ def dir_param_write(spi, ser, addr, value):
     data = com_read(spi, ser, 4)[3:]
 
     if len(data) < 1:
-        raise OSError("response is too short")  # noqa: EM101, TRY003
+        raise OSError("response is too short")
     elif data[0] != msq_checksum([]):  # noqa: RET506
-        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
+        raise OSError("checksum unmatch")
 
 
 def isdu_req_build(index, length):
@@ -230,9 +230,9 @@ def isdu_res_read(spi, ser, flow):
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise OSError("response is too short")  # noqa: EM101, TRY003
+        raise OSError("response is too short")
     if data[1] != msq_checksum([data[0]]):
-        raise OSError("checksum unmatch")  # noqa: EM101, TRY003
+        raise OSError("checksum unmatch")
 
     return data[0]
 
@@ -266,9 +266,9 @@ def isdu_read(spi, ser, index, data_type):  # noqa: PLR0912, C901
             logging.warning("WAIT response")
             continue
         elif (header >> 4) == 0x0C:
-            raise OSError("ERROR reponse")  # noqa: EM101, TRY003
+            raise OSError("ERROR reponse")
         else:
-            raise OSError(f"INVALID response: {pprint.pformat(header)}")  # noqa: EM102, TRY003
+            raise OSError(f"INVALID response: {pprint.pformat(header)}")
 
     for _ in range(remain - 1):
         data = isdu_res_read(spi, ser, flow & 0xF)
@@ -279,7 +279,7 @@ def isdu_read(spi, ser, index, data_type):  # noqa: PLR0912, C901
     chk ^= isdu_res_read(spi, ser, flow)
 
     if chk != 0x00:
-        raise OSError("ISDU checksum unmatch")  # noqa: EM101, TRY003
+        raise OSError("ISDU checksum unmatch")
 
     if data_type == DATA_TYPE_STRING:
         return bytes(data_list).decode("utf-8")

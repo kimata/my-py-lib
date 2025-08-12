@@ -78,7 +78,7 @@ class EchonetEnergy:
 
         self.ipv6_addr = self.echonet_if.connect(pan_info)
         if self.ipv6_addr is None:
-            raise Exception("Faile to connect Wi-SUN")  # noqa: EM101, TRY002, TRY003
+            raise Exception("Faile to connect Wi-SUN")
 
         # NOTE: インスタンスリスト通知メッセージが来ない場合があるので
         # チェックを省略

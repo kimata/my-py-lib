@@ -196,7 +196,7 @@ def error_with_image(  # noqa: PLR0913
 
     if attatch_img is not None:
         if ch_id is None:
-            raise ValueError("ch_id is None")  # noqa: TRY003, EM101
+            raise ValueError("ch_id is None")
 
         upload_image(token, ch_id, title, attatch_img["data"], attatch_img["text"], thread_ts)
 
