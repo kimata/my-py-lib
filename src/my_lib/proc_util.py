@@ -2,8 +2,6 @@
 import logging
 import os
 import signal
-import subprocess
-import time
 
 import psutil
 
@@ -28,51 +26,57 @@ def status_text(status):
         return f"Unknown status: {status}"
 
 
-def kill_child():  # noqa: C901, PLR0912
-    """現在のプロセスの子プロセスを終了させる"""
-    try:
-        current_pid = os.getpid()
-        # psコマンドで子プロセスを検索
-        result = subprocess.run(
-            ["ps", "-o", "pid,ppid,cmd", "--no-headers", "-A"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
+def kill_child(timeout=5):  # noqa: C901, PLR0912
+    """現在のプロセスの子プロセスを終了させる
 
-        child_pids = []
-        for line in result.stdout.strip().split("\n"):
-            if line.strip():
-                parts = line.strip().split(None, 2)
-                if len(parts) >= 2:
-                    pid, ppid = parts[0], parts[1]
-                    try:
-                        if int(ppid) == current_pid and int(pid) != current_pid:
-                            child_pids.append(int(pid))
-                    except ValueError:
-                        continue
+    Args:
+        timeout: プロセス終了を待つ最大時間（秒）
+
+    """
+    try:
+        parent = psutil.Process()
+        children = parent.children(recursive=True)
+
+        if not children:
+            return
 
         # 子プロセスにSIGTERMを送信
-        for child_pid in child_pids:
+        for child in children:
             try:
-                logging.info("Terminating child process: %d", child_pid)
-                os.kill(child_pid, signal.SIGTERM)
-            except ProcessLookupError:  # noqa: PERF203
+                logging.info("Terminating child process: %d (%s)", child.pid, child.name())
+                child.terminate()
+            except psutil.NoSuchProcess:  # noqa: PERF203
                 pass  # プロセスが既に終了している
+            except psutil.AccessDenied:
+                logging.warning("Access denied to terminate process %d", child.pid)
             except Exception as e:
-                logging.warning("Failed to terminate child process %d: %s", child_pid, e)
+                logging.warning("Failed to terminate child process %d: %s", child.pid, e)
 
-        # 少し待ってからSIGKILLを送信
-        if child_pids:
-            time.sleep(0.5)
-            for child_pid in child_pids:
+        # プロセスの終了を待つ（最大timeout/2秒）
+        gone, alive = psutil.wait_procs(children, timeout=min(timeout / 2, 2.5))
+
+        # まだ生きているプロセスにSIGKILLを送信
+        if alive:
+            for child in alive:
                 try:
-                    os.kill(child_pid, signal.SIGKILL)
-                except ProcessLookupError:  # noqa: PERF203
+                    logging.warning("Force killing child process: %d (%s)", child.pid, child.name())
+                    child.kill()
+                except psutil.NoSuchProcess:  # noqa: PERF203
                     pass  # プロセスが既に終了している
+                except psutil.AccessDenied:
+                    logging.warning("Access denied to kill process %d", child.pid)
                 except Exception as e:
-                    logging.warning("Failed to kill child process %d: %s", child_pid, e)
+                    logging.warning("Failed to kill child process %d: %s", child.pid, e)
+
+            # SIGKILLの効果を待つ
+            gone, alive = psutil.wait_procs(alive, timeout=min(timeout / 2, 2.5))
+
+            # それでも終了しないプロセスがある場合は警告
+            if alive:
+                for child in alive:
+                    logging.error(
+                        "Failed to terminate child process %d (%s) within timeout", child.pid, child.name()
+                    )
 
     except Exception as e:
         logging.warning("Failed to kill child processes: %s", e)
