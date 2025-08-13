@@ -50,16 +50,21 @@ def init(conn, *, timeout=30.0):
     logging.info("SQLiteデータベースのテーブル設定を初期化しました")
 
 
+@contextlib.contextmanager
 def connect(db_path, *, timeout=30.0):
     """
-    rook-cephfs環境に適したSQLiteデータベースに接続する
+    rook-cephfs環境に適したSQLiteデータベースに接続するContext Manager
 
     Args:
         db_path: データベースファイルのパス
         timeout: データベース接続のタイムアウト時間（秒）
 
-    Returns:
+    Yields:
         sqlite3.Connection: データベース接続
+
+    Usage:
+        with my_lib.sqlite_util.connect(db_path) as conn:
+            conn.execute("SELECT * FROM table")
 
     """
     db_path = pathlib.Path(db_path)
@@ -68,41 +73,43 @@ def connect(db_path, *, timeout=30.0):
     # データベースファイルが存在しない場合のみ初期化を実行
     is_new_db = not db_path.exists()
 
-    if is_new_db:
-        # 新規作成時は排他制御を行う
-        lock_path = db_path.with_suffix(".lock")
-        # ロックファイルを使用して排他制御
-        with lock_path.open("w") as lock_file:
-            # 排他ロックを取得（他のプロセスがロックを保持している場合は待機）
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-            try:
-                # ロック取得後、再度存在確認（他のプロセスが作成済みの可能性）
-                is_new_db = not db_path.exists()
+    conn = None
+    try:
+        if is_new_db:
+            # 新規作成時は排他制御を行う
+            lock_path = db_path.with_suffix(".lock")
+            # ロックファイルを使用して排他制御
+            with lock_path.open("w") as lock_file:
+                # 排他ロックを取得（他のプロセスがロックを保持している場合は待機）
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    # ロック取得後、再度存在確認（他のプロセスが作成済みの可能性）
+                    is_new_db = not db_path.exists()
 
-                conn = sqlite3.connect(db_path, timeout=timeout)
+                    conn = sqlite3.connect(db_path, timeout=timeout)
 
-                if is_new_db:
-                    init(conn, timeout=timeout)
-                    logging.info("新規SQLiteデータベースを作成・初期化しました: %s", db_path)
-                else:
-                    logging.debug("既存のSQLiteデータベースに接続しました（ロック待機後）: %s", db_path)
-            except Exception:
-                if "conn" in locals():
-                    conn.close()
-                raise
-            finally:
-                # ロックを解放
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    if is_new_db:
+                        init(conn, timeout=timeout)
+                        logging.info("新規SQLiteデータベースを作成・初期化しました: %s", db_path)
+                    else:
+                        logging.debug("既存のSQLiteデータベースに接続しました（ロック待機後）: %s", db_path)
+                finally:
+                    # ロックを解放
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
-        # ロックファイルを削除（エラーは無視）
-        with contextlib.suppress(Exception):
-            lock_path.unlink()
-    else:
-        # 既存のデータベースへの接続は排他制御不要
-        conn = sqlite3.connect(db_path, timeout=timeout)
-        logging.debug("既存のSQLiteデータベースに接続しました: %s", db_path)
+            # ロックファイルを削除（エラーは無視）
+            with contextlib.suppress(Exception):
+                lock_path.unlink()
+        else:
+            # 既存のデータベースへの接続は排他制御不要
+            conn = sqlite3.connect(db_path, timeout=timeout)
+            logging.debug("既存のSQLiteデータベースに接続しました: %s", db_path)
 
-    return conn
+        yield conn
+
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def recover(db_path):

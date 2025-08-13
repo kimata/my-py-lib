@@ -64,15 +64,12 @@ def init(config_, is_read_only=False):
 
     db_path = get_db_path()
     # 初回のみsqlite_util.connectを使用してデータベースを初期化
-    sqlite = my_lib.sqlite_util.connect(db_path)
-    try:
+    with my_lib.sqlite_util.connect(db_path) as sqlite:
         sqlite.execute(
             f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
             "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
         )
         sqlite.commit()
-    finally:
-        sqlite.close()
 
     if not is_read_only:
         init_impl()
@@ -229,8 +226,7 @@ def log_impl(sqlite, message, level):
 
 
 def worker(log_queue):
-    sqlite = my_lib.sqlite_util.connect(get_db_path())
-    try:
+    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
         while True:
             if get_should_terminate().is_set():
                 break
@@ -254,8 +250,6 @@ def worker(log_queue):
                 # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
                 # 発生する。
                 logging.warning(traceback.format_exc())
-    finally:
-        sqlite.close()
         logging.info("Terminate worker")
 
 
@@ -285,8 +279,7 @@ def info(message):
 
 
 def get(stop_day=0):
-    sqlite = my_lib.sqlite_util.connect(get_db_path())
-    try:
+    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
         sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
         cur = sqlite.cursor()
         cur.execute(
@@ -303,18 +296,15 @@ def get(stop_day=0):
                 .strftime("%Y-%m-%d %H:%M:%S")
             )
         return log_list
-    finally:
-        sqlite.close()
 
 
 def clear():
-    sqlite = my_lib.sqlite_util.connect(get_db_path())
-    cur = sqlite.cursor()
+    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
+        cur = sqlite.cursor()
 
-    logging.debug("clear SQLite")
-    cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
-    sqlite.commit()
-    sqlite.close()
+        logging.debug("clear SQLite")
+        cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
+        sqlite.commit()
 
     logging.debug("clear Queue")
     while not get_log_queue().empty():  # NOTE: 信用できないけど、許容する
