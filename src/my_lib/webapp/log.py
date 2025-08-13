@@ -229,7 +229,7 @@ def log_impl(sqlite, message, level):
 
 
 def worker(log_queue):
-    sqlite = sqlite3.connect(get_db_path())
+    sqlite = my_lib.sqlite_util.connect(get_db_path())
     try:
         while True:
             if get_should_terminate().is_set():
@@ -285,7 +285,7 @@ def info(message):
 
 
 def get(stop_day=0):
-    sqlite = sqlite3.connect(get_db_path())
+    sqlite = my_lib.sqlite_util.connect(get_db_path())
     try:
         sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
         cur = sqlite.cursor()
@@ -308,7 +308,7 @@ def get(stop_day=0):
 
 
 def clear():
-    sqlite = sqlite3.connect(get_db_path())
+    sqlite = my_lib.sqlite_util.connect(get_db_path())
     cur = sqlite.cursor()
 
     logging.debug("clear SQLite")
