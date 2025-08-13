@@ -644,7 +644,8 @@ def test_sqlite_util():
         """ワーカースレッドが実行する関数"""
         try:
             start_time = time.time()
-            conn = my_lib.sqlite_util.connect(db_path)
+            db_conn = my_lib.sqlite_util.connect(db_path)
+            conn = db_conn.get()
             elapsed_time = time.time() - start_time
 
             # 接続が成功したことを確認
@@ -686,7 +687,8 @@ def test_sqlite_util():
         assert db_path.exists()
 
         # 既存データベースへの再接続テスト
-        conn = my_lib.sqlite_util.connect(db_path)
+        db_conn = my_lib.sqlite_util.connect(db_path)
+        conn = db_conn.get()
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
         result = cursor.fetchone()
