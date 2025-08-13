@@ -63,15 +63,16 @@ def init(config_, is_read_only=False):
     config = config_
 
     db_path = get_db_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    sqlite = sqlite3.connect(db_path)
-    sqlite.execute(
-        f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
-        "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
-    )
-    sqlite.execute("PRAGMA journal_mode=WAL")
-    sqlite.commit()
-    sqlite.close()
+    # 初回のみsqlite_util.createを使用してデータベースを初期化
+    sqlite = my_lib.sqlite_util.create(db_path)
+    try:
+        sqlite.execute(
+            f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
+            "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
+        )
+        sqlite.commit()
+    finally:
+        sqlite.close()
 
     if not is_read_only:
         init_impl()
