@@ -17,10 +17,10 @@ import os
 import time
 import wsgiref.handlers
 
+import flask
 import requests
 import sseclient  # 使うのは sseclient、sseclient-py ではない
 
-import flask
 import my_lib.flask_util
 import my_lib.webapp.config
 

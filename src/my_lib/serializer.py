@@ -10,6 +10,7 @@ Options:
 """
 
 import logging
+import os
 import pathlib
 import pickle
 import shutil
@@ -26,6 +27,8 @@ def store(path_str, data):
 
     with tempfile.NamedTemporaryFile("wb", dir=str(path.parent), delete=False) as f:
         pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.flush()
+        os.fsync(f.fileno())
         temp_name = f.name
 
     if path.exists():

@@ -50,49 +50,49 @@ def init(conn, *, timeout=30.0):
     logging.info("SQLiteデータベースのテーブル設定を初期化しました")
 
 
-@contextlib.contextmanager
-def connect(db_path, *, timeout=30.0):
-    """
-    rook-cephfs環境に適したSQLiteデータベースに接続するContext Manager
+class DatabaseConnection:
+    """SQLite接続をContext Managerとしても通常の関数としても使用可能にするラッパー"""
 
-    Args:
-        db_path: データベースファイルのパス
-        timeout: データベース接続のタイムアウト時間（秒）
+    def __init__(self, db_path, *, timeout=30.0):
+        """
+        データベース接続の初期化
 
-    Yields:
-        sqlite3.Connection: データベース接続
+        Args:
+            db_path: データベースファイルのパス
+            timeout: データベース接続のタイムアウト時間（秒）
 
-    Usage:
-        with my_lib.sqlite_util.connect(db_path) as conn:
-            conn.execute("SELECT * FROM table")
+        """
+        self.db_path = pathlib.Path(db_path)
+        self.timeout = timeout
+        self.conn = None
 
-    """
-    db_path = pathlib.Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    def _create_connection(self):
+        """実際の接続処理"""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # データベースファイルが存在しない場合のみ初期化を実行
-    is_new_db = not db_path.exists()
+        # データベースファイルが存在しない場合のみ初期化を実行
+        is_new_db = not self.db_path.exists()
 
-    conn = None
-    try:
         if is_new_db:
             # 新規作成時は排他制御を行う
-            lock_path = db_path.with_suffix(".lock")
+            lock_path = self.db_path.with_suffix(".lock")
             # ロックファイルを使用して排他制御
             with lock_path.open("w") as lock_file:
                 # 排他ロックを取得（他のプロセスがロックを保持している場合は待機）
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
                 try:
                     # ロック取得後、再度存在確認（他のプロセスが作成済みの可能性）
-                    is_new_db = not db_path.exists()
+                    is_new_db = not self.db_path.exists()
 
-                    conn = sqlite3.connect(db_path, timeout=timeout)
+                    self.conn = sqlite3.connect(self.db_path, timeout=self.timeout)
 
                     if is_new_db:
-                        init(conn, timeout=timeout)
-                        logging.info("新規SQLiteデータベースを作成・初期化しました: %s", db_path)
+                        init(self.conn, timeout=self.timeout)
+                        logging.info("新規SQLiteデータベースを作成・初期化しました: %s", self.db_path)
                     else:
-                        logging.debug("既存のSQLiteデータベースに接続しました（ロック待機後）: %s", db_path)
+                        logging.debug(
+                            "既存のSQLiteデータベースに接続しました（ロック待機後）: %s", self.db_path
+                        )
                 finally:
                     # ロックを解放
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
@@ -102,14 +102,53 @@ def connect(db_path, *, timeout=30.0):
                 lock_path.unlink()
         else:
             # 既存のデータベースへの接続は排他制御不要
-            conn = sqlite3.connect(db_path, timeout=timeout)
-            logging.debug("既存のSQLiteデータベースに接続しました: %s", db_path)
+            self.conn = sqlite3.connect(self.db_path, timeout=self.timeout)
+            logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
-        yield conn
+        return self.conn
 
-    finally:
-        if conn is not None:
+    def __enter__(self):
+        """Context Manager として使用する場合のenter"""
+        return self._create_connection()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context Manager として使用する場合のexit"""
+        if self.conn is not None:
+            self.conn.close()
+
+    def get(self):
+        """通常の関数として使用する場合（使用後は必ずcloseすること）"""
+        return self._create_connection()
+
+
+def connect(db_path, *, timeout=30.0):
+    """
+    rook-cephfs環境に適したSQLiteデータベースに接続する
+
+    Context Managerとしても通常の関数としても使用可能
+
+    Args:
+        db_path: データベースファイルのパス
+        timeout: データベース接続のタイムアウト時間（秒）
+
+    Returns:
+        DatabaseConnection: Context Managerとしても通常の接続取得にも使用可能
+
+    Usage:
+        # Context Manager として使用
+        with my_lib.sqlite_util.connect(db_path) as conn:
+            conn.execute("SELECT * FROM table")
+
+        # 通常の関数として使用
+        db_conn = my_lib.sqlite_util.connect(db_path)
+        conn = db_conn.get()
+        try:
+            conn.execute("SELECT * FROM table")
+        finally:
             conn.close()
+
+    """
+    return DatabaseConnection(db_path, timeout=timeout)
 
 
 def recover(db_path):

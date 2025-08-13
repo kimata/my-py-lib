@@ -4,10 +4,10 @@ import os
 import tracemalloc
 from pathlib import Path
 
+import flask
 import psutil
 import uptime
 
-import flask
 import my_lib.flask_util
 import my_lib.time
 import my_lib.webapp.config
