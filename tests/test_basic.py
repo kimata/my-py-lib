@@ -631,3 +631,64 @@ def test_json_util():
     json_str = my_lib.json_util.dumps(simple_data)
     restored_simple = my_lib.json_util.loads(json_str)
     assert restored_simple == simple_data
+
+
+def test_sqlite_util():
+    import pathlib
+    import tempfile
+    import threading
+
+    import my_lib.sqlite_util
+
+    def connect_worker(db_path, worker_id, results):
+        """ワーカースレッドが実行する関数"""
+        try:
+            start_time = time.time()
+            conn = my_lib.sqlite_util.connect(db_path)
+            elapsed_time = time.time() - start_time
+
+            # 接続が成功したことを確認
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            assert result[0] == 1
+
+            conn.close()
+            results[worker_id] = {"success": True, "elapsed": elapsed_time}
+        except Exception as e:
+            results[worker_id] = {"success": False, "error": str(e)}
+
+    # 同時接続テスト
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = pathlib.Path(tmpdir) / "concurrent_test.db"
+        num_workers = 5
+        threads = []
+        results = {}
+
+        # 複数のスレッドを起動
+        for i in range(num_workers):
+            thread = threading.Thread(target=connect_worker, args=(db_path, i, results))
+            threads.append(thread)
+
+        # すべてのスレッドを同時に開始
+        for thread in threads:
+            thread.start()
+
+        # すべてのスレッドの完了を待つ
+        for thread in threads:
+            thread.join()
+
+        # 結果を確認
+        success_count = sum(1 for r in results.values() if r["success"])
+        assert success_count == num_workers, f"Some workers failed: {results}"
+
+        # データベースファイルが作成されたことを確認
+        assert db_path.exists()
+
+        # 既存データベースへの再接続テスト
+        conn = my_lib.sqlite_util.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        result = cursor.fetchone()
+        assert result[0] == 1
+        conn.close()

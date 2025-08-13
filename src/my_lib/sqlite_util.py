@@ -1,64 +1,106 @@
 #!/usr/bin/env python3
 """SQLiteデータベースのユーティリティ関数"""
 
+import contextlib
+import fcntl
 import logging
 import pathlib
 import sqlite3
 import time
 
 
-def create(db_path, *, timeout=30.0):
+def init(conn, *, timeout=30.0):
     """
-    rook-cephfs環境に適したSQLiteデータベースを作成・初期化する
+    SQLiteデータベースのテーブル設定を初期化する
+
+    Args:
+        conn: SQLiteデータベース接続
+        timeout: データベース接続のタイムアウト時間（秒）
+
+    """
+    # rook-cephfsに最適化されたPRAGMA設定
+    # WALモードでファイルロックの競合を減らす
+    conn.execute("PRAGMA journal_mode=WAL")
+
+    # 同期モードをNORMALに設定（FULLより高速で十分な安全性）
+    conn.execute("PRAGMA synchronous=NORMAL")
+
+    # ページサイズを大きくしてI/O効率を向上（cephfsのブロックサイズに合わせる）
+    conn.execute("PRAGMA page_size=8192")
+
+    # WALの自動チェックポイント間隔を調整（デフォルト1000から）
+    conn.execute("PRAGMA wal_autocheckpoint=2000")
+
+    # キャッシュサイズを増やしてディスクI/Oを削減（ページ数で指定）
+    conn.execute("PRAGMA cache_size=-64000")  # 約64MB（負値はKB単位）
+
+    # テンポラリストレージをメモリに設定してcephfsへの書き込みを削減
+    conn.execute("PRAGMA temp_store=MEMORY")
+
+    # mmapサイズを設定してパフォーマンスを向上
+    conn.execute("PRAGMA mmap_size=268435456")  # 256MB
+
+    # ロックタイムアウトを設定
+    conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
+
+    # 外部キー制約を有効化（データ整合性のため）
+    conn.execute("PRAGMA foreign_keys=ON")
+
+    conn.commit()
+    logging.info("SQLiteデータベースのテーブル設定を初期化しました")
+
+
+def connect(db_path, *, timeout=30.0):
+    """
+    rook-cephfs環境に適したSQLiteデータベースに接続する
 
     Args:
         db_path: データベースファイルのパス
         timeout: データベース接続のタイムアウト時間（秒）
 
     Returns:
-        sqlite3.Connection: 初期化されたデータベース接続
+        sqlite3.Connection: データベース接続
 
     """
     db_path = pathlib.Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(db_path, timeout=timeout)
+    # データベースファイルが存在しない場合のみ初期化を実行
+    is_new_db = not db_path.exists()
 
-    try:
-        # rook-cephfsに最適化されたPRAGMA設定
-        # WALモードでファイルロックの競合を減らす
-        conn.execute("PRAGMA journal_mode=WAL")
+    if is_new_db:
+        # 新規作成時は排他制御を行う
+        lock_path = db_path.with_suffix(".lock")
+        # ロックファイルを使用して排他制御
+        with lock_path.open("w") as lock_file:
+            # 排他ロックを取得（他のプロセスがロックを保持している場合は待機）
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                # ロック取得後、再度存在確認（他のプロセスが作成済みの可能性）
+                is_new_db = not db_path.exists()
 
-        # 同期モードをNORMALに設定（FULLより高速で十分な安全性）
-        conn.execute("PRAGMA synchronous=NORMAL")
+                conn = sqlite3.connect(db_path, timeout=timeout)
 
-        # ページサイズを大きくしてI/O効率を向上（cephfsのブロックサイズに合わせる）
-        conn.execute("PRAGMA page_size=8192")
+                if is_new_db:
+                    init(conn, timeout=timeout)
+                    logging.info("新規SQLiteデータベースを作成・初期化しました: %s", db_path)
+                else:
+                    logging.debug("既存のSQLiteデータベースに接続しました（ロック待機後）: %s", db_path)
+            except Exception:
+                if "conn" in locals():
+                    conn.close()
+                raise
+            finally:
+                # ロックを解放
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
-        # WALの自動チェックポイント間隔を調整（デフォルト1000から）
-        conn.execute("PRAGMA wal_autocheckpoint=2000")
-
-        # キャッシュサイズを増やしてディスクI/Oを削減（ページ数で指定）
-        conn.execute("PRAGMA cache_size=-64000")  # 約64MB（負値はKB単位）
-
-        # テンポラリストレージをメモリに設定してcephfsへの書き込みを削減
-        conn.execute("PRAGMA temp_store=MEMORY")
-
-        # mmapサイズを設定してパフォーマンスを向上
-        conn.execute("PRAGMA mmap_size=268435456")  # 256MB
-
-        # ロックタイムアウトを設定
-        conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
-
-        # 外部キー制約を有効化（データ整合性のため）
-        conn.execute("PRAGMA foreign_keys=ON")
-
-        conn.commit()
-        logging.info("SQLiteデータベースを初期化しました: %s", db_path)
-
-    except Exception:
-        conn.close()
-        raise
+        # ロックファイルを削除（エラーは無視）
+        with contextlib.suppress(Exception):
+            lock_path.unlink()
+    else:
+        # 既存のデータベースへの接続は排他制御不要
+        conn = sqlite3.connect(db_path, timeout=timeout)
+        logging.debug("既存のSQLiteデータベースに接続しました: %s", db_path)
 
     return conn
 

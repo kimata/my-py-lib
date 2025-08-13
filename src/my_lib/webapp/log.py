@@ -63,8 +63,8 @@ def init(config_, is_read_only=False):
     config = config_
 
     db_path = get_db_path()
-    # 初回のみsqlite_util.createを使用してデータベースを初期化
-    sqlite = my_lib.sqlite_util.create(db_path)
+    # 初回のみsqlite_util.connectを使用してデータベースを初期化
+    sqlite = my_lib.sqlite_util.connect(db_path)
     try:
         sqlite.execute(
             f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
