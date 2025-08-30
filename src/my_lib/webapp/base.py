@@ -9,8 +9,19 @@ import my_lib.webapp.config
 blueprint = flask.Blueprint("webapp-base", __name__)
 
 
+def _get_file_path(filename):
+    static_dir = pathlib.Path(my_lib.webapp.config.STATIC_DIR_PATH).resolve()
+    requested_path = (static_dir / filename).resolve()
+
+    if not str(requested_path).startswith(str(static_dir)):
+        return None
+
+    return str(requested_path)
+
+
 @blueprint.route("/", defaults={"filename": "index.html"})
 @blueprint.route("/<path:filename>")
+@my_lib.flask_util.file_etag(filename_func=_get_file_path)
 @my_lib.flask_util.gzipped
 def webapp(filename):
     try:

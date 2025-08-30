@@ -157,3 +157,146 @@ def etag_file(file_path):
         return decorated_function
 
     return decorator
+
+
+def _generate_etag_from_data(etag_data, weak=True):
+    """ETAGデータからETAGを生成する内部関数"""
+    if isinstance(etag_data, str):
+        return calculate_etag(file_path=etag_data, weak=weak)
+    elif isinstance(etag_data, (bytes, str)):
+        return calculate_etag(data=etag_data, weak=weak)
+    elif isinstance(etag_data, dict) and "file_path" in etag_data:
+        return calculate_etag(file_path=etag_data["file_path"], weak=weak)
+    elif isinstance(etag_data, dict) and "data" in etag_data:
+        return calculate_etag(data=etag_data["data"], weak=weak)
+    return None
+
+
+def etag_conditional(etag_func=None, cache_control="max-age=86400, must-revalidate", weak=True):
+    """
+    汎用ETAGキャッシュデコレーター
+
+    Args:
+        etag_func: ETag生成のためのデータを取得する関数。None の場合はレスポンスデータからETagを生成
+        cache_control: Cache-Controlヘッダーの値
+        weak: WeakなETAGを使用するかどうか
+
+    Examples:
+        # レスポンスデータからETAGを自動生成
+        @etag_conditional()
+        def api_data():
+            return {"data": "some content"}
+
+        # カスタムETag生成関数を使用
+        def get_etag_data():
+            return {"file_path": "/path/to/file.txt"}
+
+        @etag_conditional(etag_func=get_etag_data)
+        def custom_handler():
+            return "content"
+
+    """
+
+    def decorator(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            # ETAGを生成
+            etag = None
+            if etag_func:
+                etag_data = etag_func(*args, **kwargs)
+                etag = _generate_etag_from_data(etag_data, weak)
+
+            # If-None-Matchヘッダーをチェック
+            if etag and check_etag(etag, flask.request.headers):
+                response = flask.make_response("", 304)
+                response.headers["ETag"] = etag
+                if cache_control:
+                    response.headers["Cache-Control"] = cache_control
+                return response
+
+            # 元の関数を実行
+            response = f(*args, **kwargs)
+
+            # レスポンスにETAGヘッダーを追加
+            if isinstance(response, flask.Response) and response.status_code == 200:
+                if etag:
+                    response.headers["ETag"] = etag
+                elif not response.headers.get("ETag"):
+                    response_etag = calculate_etag(data=response.get_data(), weak=weak)
+                    response.headers["ETag"] = response_etag
+
+                if cache_control and "Cache-Control" not in response.headers:
+                    response.headers["Cache-Control"] = cache_control
+
+            return response
+
+        return decorated_function
+
+    return decorator
+
+
+def file_etag(filename_func=None, cache_control="max-age=86400, must-revalidate"):
+    """
+    ファイルベースETAGキャッシュデコレーター
+
+    Args:
+        filename_func: ファイルパスを取得する関数。Noneの場合は'filename'パラメータを使用
+        cache_control: Cache-Controlヘッダーの値
+
+    Examples:
+        # filename パラメータから自動取得
+        @file_etag()
+        def serve_file(filename):
+            return send_file(filename)
+
+        # カスタムファイルパス取得関数を使用
+        def get_file_path(resource_id):
+            return f"/static/{resource_id}.html"
+
+        @file_etag(filename_func=get_file_path)
+        def serve_resource(resource_id):
+            return send_file(get_file_path(resource_id))
+
+    """
+
+    def decorator(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            # ファイルパスを取得
+            if filename_func:
+                file_path = filename_func(*args, **kwargs)
+            else:
+                # デフォルトでfilenameパラメータを使用
+                file_path = kwargs.get("filename") or (args[0] if args else None)
+
+            if file_path and Path(file_path).exists():
+                etag = calculate_etag(file_path=file_path, weak=True)
+
+                # If-None-Matchヘッダーをチェック
+                if etag and check_etag(etag, flask.request.headers):
+                    response = flask.make_response("", 304)
+                    response.headers["ETag"] = etag
+                    if cache_control:
+                        response.headers["Cache-Control"] = cache_control
+                    return response
+
+            # 元の関数を実行
+            response = f(*args, **kwargs)
+
+            # レスポンスにETAGヘッダーを追加
+            if (
+                isinstance(response, flask.Response)
+                and response.status_code == 200
+                and file_path
+                and Path(file_path).exists()
+            ):
+                etag = calculate_etag(file_path=file_path, weak=True)
+                response.headers["ETag"] = etag
+                if cache_control and "Cache-Control" not in response.headers:
+                    response.headers["Cache-Control"] = cache_control
+
+            return response
+
+        return decorated_function
+
+    return decorator
