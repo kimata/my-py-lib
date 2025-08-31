@@ -167,26 +167,20 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
 
 
 def fetch_price(driver, wait, config, item):
-    driver.execute_script('window.open(arguments[0], "newtab")', item["url"])
-    driver.switch_to.window(driver.window_handles[1])
-
-    driver.get(item["url"])
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
-
     try:
-        item |= fetch_price_impl(driver, wait, config, item)
+        with my_lib.selenium_util.browser_tab(driver, item["url"]):
+            wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
 
-        if (item["price"] is None) or (item["price"] == 0):
-            my_lib.selenium_util.dump_page(
-                driver,
-                int(random.random() * 100),  # noqa: S311
-                pathlib.Path(config["data"]["dump"]),
-            )
+            item |= fetch_price_impl(driver, wait, config, item)
+
+            if (item["price"] is None) or (item["price"] == 0):
+                my_lib.selenium_util.dump_page(
+                    driver,
+                    int(random.random() * 100),  # noqa: S311
+                    pathlib.Path(config["data"]["dump"]),
+                )
     except Exception:
         logging.exception("Failed to fetch price")
-
-    driver.close()
-    driver.switch_to.window(driver.window_handles[0])
 
     return item
 
