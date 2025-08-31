@@ -25,6 +25,7 @@ import my_lib.store.amazon.captcha
 LOGIN_URL = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
 LOGIN_MARK_XPATH = '//span[contains(text(), "アカウント＆リスト")]'
+WAIT_COUNT = 40
 
 
 def resolve_puzzle(driver, wait, config):
@@ -45,81 +46,112 @@ def resolve_puzzle(driver, wait, config):
     time.sleep(0.1)
 
 
-def execute_impl(driver, wait, config, login_mark_xpath):
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
-    time.sleep(0.1)
-
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, login_mark_xpath)) != 0:
-        logging.info("Login succeeded")
-        return
-
-    if (
-        len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@name="cvf_captcha_input"]'))
-        != 0
-    ):
-        resolve_puzzle(driver, wait, config)
-
-    if (
-        len(
-            driver.find_elements(
-                selenium.webdriver.common.by.By.XPATH, '//input[@type="email" and @id="ap_email"]'
-            )
-        )
-        != 0
-    ):
+def handle_email_input(driver, config):
+    """メールアドレス入力処理"""
+    email_xpath = '//input[@type="email" and (@id="ap_email_login" or @id="ap_email")]'
+    if my_lib.selenium_util.xpath_exists(driver, email_xpath):
         logging.debug("Input email")
-        driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, '//input[@type="email" and @id="ap_email"]'
-        ).clear()
-        driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, '//input[@type="email" and @id="ap_email"]'
-        ).send_keys(config["store"]["amazon"]["user"])
+        email_input = driver.find_element(selenium.webdriver.common.by.By.XPATH, email_xpath)
+        email_input.clear()
+        email_input.send_keys(config["store"]["amazon"]["user"])
 
         logging.debug("Click continue")
-        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@id="continue"]')) != 0:
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="continue"]').click()
-            time.sleep(2)
+        if my_lib.selenium_util.xpath_exists(driver, '//input[@type="submit"]'):
+            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@type="submit"]').click()
+            time.sleep(3)
+
+
+def handle_password_input(driver, wait, config):
+    """パスワード入力処理"""
+    if not my_lib.selenium_util.xpath_exists(driver, '//input[@id="ap_password"]'):
+        return
 
     logging.debug("Input password")
-    wait.until(
+    pass_input = wait.until(
         selenium.webdriver.support.expected_conditions.element_to_be_clickable(
             (selenium.webdriver.common.by.By.XPATH, '//input[@id="ap_password"]')
         )
     )
-
-    driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="ap_password"]').send_keys(
-        config["store"]["amazon"]["pass"]
+    driver.execute_script(
+        "arguments[0].value = arguments[1];",
+        pass_input,
+        config["store"]["amazon"]["pass"],
     )
 
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]')) != 0:  # noqa: SIM102
-        if not driver.find_element(
+    if my_lib.selenium_util.xpath_exists(driver, '//input[@name="rememberMe"]'):
+        remember_checkbox = driver.find_element(
             selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]'
-        ).get_attribute("checked"):
+        )
+        if not remember_checkbox.get_attribute("checked"):
             logging.debug("Check remember")
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]').click()
+            remember_checkbox.click()
 
-    if (
-        len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//input[@id="auth-captcha-guess"]'))
-        != 0
-    ):
+    if my_lib.selenium_util.xpath_exists(driver, '//input[@id="auth-captcha-guess"]'):
         my_lib.store.amazon.captcha.resolve(
             driver,
             wait,
             config,
-            {"image": '//img[@id="auth-captcha-image"]', "text": '//input[@id="auth-captcha-guess"]'},
+            {
+                "image": '//img[@id="auth-captcha-image"]',
+                "text": '//input[@id="auth-captcha-guess"]',
+            },
         )
 
-    driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="signInSubmit"]').click()
+    time.sleep(0.1)
 
+    logging.debug("Click submit")
+    submit_button = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="signInSubmit"]')
+    driver.execute_script("arguments[0].click();", submit_button)
+
+    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    time.sleep(3)
+
+
+def handle_security_check(driver):
+    """セキュリティチェック画面の処理"""
+    security_xpath = (
+        '//span[contains(@class, "a-size-base-plus") and '
+        '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
+    )
+    if not my_lib.selenium_util.xpath_exists(driver, security_xpath):
+        return
+
+    for i in range(WAIT_COUNT):
+        security_check_xpath = '//span[contains(@class, "a-size-base-plus") and contains(., "セキュリティ")]'
+        if not my_lib.selenium_util.xpath_exists(driver, security_check_xpath):
+            logging.info("Security check finished!")
+            break
+
+        logging.info("Waiting for security check... (%d/%d)", i + 1, WAIT_COUNT)
+        time.sleep(2)
+
+    for i in range(WAIT_COUNT):
+        wait_xpath = '//span[contains(@class, "a-size-base") and contains(., "少しお待ちください")]'
+        if not my_lib.selenium_util.xpath_exists(driver, wait_xpath):
+            logging.info("Acknowledged!")
+            break
+
+        logging.info("Waiting for acknowledge... (%d/%d)", i + 1, WAIT_COUNT)
+        time.sleep(2)
+
+
+def execute_impl(driver, wait, config, login_mark_xpath):
     wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
     time.sleep(0.1)
 
-    if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
-        my_lib.selenium_util.dump_page(
-            driver,
-            int(random.random() * 100),  # noqa: S311
-            pathlib.Path(config["data"]["dump"]),
-        )
+    if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
+        logging.info("Login succeeded")
+        return
+
+    if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
+        resolve_puzzle(driver, wait, config)
+
+    handle_email_input(driver, config)
+    handle_password_input(driver, wait, config)
+    handle_security_check(driver)
+
+    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    time.sleep(0.1)
 
 
 def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MARK_XPATH, retry=2):  # noqa: PLR0913
@@ -130,7 +162,7 @@ def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MA
     for i in range(retry):
         execute_impl(driver, wait, config, login_mark_xpath)
 
-        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, login_mark_xpath)) != 0:
+        if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
             logging.info("Login sccessful!")
             return True
 
