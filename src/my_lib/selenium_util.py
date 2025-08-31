@@ -19,7 +19,7 @@ import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
 
 WAIT_RETRY_COUNT = 1
-AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"  # noqa: E501
+AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"  # noqa: E501
 
 
 def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noqa: ARG001
@@ -60,11 +60,11 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
     options.add_argument("--disable-component-update")
 
     options.add_argument("--lang=ja-JP")
-    options.add_argument("--window-size=1920,1200")
+    options.add_argument("--window-size=1920,1080")
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
-    # options.add_argument(f'--user-agent="{agent_name}"')
+    options.add_argument(f'--user-agent="{AGENT_NAME}"')
 
     service = selenium.webdriver.chrome.service.Service(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
@@ -81,9 +81,9 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
     #         "platform": "macOS",
     #         "userAgentMetadata": {
     #             "brands": [
-    #                 {"brand": "Google Chrome", "version": "131"},
-    #                 {"brand": "Not:A-Brand", "version": "24"},
-    #                 {"brand": "Chromium", "version": "131"},
+    #                 {"brand": "Google Chrome", "version": "139"},
+    #                 {"brand": "Not:A-Brand", "version": "99"},
+    #                 {"brand": "Chromium", "version": "139"},
     #             ],
     #             "platform": "macOS",
     #             "platformVersion": "15.0.0",
