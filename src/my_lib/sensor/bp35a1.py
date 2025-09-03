@@ -51,7 +51,7 @@ class BP35A1:
         self.ser.flushInput()
         self.ser.flushOutput()
 
-        self.logger.warning("reset")
+        self.logger.debug("reset")
         self.__send_command_without_check("SKRESET")
         self.__expect("OK")
 
