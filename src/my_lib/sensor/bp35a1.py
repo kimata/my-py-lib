@@ -23,6 +23,8 @@ class BP35A1:
 
     def ping(self):
         try:
+            self.reset()
+
             ret = self.__send_command_raw("SKINFO")
             self.__expect("OK")
             ret = ret.split(" ", 1)
