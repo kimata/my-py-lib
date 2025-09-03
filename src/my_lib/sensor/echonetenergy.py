@@ -58,7 +58,9 @@ class EchonetEnergy:
         if PAN_DESC_DAT_PATH.exists():
             with PAN_DESC_DAT_PATH.open(mode="rb") as f:
                 try:
-                    return pickle.load(f)  # noqa: S301
+                    pan_info = pickle.load(f)  # noqa: S301
+                    if isinstance(pan_info, dict):
+                        return pan_info
                 except Exception:  # noqa: S110
                     pass
 
