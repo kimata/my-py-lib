@@ -64,7 +64,8 @@ class ECHONETLite:
         frame = {}
 
         if (packet is None) or (len(packet) < 10):
-            raise Exception("Invalid Packet: too short")
+            hex_data = " ".join(f"0x{b:02x}" for b in packet) if packet else "None"
+            raise Exception(f"Invalid Packet: too short (data = {hex_data})")
 
         # ヘッダ
         frame["EHD1"] = struct.unpack("B", packet[0:1])[0]
