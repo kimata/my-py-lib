@@ -73,6 +73,7 @@ def load(sensor_def_list):
                 **{k: v for k, v in param.items() if k in ["bus_id", "dev_addr"]}
             )
 
+        sensor.required = sensor_def.get("required", False)
         sensor_list.append(sensor)
 
     return sensor_list
@@ -94,7 +95,11 @@ def ping(sensor_list):
             logging.info("Sensor %s exists.", sensor.NAME)
             active_sensor_list.append(sensor)
         else:
-            logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
+            if sensor.required:
+                logging.error("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
+                raise "The required sensor could not be found."
+            else:
+                logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
 
     logging.info("Active sensor list: %s", ", ".join([sensor_info(sensor) for sensor in active_sensor_list]))
     return active_sensor_list
@@ -102,6 +107,7 @@ def ping(sensor_list):
 
 def sense(sensor_list):
     value_map = {}
+    is_success = True
     for sensor in sensor_list:
         try:
             logging.info("Measurement is taken using %s", sensor.NAME)
@@ -110,7 +116,8 @@ def sense(sensor_list):
             value_map.update(val)
         except Exception:  # noqa: PERF203
             logging.exception("Failed to measure using %s", sensor.NAME)
+            is_success = False
 
     logging.info("Measured results: %s", value_map)
 
-    return value_map
+    return (value_map, is_success)
