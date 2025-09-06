@@ -107,7 +107,7 @@ def handle_password_input(driver, wait, config):
     time.sleep(3)
 
 
-def handle_security_check(driver):
+def handle_security_check(driver, config):
     """セキュリティチェック画面の処理"""
     time.sleep(2)
 
@@ -160,7 +160,7 @@ def execute_impl(driver, wait, config, login_mark_xpath):
 
     handle_email_input(driver, config)
     handle_password_input(driver, wait, config)
-    handle_security_check(driver)
+    handle_security_check(driver, config)
 
     wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
     time.sleep(0.1)
