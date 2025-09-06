@@ -109,6 +109,8 @@ def handle_password_input(driver, wait, config):
 
 def handle_security_check(driver):
     """セキュリティチェック画面の処理"""
+    time.sleep(2)
+
     security_xpath = (
         '//span[contains(@class, "a-size-base-plus") and '
         '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
@@ -119,6 +121,11 @@ def handle_security_check(driver):
     for i in range(WAIT_COUNT):
         security_check_xpath = '//span[contains(@class, "a-size-base-plus") and contains(., "セキュリティ")]'
         if not my_lib.selenium_util.xpath_exists(driver, security_check_xpath):
+            my_lib.selenium_util.dump_page(
+                driver,
+                int(random.random() * 100),  # noqa: S311
+                pathlib.Path(config["data"]["dump"]),
+            )
             logging.info("Security check finished!")
             break
 
@@ -128,6 +135,11 @@ def handle_security_check(driver):
     for i in range(WAIT_COUNT):
         wait_xpath = '//span[contains(@class, "a-size-base") and contains(., "少しお待ちください")]'
         if not my_lib.selenium_util.xpath_exists(driver, wait_xpath):
+            my_lib.selenium_util.dump_page(
+                driver,
+                int(random.random() * 100),  # noqa: S311
+                pathlib.Path(config["data"]["dump"]),
+            )
             logging.info("Acknowledged!")
             break
 
