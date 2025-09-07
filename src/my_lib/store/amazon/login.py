@@ -10,11 +10,13 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+import io
 import logging
 import pathlib
 import random
 import time
 
+import PIL
 import selenium.webdriver.common.by
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
@@ -107,10 +109,56 @@ def handle_password_input(driver, wait, config):
     time.sleep(3)
 
 
-def handle_security_check(driver, config):
-    """セキュリティチェック画面の処理"""
+def handle_quiz(driver, config):
+    quiz_xpath = (
+        '//span[contains(@class, "a-size-base-plus") and '
+        '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
+    )
+    if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):
+        return
+
+    file_id = my_lib.store.captcha.send_challenge_image_slack(
+        config["slack"]["bot_token"],
+        config["slack"]["captcha"]["channel"]["id"],
+        "Amazon Login",
+        PIL.Image.open(
+            io.BytesIO(
+                driver.find_element(
+                    selenium.webdriver.common.by.By.XPATH, '//div[contains(@class, "amzn-captcha-modal")]'
+                ).screenshot_as_png
+            )
+        ),
+        "画像クイズ",
+    )
+
+    captcha = my_lib.store.captcha.recv_response_image_slack(
+        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], "image", file_id
+    )
+
+    if captcha is None:
+        raise RuntimeError("クイズを解決できませんでした。")
+
+    digits = [int(ch) for ch in captcha if ch.isdigit()]
+    for digit in digits:
+        xpath = f'//canvas/button[normalize-space(text())="{digit}"]'
+        button = driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath)
+        button.click()
+        time.sleep(0.2)
+
+    my_lib.selenium_util.dump_page(
+        driver,
+        int(random.random() * 100),  # noqa: S311
+        pathlib.Path(config["data"]["dump"]),
+    )
+
+    driver.find_element(
+        selenium.webdriver.common.by.By.XPATH, '//button[@id="amzn-btn-verify-internal"]'
+    ).click()
     time.sleep(2)
 
+
+def handle_security_check(driver, config):
+    """セキュリティチェック画面の処理"""
     security_xpath = (
         '//span[contains(@class, "a-size-base-plus") and '
         '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
@@ -149,7 +197,7 @@ def handle_security_check(driver, config):
 
 def execute_impl(driver, wait, config, login_mark_xpath):
     wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
-    time.sleep(0.1)
+    time.sleep(2)
 
     if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
         logging.info("Login succeeded")
@@ -160,6 +208,7 @@ def execute_impl(driver, wait, config, login_mark_xpath):
 
     handle_email_input(driver, config)
     handle_password_input(driver, wait, config)
+    handle_quiz(driver, config)
     handle_security_check(driver, config)
 
     wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
