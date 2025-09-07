@@ -270,7 +270,11 @@ def recv_response_image_slack(token, ch_id, file_id, timeout_sec=RESPONSE_TIMEOU
 
         resp = client.conversations_replies(channel=ch_id, ts=thread_ts)
 
-        return resp["messages"][-1]["text"].strip()
+        text = resp["messages"][-1]["text"].strip()
+
+        logging.info("CAPTCHA: receive %s", text)
+
+        return text
     except slack_sdk.errors.SlackApiError:
         logging.exception("Failed to receive response")
 
