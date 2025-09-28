@@ -51,8 +51,12 @@ def convert_wav_data(wav_data_in):
         n_frames = wav_in.getnframes()
         audio_data = wav_in.readframes(n_frames)
 
-    # WAV の sample dtype を推定（ここでは 16bit 限定）
-    dtype = {1: np.int8, 2: np.int16, 4: np.int32}[sampwidth]
+    # WAV の sample dtype を推定
+    dtype_map = {1: np.int8, 2: np.int16, 4: np.int32}
+    if sampwidth not in dtype_map:
+        logging.error("Unsupported sampwidth: %d, defaulting to int16", sampwidth)
+        sampwidth = 2  # Default to 16-bit
+    dtype = dtype_map[sampwidth]
     audio = np.frombuffer(audio_data, dtype=dtype)
 
     # ステレオ → モノラル（加算ではなく平均にする）
@@ -66,6 +70,8 @@ def convert_wav_data(wav_data_in):
             audio = np.clip(audio, -128, 127).astype(dtype)
         elif dtype == np.int32:
             audio = np.clip(audio, -2147483648, 2147483647).astype(dtype)
+        else:
+            logging.warning("Unexpected datatype: %s", np.dtype(dtype).name)
 
     # リサンプリング
     if framerate != 44100:
@@ -78,6 +84,8 @@ def convert_wav_data(wav_data_in):
             audio = np.clip(audio_resampled, -128, 127).astype(dtype)
         elif dtype == np.int32:
             audio = np.clip(audio_resampled, -2147483648, 2147483647).astype(dtype)
+        else:
+            logging.warning("Unexpected datatype: %s", np.dtype(dtype).name)
 
     # 書き出し
     out_buf = io.BytesIO()
@@ -129,8 +137,12 @@ def synthesize(config, text, speaker_id=3, volume=2):
 
 
 def play(wav_data, duration_sec=None):
-    # Convert to standard format (mono, 44.1kHz) if needed
-    wav_data = convert_wav_data(wav_data)
+    # Check if data needs conversion (only convert if not already 44.1kHz mono)
+    with wave.open(io.BytesIO(wav_data), "rb") as wav_check:
+        needs_conversion = wav_check.getframerate() != 44100 or wav_check.getnchannels() != 1
+
+    if needs_conversion:
+        wav_data = convert_wav_data(wav_data)
 
     # PyAudio instance
     p = pyaudio.PyAudio()
