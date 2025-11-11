@@ -40,8 +40,8 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
         options.add_argument("--headless")
 
     # options.add_argument("--disable-blink-features=AutomationControlled")
-    # options.add_argument("--no-sandbox")  # for Docker
-    # options.add_argument("--disable-dev-shm-usage")  # for Docker
+    options.add_argument("--no-sandbox")  # for Docker
+    options.add_argument("--disable-dev-shm-usage")  # for Docker
 
     # options.add_argument("--disable-desktop-notifications")
     # options.add_argument("--disable-extensions")
