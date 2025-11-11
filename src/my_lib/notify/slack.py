@@ -79,11 +79,22 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
 
     logging.info("Post slack channel: %s", ch_name)
 
+    if not message or not message.strip():
+        logging.warning("Empty message, skipping Slack notification")
+        return None
+
     message_lines = message.splitlines()
     total = math.ceil(len(message_lines) / LINE_SPLIT)
     thread_ts = None
 
     for i in range(0, len(message_lines), LINE_SPLIT):
+        # メッセージ内容を事前に生成
+        message_content = "\n".join(message_lines[i : i + LINE_SPLIT])
+
+        # 空のメッセージはスキップ
+        if not message_content or not message_content.strip():
+            continue
+
         split_title = title if total == 1 else f"{title} ({(i // LINE_SPLIT) + 1}/{total})"
 
         # 最初のメッセージを送信
@@ -91,7 +102,7 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
             response = send(
                 token,
                 ch_name,
-                formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
+                formatter(split_title, message_content),
             )
             # 最初のメッセージのタイムスタンプを保存（スレッドがない場合でも画像投稿で使用）
             if response:
@@ -100,7 +111,7 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
             # 2つ以上に分割される場合は、2番目以降をスレッドへの返信として送信
             try:
                 client = slack_sdk.WebClient(token=token)
-                formatted_msg = formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT]))
+                formatted_msg = formatter(split_title, message_content)
                 client.chat_postMessage(
                     channel=ch_name,
                     text=formatted_msg["text"],
@@ -114,7 +125,7 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
             send(
                 token,
                 ch_name,
-                formatter(split_title, "\n".join(message_lines[i : i + LINE_SPLIT])),
+                formatter(split_title, message_content),
             )
 
         time.sleep(1)
