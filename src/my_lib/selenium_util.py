@@ -70,7 +70,7 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
 
-    driver = undetected_chromedriver.Chrome(service=service, options=options)
+    driver = undetected_chromedriver.Chrome(service=service, options=options, use_subprocess=False)
 
     driver.set_page_load_timeout(30)
 
