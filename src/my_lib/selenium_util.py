@@ -64,6 +64,8 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
+    options.add_argument("--auto-open-devtools-for-tabs")
+
     service = selenium.webdriver.chrome.service.Service(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
