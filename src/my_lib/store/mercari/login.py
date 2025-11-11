@@ -47,6 +47,17 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
         logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
 
         login_wait = selenium.webdriver.support.ui.WebDriverWait(driver, LINE_LOGIN_TIMEOUT)
+
+        login_wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                (
+                    selenium.webdriver.common.by.By.XPATH,
+                    '//div[contains(@class, "LyContents")]',
+                )
+            )
+        )
+        my_lib.selenium_util.click_xpath(driver, '//button[contains(normalize-space(.), "許可する")]')
+
         login_wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_element_located(
                 (
