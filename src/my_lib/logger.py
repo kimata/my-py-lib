@@ -31,15 +31,8 @@ class GZipRotator:
 
 
 def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_log=False):
-    # 名前付きロガーを取得
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    # ルートロガーへの伝播を無効化（二重出力を防ぐ）
-    logger.propagate = False
-
     if os.environ.get("NO_COLORED_LOGS", "false") != "true":
-        # 名前付きロガーに対してcoloredlogsを設定
-        coloredlogs.install(fmt=LOG_FORMAT.format(name=name), level=level, logger=logger)
+        coloredlogs.install(fmt=LOG_FORMAT.format(name=name), level=level)
 
     if log_dir_path is not None:
         log_dir_path = pathlib.Path(log_dir_path)
@@ -49,6 +42,7 @@ def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_
 
         logging.info("Log to %s", log_file_path)
 
+        logger = logging.getLogger()
         log_handler = logging.handlers.RotatingFileHandler(
             log_file_path,
             encoding="utf8",
@@ -63,13 +57,13 @@ def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_
 
     if log_queue is not None:
         handler = logging.handlers.QueueHandler(log_queue)
-        logger.addHandler(handler)
+        logging.getLogger().addHandler(handler)
 
     if is_str_log:
         str_io = io.StringIO()
         handler = logging.StreamHandler(str_io)
         handler.formatter = log_formatter(name)
-        logger.addHandler(handler)
+        logging.getLogger().addHandler(handler)
 
         return str_io
 
