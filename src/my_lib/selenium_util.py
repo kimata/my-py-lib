@@ -17,12 +17,12 @@ import selenium.webdriver.common.action_chains
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
+import undetected_chromedriver
 
 WAIT_RETRY_COUNT = 1
-AGENT_NAME = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"  # noqa: E501
 
 
-def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noqa: ARG001
+def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -64,44 +64,18 @@ def create_driver_impl(profile_name, data_path, agent_name, is_headless):  # noq
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
-    options.add_argument(f'--user-agent="{AGENT_NAME}"')
-
     service = selenium.webdriver.chrome.service.Service(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
 
-    driver = selenium.webdriver.Chrome(service=service, options=options)
-
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    # driver.execute_cdp_cmd(
-    #     "Network.setUserAgentOverride",
-    #     {
-    #         "userAgent": agent_name,
-    #         "acceptLanguage": "ja,en-US;q=0.9,en;q=0.8",
-    #         "platform": "macOS",
-    #         "userAgentMetadata": {
-    #             "brands": [
-    #                 {"brand": "Google Chrome", "version": "139"},
-    #                 {"brand": "Not:A-Brand", "version": "99"},
-    #                 {"brand": "Chromium", "version": "139"},
-    #             ],
-    #             "platform": "macOS",
-    #             "platformVersion": "15.0.0",
-    #             "architecture": "x86",
-    #             "model": "",
-    #             "mobile": False,
-    #             "bitness": "64",
-    #             "wow64": False,
-    #         },
-    #     },
-    # )
+    driver = undetected_chromedriver.Chrome(service=service, options=options)
 
     driver.set_page_load_timeout(30)
 
     return driver
 
 
-def create_driver(profile_name, data_path, agent_name=AGENT_NAME, is_headless=True):
+def create_driver(profile_name, data_path, is_headless=True):
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
@@ -109,9 +83,9 @@ def create_driver(profile_name, data_path, agent_name=AGENT_NAME, is_headless=Tr
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return create_driver_impl(profile_name, data_path, agent_name, is_headless)
+        return create_driver_impl(profile_name, data_path, is_headless)
     except Exception:
-        return create_driver_impl(profile_name, data_path, agent_name, is_headless)
+        return create_driver_impl(profile_name, data_path, is_headless)
 
 
 def xpath_exists(driver, xpath):
