@@ -31,8 +31,23 @@ class GZipRotator:
 
 
 def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_log=False):
+    # ルートロガーを取得
+    root_logger = logging.getLogger()
+
     if os.environ.get("NO_COLORED_LOGS", "false") != "true":
-        coloredlogs.install(fmt=LOG_FORMAT.format(name=name), level=level)
+        # docker compose の TTY 環境での二重出力を防ぐため、
+        # 既存の StreamHandler を明示的に削除してから coloredlogs をインストール
+        root_logger.handlers = [
+            h for h in root_logger.handlers
+            if not isinstance(h, logging.StreamHandler)
+        ]
+        # isatty=None で自動検出を有効にしつつ、reconfigure で既存のハンドラーを適切に処理
+        coloredlogs.install(
+            fmt=LOG_FORMAT.format(name=name),
+            level=level,
+            reconfigure=True,
+            isatty=None,  # 自動検出
+        )
 
     if log_dir_path is not None:
         log_dir_path = pathlib.Path(log_dir_path)
