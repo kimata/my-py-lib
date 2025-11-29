@@ -7,14 +7,16 @@ import re
 import time
 import unittest
 
-import data.sample_webapp
 import pytest
 
+import data.sample_webapp
 import my_lib.config
 import my_lib.notify.slack
+import my_lib.store.mercari.login
 import my_lib.webapp.config
 
 CONFIG_FILE = "tests/data/config.example.yaml"
+WAIT_TIMEOUT_SEC = 5
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -694,3 +696,36 @@ def test_sqlite_util():
         result = cursor.fetchone()
         assert result[0] == 1
         conn.close()
+
+
+@pytest.fixture
+def slack_mock():
+    # NOTE: デフォルトの slack_mock を上書き
+    pass
+
+
+@pytest.mark.mercari
+def test_mercari(slack_mock):
+    import os
+
+    import selenium.webdriver.support.wait
+
+    import my_lib.selenium_util
+
+    config = my_lib.config.load(CONFIG_FILE)
+    config["slack"]["bot_token"] = os.environ.get("SLACK_BOT_TOKEN")
+
+    driver = my_lib.selenium_util.create_driver("mercari", pathlib.Path(config["data"]["selenium"]))
+
+    my_lib.selenium_util.clear_cache(driver)
+
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, WAIT_TIMEOUT_SEC)
+
+    my_lib.store.mercari.login.execute(
+        driver,
+        wait,
+        os.environ.get("LINE_USER"),
+        os.environ.get("LINE_PASS"),
+        config["slack"],
+        pathlib.Path(config["data"]["dump"]),
+    )

@@ -5,6 +5,20 @@ import pytest
 def pytest_addoption(parser):
     parser.addoption("--host", default="127.0.0.1")
     parser.addoption("--port", default="5000")
+    parser.addoption("--run-mercari", action="store_true", default=False, help="run mercari tests")
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "mercari: mark test as mercari test (deselected by default)")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-mercari"):
+        return
+    skip_mercari = pytest.mark.skip(reason="need --run-mercari option to run")
+    for item in items:
+        if "mercari" in item.keywords:
+            item.add_marker(skip_mercari)
 
 
 @pytest.fixture
