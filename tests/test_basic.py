@@ -12,7 +12,6 @@ import pytest
 import data.sample_webapp
 import my_lib.config
 import my_lib.notify.slack
-import my_lib.store.mercari.login
 import my_lib.webapp.config
 
 CONFIG_FILE = "tests/data/config.example.yaml"
@@ -705,12 +704,13 @@ def slack_mock():
 
 
 @pytest.mark.mercari
-def test_mercari(slack_mock):
+def test_mercari_login(slack_mock):
     import os
 
     import selenium.webdriver.support.wait
 
     import my_lib.selenium_util
+    import my_lib.store.mercari.login
 
     config = my_lib.config.load(CONFIG_FILE)
     config["slack"]["bot_token"] = os.environ.get("SLACK_BOT_TOKEN")
@@ -729,3 +729,38 @@ def test_mercari(slack_mock):
         config["slack"],
         pathlib.Path(config["data"]["dump"]),
     )
+
+
+@pytest.mark.mercari
+def test_mercari_iter_items_on_display(slack_mock):
+    import os
+    import random
+
+    import selenium.webdriver.support.wait
+
+    import my_lib.selenium_util
+    import my_lib.store.mercari.login
+    import my_lib.store.mercari.scrape
+
+    config = my_lib.config.load(CONFIG_FILE)
+    config["slack"]["bot_token"] = os.environ.get("SLACK_BOT_TOKEN")
+
+    dump_path = pathlib.Path(config["data"]["dump"])
+
+    driver = my_lib.selenium_util.create_driver("mercari", pathlib.Path(config["data"]["selenium"]))
+
+    my_lib.selenium_util.clear_cache(driver)
+
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, WAIT_TIMEOUT_SEC)
+
+    my_lib.store.mercari.login.execute(
+        driver, wait, os.environ.get("LINE_USER"), os.environ.get("LINE_PASS"), config["slack"], dump_path
+    )
+
+    try:
+        my_lib.store.mercari.scrape.iter_items_on_display(
+            driver, wait, {}, True, [lambda driver, wait, scrape_config, item, debug_mode: True]
+        )
+    except Exception:
+        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+        raise
