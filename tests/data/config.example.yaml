@@ -10,17 +10,31 @@ webapp:
         log_file_path: tests/data/log.db
         stat_dir_path: tests/data
 
+data:
+    selenium: ./data
+    dump: ./data/debug
+        
 slack:
     bot_token: xoxb-000000000000-0000000000000-000000000000000000000000
 
-    from: Shutter
+    from: Test
+
+    info:
+        channel:
+            name: "#mercari"
+
+    captcha:
+        channel:
+            name: "#captcha"
+            id: C05QP7R5SH3
 
     error:
         channel:
             name: "#error"
-            id: 00000000000
+            id: C04Q1CEGW9K
         interval_min: 180
 
+        
 voice:
     server:
         url: http://192.168.0.20:50021
