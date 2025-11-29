@@ -15,6 +15,22 @@ import my_lib.store.captcha
 
 TRY_COUNT = 3
 ITEM_LIST_XPATH = '//ul[@data-testid="listed-item-list"]//li'
+POPUP_CLOSE_XPATHS = [
+    # NOTE: 右上のポップアップの閉じるボタン（オークション案内など）
+    '//div[contains(@class, "merIconButton")][@aria-label="close"]/button',
+    # NOTE: モーダルダイアログのキャンセルボタン（アンバサダーツールバー非表示確認など）
+    '//button[contains(text(), "キャンセル")]',
+]
+
+
+def close_popup(driver):
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+    for xpath in POPUP_CLOSE_XPATHS:
+        for button in driver.find_elements(by_xpath, xpath):
+            with contextlib.suppress(Exception):
+                if button.is_displayed():
+                    button.click()
+                    time.sleep(0.5)
 
 
 def parse_item(driver, index):
@@ -105,6 +121,9 @@ def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, ite
         f"{item['view']:,}",
         f"{item['favorite']:,}",
     )
+
+    # NOTE: ポップアップがリンクを覆い隠す場合があるため、先に閉じる
+    close_popup(driver)
 
     driver.execute_script("window.scrollTo(0, 0);")
     # NOTE: アイテムにスクロールしてから、ヘッダーに隠れないようちょっと前に戻す
