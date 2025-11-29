@@ -94,7 +94,14 @@ def xpath_exists(driver, xpath):
     return len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0
 
 
-def get_text(driver, xpath, safe_text):
+def get_text(driver, xpath, safe_text, wait=None):
+    if wait is not None:
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
+                (selenium.webdriver.common.by.By.XPATH, xpath)
+            )
+        )
+
     if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0:
         return driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).text.strip()
     else:
