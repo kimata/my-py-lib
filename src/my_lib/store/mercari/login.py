@@ -29,13 +29,14 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
     else:
         my_lib.selenium_util.click_xpath(driver, '//button[.//span[normalize-space()="ログイン"]]', wait)
 
-    time.sleep(1)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
+            (selenium.webdriver.common.by.By.XPATH, "//body")
+        )
+    )
 
     if "LINE Login" in driver.title:
-        wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
-        code = driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, '//p[contains(@class, "Number")]'
-        ).text
+        code = my_lib.selenium_util.get_text(driver, '//p[contains(@class, "Number")]', "?", wait)
 
         if slack_config is not None:
             my_lib.notify.slack.info(
@@ -48,17 +49,25 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
 
         login_wait = selenium.webdriver.support.ui.WebDriverWait(driver, LINE_LOGIN_TIMEOUT)
 
-        login_wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (
-                    selenium.webdriver.common.by.By.XPATH,
-                    '//div[contains(@class, "LyContents")]',
-                )
+        elem = login_wait.until(
+            selenium.webdriver.support.expected_conditions.any_of(
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (
+                        selenium.webdriver.common.by.By.XPATH,
+                        '//button[contains(normalize-space(.), "許可する")]',
+                    )
+                ),
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (selenium.webdriver.common.by.By.XPATH, '//h1[contains(text(), "電話番号の確認")]')
+                ),
             )
         )
-        my_lib.selenium_util.click_xpath(driver, '//button[contains(normalize-space(.), "許可する")]')
 
-        login_wait.until(
+        if elem.tag_name == "button":
+            my_lib.selenium_util.click_xpath(driver, '//button[contains(normalize-space(.), "許可する")]')
+            my_lib.selenium_util.click_xpath(driver, '//span[contains(normalize-space(.), "戻る")]', wait)
+
+        wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_element_located(
                 (
                     selenium.webdriver.common.by.By.XPATH,
@@ -68,7 +77,7 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
         )
 
 
-def execute_impl(driver, wait, line_use, line_pass, slack_config):
+def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
     logging.info("ログインを行います。")
     driver.get(LOGIN_URL)
 
@@ -119,6 +128,7 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
     logging.info("認証番号の対応を行います。")
 
     if slack_config is not None:
+        logging.info("Slack に SMS で送られてきた認証番号を入力してください")
         ts = my_lib.store.captcha.send_request_text_slack(
             slack_config["bot_token"],
             slack_config["captcha"]["channel"]["name"],
@@ -130,19 +140,12 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
             slack_config["captcha"]["channel"]["id"],
             ts,
         )
-        logging.info("Slack に SMS で送られてきた認証番号を入力してください")
     else:
         code = input("SMS で送られてきた認証番号を入力してください: ")
 
     driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="code"]').send_keys(code)
     my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "認証して完了する")]', wait)
 
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
-    time.sleep(5)
-
-    driver.get(LOGIN_URL)
-
-    time.sleep(1)
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
@@ -160,12 +163,13 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config):
             )
         )
     )
+
     logging.info("ログインに成功しました。")
 
 
 def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa: PLR0913
     try:
-        execute_impl(driver, wait, line_use, line_pass, slack_config)
+        execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path)
     except Exception:
         logging.exception("ログインをリトライします。")
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
