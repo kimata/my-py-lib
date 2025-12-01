@@ -252,7 +252,16 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
 
     list_url = driver.current_url
     for i in range(1, item_count + 1):
-        execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
+        for retry in range(TRY_COUNT):
+            try:
+                execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
+                break
+            except Exception:
+                logging.exception("execute_item でエラーが発生しました (retry=%d)", retry + 1)
+                if retry == TRY_COUNT - 1:
+                    raise
+                my_lib.selenium_util.random_sleep(10)
+                load_url(driver, wait, list_url)
 
         if debug_mode:
             break
