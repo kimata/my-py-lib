@@ -108,6 +108,20 @@ def parse_item(driver, index):
     return item, item_element, elements_cache["link"]
 
 
+def auto_reload(driver, wait):
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
+            (selenium.webdriver.common.by.By.XPATH, "//body")
+        )
+    )
+
+    if my_lib.selenium_util.xpath_exists(
+        driver, '//div[contains(@class, "titleContainer")]/p[text()="エラーが発生しました"]'
+    ):
+        logging.warning("ページの表示でエラーが発生したのでリロードします。")
+        driver.refresh()
+
+
 def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, item_func_list):  # noqa: PLR0913
     item, item_element, item_link = parse_item(driver, index)
 
@@ -130,6 +144,8 @@ def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, ite
     item_link.location_once_scrolled_into_view  # noqa: B018
     driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
     item_link.click()
+
+    auto_reload(driver, wait)
 
     try:
         wait.until(
