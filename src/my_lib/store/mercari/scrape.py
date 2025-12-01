@@ -257,7 +257,7 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
                 execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
                 break
             except Exception:
-                logging.exception("execute_item でエラーが発生しました (retry=%d)", retry + 1)
+                logging.exception("エラーが発生しました。リトライします。(retry=%d)", retry + 1)
                 if retry == TRY_COUNT - 1:
                     raise
                 my_lib.selenium_util.random_sleep(10)
