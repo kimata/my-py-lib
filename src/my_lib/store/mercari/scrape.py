@@ -176,7 +176,11 @@ def expand_all(driver, wait):
     while len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, MORE_BUTTON_XPATH)) != 0:
         my_lib.selenium_util.click_xpath(driver, MORE_BUTTON_XPATH, wait)
 
-        wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
+                (selenium.webdriver.common.by.By.XPATH, "//body")
+            )
+        )
         time.sleep(2)
 
 
