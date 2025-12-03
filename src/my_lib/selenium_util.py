@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import random
+import re
 import signal
 import subprocess
 import time
@@ -20,6 +21,22 @@ import selenium.webdriver.support.expected_conditions
 import undetected_chromedriver
 
 WAIT_RETRY_COUNT = 1
+
+
+def get_chrome_version():
+    try:
+        result = subprocess.run(
+            ["google-chrome", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        match = re.search(r"(\d+)\.", result.stdout)
+        if match:
+            return int(match.group(1))
+    except Exception:
+        logging.warning("Failed to detect Chrome version")
+    return None
 
 
 def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
@@ -70,7 +87,13 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
 
-    driver = undetected_chromedriver.Chrome(service=service, options=options, use_subprocess=False)
+    chrome_version = get_chrome_version()
+    driver = undetected_chromedriver.Chrome(
+        service=service,
+        options=options,
+        use_subprocess=False,
+        version_main=chrome_version,
+    )
 
     driver.set_page_load_timeout(30)
 
