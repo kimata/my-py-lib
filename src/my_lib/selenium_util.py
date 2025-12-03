@@ -62,17 +62,17 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 
     # options.add_argument("--disable-desktop-notifications")
     # options.add_argument("--disable-extensions")
-    # options.add_argument("--disable-gpu")
+    options.add_argument("--disable-gpu")
 
     # options.add_argument("--disable-crash-reporter")
 
-    # # ゾンビプロセス対策のオプション
+    # ゾンビプロセス対策のオプション
     # options.add_argument("--no-zygote")
-    # options.add_argument("--disable-background-timer-throttling")
-    # options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-background-networking")
     # options.add_argument("--disable-default-apps")
     # options.add_argument("--disable-sync")
-    # options.add_argument("--no-first-run")
+    options.add_argument("--no-first-run")
     # options.add_argument("--no-default-browser-check")
     # options.add_argument("--disable-component-update")
 
@@ -81,7 +81,8 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
-    options.add_argument("--auto-open-devtools-for-tabs")
+    if not is_headless:
+        options.add_argument("--auto-open-devtools-for-tabs")
 
     service = selenium.webdriver.chrome.service.Service(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
@@ -294,8 +295,10 @@ class browser_tab:  # noqa: N801
     def __init__(self, driver, url):  # noqa: D107
         self.driver = driver
         self.url = url
+        self.original_window = None
 
     def __enter__(self):  # noqa: D105
+        self.original_window = self.driver.current_window_handle
         self.driver.execute_script("window.open('');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
         self.driver.get(self.url)
@@ -303,7 +306,7 @@ class browser_tab:  # noqa: N801
     def __exit__(self, exception_type, exception_value, traceback):  # noqa: D105
         try:
             self.driver.close()
-            self.driver.switch_to.window(self.driver.window_handles[-1])
+            self.driver.switch_to.window(self.original_window)
             time.sleep(0.5)
         except Exception:
             # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
