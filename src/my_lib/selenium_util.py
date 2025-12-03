@@ -306,7 +306,7 @@ class browser_tab:  # noqa: N801
             self.driver.switch_to.window(self.driver.window_handles[-1])
             time.sleep(0.5)
         except Exception:
-            # Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
+            # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
             logging.warning("Failed to close browser tab (Chrome may have crashed)")
 
 
