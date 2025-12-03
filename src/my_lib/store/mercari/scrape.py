@@ -201,7 +201,7 @@ def expand_all(driver, wait):
 
 
 def load_url(driver, wait, url):
-    for i in range(TRY_COUNT):
+    for retry in range(TRY_COUNT):
         try:
             driver.execute_script(f'window.location.href = "{url}";')
             wait.until(
@@ -211,11 +211,13 @@ def load_url(driver, wait, url):
             )
             expand_all(driver, wait)
         except selenium.common.exceptions.TimeoutException:
-            logging.exception("Failed to load %s", url)
+            logging.exception("エラーが発生しました。")
 
-            if i == TRY_COUNT - 1:
-                logging.warning("エラーが %d 回続いたので諦めます。", i + 1)
+            if retry == TRY_COUNT - 1:
+                logging.warning("エラーが %d 回続いたので諦めます。", retry + 1)
                 raise
+
+            logging.waring("リトライします。(retry=%d)", retry + 1)
 
 
 def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
@@ -237,7 +239,10 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
 
     time.sleep(1)
 
-    expand_all(driver, wait)
+    list_url = driver.current_url
+
+    # NOTE: リトライ付きでアイテムを列挙させたいので、load_url を使う。
+    load_url(driver, wait, list_url)
 
     item_count = len(
         driver.find_elements(
@@ -248,16 +253,17 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
 
     logging.info("%d 個の出品があります。", item_count)
 
-    list_url = driver.current_url
     for i in range(1, item_count + 1):
         for retry in range(TRY_COUNT):
             try:
                 execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
                 break
             except Exception:
-                logging.exception("エラーが発生しました。リトライします。(retry=%d)", retry + 1)
+                logging.exception("エラーが発生しました。")
                 if retry == TRY_COUNT - 1:
                     raise
+
+                logging.warning("リトライします。(retry=%d)", retry + 1)
                 my_lib.selenium_util.random_sleep(10)
                 load_url(driver, wait, list_url)
 
@@ -266,4 +272,5 @@ def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_lis
 
         my_lib.selenium_util.random_sleep(10)
 
+        # NOTE: load_url は内部的でリトライ処理が入っているので、try では囲わない。
         load_url(driver, wait, list_url)
