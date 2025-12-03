@@ -15,6 +15,8 @@ test-prepare:
     needs: []
 
     script:
+        # ChromeDriver のキャッシュを削除して最新版を強制的に再ダウンロード
+        - rm -rf ~/.local/share/undetected_chromedriver ${UV_CACHE_DIR}/undetected_chromedriver
         - uv sync --locked --no-editable
 
     artifacts:
