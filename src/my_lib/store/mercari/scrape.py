@@ -202,22 +202,20 @@ def expand_all(driver, wait):
 
 def load_url(driver, wait, url):
     for i in range(TRY_COUNT):
-        driver.execute_script(f'window.location.href = "{url}";')
         try:
+            driver.execute_script(f'window.location.href = "{url}";')
             wait.until(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (selenium.webdriver.common.by.By.XPATH, ITEM_LIST_XPATH)
                 )
             )
+            expand_all(driver, wait)
         except selenium.common.exceptions.TimeoutException:
             logging.exception("Failed to load %s", url)
 
             if i == TRY_COUNT - 1:
                 logging.warning("エラーが %d 回続いたので諦めます。", i + 1)
                 raise
-
-        expand_all(driver, wait)
-        return
 
 
 def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
