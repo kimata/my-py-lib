@@ -301,9 +301,13 @@ class browser_tab:  # noqa: N801
         self.driver.get(self.url)
 
     def __exit__(self, exception_type, exception_value, traceback):  # noqa: D105
-        self.driver.close()
-        self.driver.switch_to.window(self.driver.window_handles[-1])
-        time.sleep(0.5)
+        try:
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            time.sleep(0.5)
+        except Exception:
+            # Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
+            logging.warning("Failed to close browser tab (Chrome may have crashed)")
 
 
 def _is_chrome_related_process(process):
