@@ -217,7 +217,7 @@ def load_url(driver, wait, url):
                 logging.warning("エラーが %d 回続いたので諦めます。", retry + 1)
                 raise
 
-            logging.waring("リトライします。(retry=%d)", retry + 1)
+            logging.warning("リトライします。(retry=%d)", retry + 1)
 
 
 def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
