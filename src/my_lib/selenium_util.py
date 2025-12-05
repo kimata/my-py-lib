@@ -101,11 +101,29 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     return driver
 
 
+def _cleanup_profile_lock(profile_path):
+    """プロファイルのロックファイルを削除する"""
+    lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    for lock_file in lock_files:
+        lock_path = profile_path / lock_file
+        if lock_path.exists() or lock_path.is_symlink():
+            try:
+                lock_path.unlink()
+                logging.info("Removed profile lock file: %s", lock_path)
+            except OSError as e:
+                logging.warning("Failed to remove lock file %s: %s", lock_path, e)
+
+
 def create_driver(profile_name, data_path, is_headless=True):
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.remote.remote_connection").setLevel(logging.WARNING)
+
+    # NOTE: Pytest を並列実行できるようにする
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    actual_profile_name = profile_name + ("." + suffix if suffix is not None else "")
+    profile_path = data_path / "chrome" / actual_profile_name
 
     # NOTE: 1回だけ自動リトライ
     try:
@@ -123,6 +141,10 @@ def create_driver(profile_name, data_path, is_headless=True):
                 except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, OSError):
                     pass
             time.sleep(1)
+
+        # NOTE: プロファイルのロックファイルを削除
+        _cleanup_profile_lock(profile_path)
+
         return create_driver_impl(profile_name, data_path, is_headless)
 
 
