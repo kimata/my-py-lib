@@ -175,4 +175,4 @@ def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
         # NOTE: 1回だけリトライする
         time.sleep(10)
-        execute_impl(driver, wait, line_use, line_pass, slack_config)
+        execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path)
