@@ -67,7 +67,7 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     # options.add_argument("--disable-crash-reporter")
 
     # ゾンビプロセス対策のオプション
-    # options.add_argument("--no-zygote")
+    options.add_argument("--no-zygote")
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-background-networking")
     # options.add_argument("--disable-default-apps")
