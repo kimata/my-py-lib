@@ -110,7 +110,19 @@ def create_driver(profile_name, data_path, is_headless=True):
     # NOTE: 1回だけ自動リトライ
     try:
         return create_driver_impl(profile_name, data_path, is_headless)
-    except Exception:
+    except Exception as e:
+        logging.warning("First attempt to create driver failed: %s", e)
+        # NOTE: コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
+        if os.path.exists("/.dockerenv"):
+            for proc in psutil.process_iter(["pid", "name"]):
+                try:
+                    proc_name = proc.info["name"].lower() if proc.info["name"] else ""
+                    if "chrome" in proc_name:
+                        logging.info("Terminating orphaned Chrome process: PID %d", proc.info["pid"])
+                        os.kill(proc.info["pid"], signal.SIGTERM)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, OSError):
+                    pass
+            time.sleep(1)
         return create_driver_impl(profile_name, data_path, is_headless)
 
 
