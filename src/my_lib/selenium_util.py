@@ -104,12 +104,17 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 def _cleanup_profile_lock(profile_path):
     """プロファイルのロックファイルを削除する"""
     lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    found_locks = []
     for lock_file in lock_files:
         lock_path = profile_path / lock_file
         if lock_path.exists() or lock_path.is_symlink():
+            found_locks.append(lock_path)
+
+    if found_locks:
+        logging.warning("Profile lock files found: %s", [str(p.name) for p in found_locks])
+        for lock_path in found_locks:
             try:
                 lock_path.unlink()
-                logging.info("Removed profile lock file: %s", lock_path)
             except OSError as e:
                 logging.warning("Failed to remove lock file %s: %s", lock_path, e)
 
