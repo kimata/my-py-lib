@@ -56,25 +56,16 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     if is_headless:
         options.add_argument("--headless")
 
-    # options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--no-sandbox")  # for Docker
     options.add_argument("--disable-dev-shm-usage")  # for Docker
 
-    # options.add_argument("--disable-desktop-notifications")
-    # options.add_argument("--disable-extensions")
     options.add_argument("--disable-gpu")
-
-    # options.add_argument("--disable-crash-reporter")
 
     # ゾンビプロセス対策のオプション
     options.add_argument("--no-zygote")
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-background-networking")
-    # options.add_argument("--disable-default-apps")
-    # options.add_argument("--disable-sync")
     options.add_argument("--no-first-run")
-    # options.add_argument("--no-default-browser-check")
-    # options.add_argument("--disable-component-update")
 
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
