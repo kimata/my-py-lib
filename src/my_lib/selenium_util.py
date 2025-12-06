@@ -102,7 +102,7 @@ def _cleanup_profile_lock(profile_path):
             found_locks.append(lock_path)
 
     if found_locks:
-        logging.warning("Profile lock files found: %s", [str(p.name) for p in found_locks])
+        logging.warning("Profile lock files found: %s", ", ".join(str(p.name) for p in found_locks))
         for lock_path in found_locks:
             try:
                 lock_path.unlink()
