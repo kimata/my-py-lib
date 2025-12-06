@@ -110,7 +110,7 @@ def _cleanup_profile_lock(profile_path):
                 logging.warning("Failed to remove lock file %s: %s", lock_path, e)
 
 
-def create_driver(profile_name, data_path, is_headless=True):
+def create_driver(profile_name, data_path, is_headless=True, clean_profile=False):
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
@@ -120,6 +120,9 @@ def create_driver(profile_name, data_path, is_headless=True):
     suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
     actual_profile_name = profile_name + ("." + suffix if suffix is not None else "")
     profile_path = data_path / "chrome" / actual_profile_name
+
+    if clean_profile:
+        _cleanup_profile_lock(profile_path)
 
     # NOTE: 1回だけ自動リトライ
     try:
