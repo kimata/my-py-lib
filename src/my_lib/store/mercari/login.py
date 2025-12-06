@@ -169,6 +169,15 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
 
 def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa: PLR0913
     try:
+        # NOTE: エラーが起きた後とかだと、一発でページが表示されないことがあるので、事前に一回アクセスさせる。
+        logging.info("メルカリにアクセスします。")
+        driver.get(LOGIN_URL)
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                (selenium.webdriver.common.by.By.XPATH, "//footer")
+            )
+        )
+
         execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path)
     except Exception:
         logging.exception("ログインをリトライします。")
