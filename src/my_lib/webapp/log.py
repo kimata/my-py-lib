@@ -246,10 +246,11 @@ def worker(log_queue):
             except OverflowError:  # pragma: no cover
                 # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
                 logging.debug(traceback.format_exc())
-            except ValueError:  # pragma: no cover
-                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
-                # 発生する。
-                logging.warning(traceback.format_exc())
+            except (ValueError, BrokenPipeError, EOFError, OSError):  # pragma: no cover
+                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこれらの例外が
+                # 発生する。マネージャーがシャットダウンされた場合は BrokenPipeError が発生する。
+                logging.debug("Queue connection closed, terminating worker")
+                break
         logging.info("Terminate worker")
 
 
