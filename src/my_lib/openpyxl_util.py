@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import logging
+
 import openpyxl.drawing.image
 import openpyxl.styles
 import openpyxl.utils
@@ -67,9 +69,13 @@ def insert_table_item(sheet, row, item, is_need_thumb, thumb_path, sheet_def, ba
         cell_style = gen_item_cell_style(base_style, sheet_def["TABLE_HEADER"]["col"][key])
 
         if key == "category":
-            for i in range(sheet_def["TABLE_HEADER"]["col"][key]["length"]):
-                value = item[key][i] if i < len(item["category"]) else ""
-                set_item_cell_style(sheet, row, col + i, value, cell_style)
+            if key in item:
+                for i in range(sheet_def["TABLE_HEADER"]["col"][key]["length"]):
+                    value = item[key][i] if i < len(item["category"]) else ""
+                    set_item_cell_style(sheet, row, col + i, value, cell_style)
+            else:
+                logging.warning("キー '%s' がアイテムに存在しません", key)
+                value = None
         elif key == "image":
             sheet.cell(row, col).border = cell_style["border"]
             if is_need_thumb:
@@ -92,9 +98,21 @@ def insert_table_item(sheet, row, item, is_need_thumb, thumb_path, sheet_def, ba
                 if "value" in sheet_def["TABLE_HEADER"]["col"][key]:
                     value = sheet_def["TABLE_HEADER"]["col"][key]["value"]
                 elif "formal_key" in sheet_def["TABLE_HEADER"]["col"][key]:
-                    value = item[sheet_def["TABLE_HEADER"]["col"][key]["formal_key"]]
+                    if sheet_def["TABLE_HEADER"]["col"][key]["formal_key"] in item:
+                        value = item[sheet_def["TABLE_HEADER"]["col"][key]["formal_key"]]
+                    else:
+                        logging.warning(
+                            "キー '%s' (formal_key: '%s') がアイテムに存在しません",
+                            key,
+                            sheet_def["TABLE_HEADER"]["col"][key]["formal_key"],
+                        )
+                        value = None
                 else:
-                    value = item[key]
+                    if key in item:
+                        value = item[key]
+                    else:
+                        logging.warning("キー '%s' がアイテムに存在しません", key)
+                        value = None
 
                 if "conv_func" in sheet_def["TABLE_HEADER"]["col"][key]:
                     value = sheet_def["TABLE_HEADER"]["col"][key]["conv_func"](value)
