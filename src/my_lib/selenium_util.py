@@ -61,6 +61,9 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 
     options.add_argument("--disable-gpu")
 
+    # ポップアップブロックを無効化（新しいタブを開くために必要）
+    options.add_argument("--disable-popup-blocking")
+
     # ゾンビプロセス対策のオプション
     options.add_argument("--no-zygote")
     options.add_argument("--disable-background-timer-throttling")
