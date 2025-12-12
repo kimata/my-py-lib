@@ -99,6 +99,7 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
         options=options,
         use_subprocess=False,
         version_main=chrome_version,
+        user_multi_procs=True,
     )
 
     driver.set_page_load_timeout(30)
