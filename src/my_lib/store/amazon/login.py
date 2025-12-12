@@ -44,7 +44,14 @@ def resolve_puzzle(driver, wait, config):
         selenium.webdriver.common.by.By.XPATH, '//input[@name="cvf_captcha_captcha_action"]'
     ).click()
 
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (
+                selenium.webdriver.common.by.By.XPATH,
+                "//body",
+            )
+        )
+    )
     time.sleep(0.1)
 
 
@@ -105,7 +112,14 @@ def handle_password_input(driver, wait, config):
     submit_button = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="signInSubmit"]')
     driver.execute_script("arguments[0].click();", submit_button)
 
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (
+                selenium.webdriver.common.by.By.XPATH,
+                "//body",
+            )
+        )
+    )
     time.sleep(3)
 
 
@@ -196,7 +210,14 @@ def handle_security_check(driver, config):
 
 
 def execute_impl(driver, wait, config, login_mark_xpath):
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (
+                selenium.webdriver.common.by.By.XPATH,
+                "//body",
+            )
+        )
+    )
     time.sleep(2)
 
     if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
@@ -211,7 +232,14 @@ def execute_impl(driver, wait, config, login_mark_xpath):
     handle_quiz(driver, config)
     handle_security_check(driver, config)
 
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (
+                selenium.webdriver.common.by.By.XPATH,
+                "//body",
+            )
+        )
+    )
     time.sleep(0.1)
 
 
