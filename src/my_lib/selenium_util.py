@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+"""
+Selenium を Chrome Driver を使って動かします。
+
+Usage:
+  selenium_util.py [-c CONFIG] [-d]
+
+Options:
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -d                : デバッグモードで動作します。
+"""
+
 import datetime
 import inspect
 import logging
@@ -538,3 +549,34 @@ def quit_driver_gracefully(driver):  # noqa: C901, PLR0912
         if still_remaining:
             for pid, name in still_remaining:
                 logging.warning("Failed to collect Chrome-related process: PID %d (%s)", pid, name)
+
+
+if __name__ == "__main__":
+    import pathlib
+
+    import docopt
+    import selenium.webdriver.support.wait
+
+    import my_lib.config
+    import my_lib.logger
+
+    args = docopt.docopt(__doc__)
+
+    config_file = args["-c"]
+    debug_mode = args["-d"]
+
+    my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
+
+    config = my_lib.config.load(config_file)
+
+    driver = create_driver("test", pathlib.Path(config["data"]["selenium"]))
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 5)
+
+    driver.get("https://www.google.com/")
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (selenium.webdriver.common.by.By.XPATH, '//input[contains(@value, "Google")]')
+        )
+    )
+
+    quit_driver_gracefully(driver)
