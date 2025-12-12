@@ -163,7 +163,14 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
 def fetch_price(driver, wait, config, item):
     try:
         with my_lib.selenium_util.browser_tab(driver, item["url"]):
-            wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+            wait.until(
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (
+                        selenium.webdriver.common.by.By.XPATH,
+                        "//body",
+                    )
+                )
+            )
 
             item |= fetch_price_impl(driver, wait, config, item)
 
