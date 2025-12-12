@@ -56,18 +56,12 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
         time.sleep(5)
         return {}
 
-    if (
-        len(
-            driver.find_elements(
-                selenium.webdriver.common.by.By.XPATH, '//span[@id="black-curtain-yes-button"]'
-            )
-        )
-        != 0
-    ):
-        driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, '//span[@id="black-curtain-yes-button"]'
-        ).click()
-        wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    my_lib.selenium_util.click_xpath(driver, '//span[@id="black-curtain-yes-button"]', is_warn=False)
+    my_lib.selenium_util.click_xpath(
+        driver,
+        '//span[contains(@class, "a-button")]//button[normalize-space(text()) = "ショッピングを続ける"]',
+        is_warn=False,
+    )
 
     # my_lib.store.amazon.captcha.resolve(driver, wait, config)
 
