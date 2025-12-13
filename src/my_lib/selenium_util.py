@@ -96,18 +96,29 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
 
     chrome_version = get_chrome_version()
 
-    # NOTE: user_multi_procs=True は既存の chromedriver ファイルが存在することを前提としているため、
-    # ファイルが存在しない場合（CI環境の初回実行など）は False にする
-    uc_data_path = pathlib.Path("~/.local/share/undetected_chromedriver").expanduser()
-    use_multi_procs = uc_data_path.exists() and any(uc_data_path.glob("*chromedriver*"))
+    # NOTE: 複数プロセスで同時に chromedriver をダウンロード/パッチングすると競合するため、
+    # ファイルロックで同期する
+    import fcntl
 
-    driver = undetected_chromedriver.Chrome(
-        service=service,
-        options=options,
-        use_subprocess=False,
-        version_main=chrome_version,
-        user_multi_procs=use_multi_procs,
-    )
+    uc_data_path = pathlib.Path("~/.local/share/undetected_chromedriver").expanduser()
+    uc_data_path.mkdir(parents=True, exist_ok=True)
+    lock_file = uc_data_path / ".lock"
+
+    with lock_file.open("w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            # ロックを取得した状態で chromedriver が存在するかチェック
+            use_multi_procs = any(uc_data_path.glob("*chromedriver*"))
+
+            driver = undetected_chromedriver.Chrome(
+                service=service,
+                options=options,
+                use_subprocess=False,
+                version_main=chrome_version,
+                user_multi_procs=use_multi_procs,
+            )
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
     driver.set_page_load_timeout(30)
 
