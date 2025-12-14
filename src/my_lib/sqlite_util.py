@@ -190,6 +190,10 @@ class DatabaseConnection:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context Manager として使用する場合のexit"""
         if self.conn is not None:
+            if exc_type is None:
+                self.conn.commit()  # 正常終了時はコミット
+            else:
+                self.conn.rollback()  # 例外発生時はロールバック
             self.conn.close()
 
     def get(self):
