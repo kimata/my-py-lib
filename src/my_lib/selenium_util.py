@@ -298,9 +298,13 @@ def clean_dump(dump_path, keep_days=1):
     for item in dump_path.iterdir():
         if not item.is_file():
             continue
-        time_diff = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
-            item.stat().st_mtime, datetime.timezone.utc
-        )
+        try:
+            time_diff = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
+                item.stat().st_mtime, datetime.timezone.utc
+            )
+        except FileNotFoundError:
+            # ファイルが別プロセスにより削除された場合（SQLiteの一時ファイルなど）
+            continue
         if time_diff > time_threshold:
             logging.info("remove %s [%s day(s) old].", item.absolute(), f"{time_diff.days:,}")
 
