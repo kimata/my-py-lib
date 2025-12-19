@@ -61,15 +61,19 @@ def format_simple(title, message):
     }
 
 
-def send(token, ch_name, message):
+def send(token, ch_name, message, thread_ts=None):
     try:
         client = slack_sdk.WebClient(token=token)
 
-        return client.chat_postMessage(
-            channel=ch_name,
-            text=message["text"],
-            blocks=message["json"],
-        )
+        kwargs = {
+            "channel": ch_name,
+            "text": message["text"],
+            "blocks": message["json"],
+        }
+        if thread_ts:
+            kwargs["thread_ts"] = thread_ts
+
+        return client.chat_postMessage(**kwargs)
     except slack_sdk.errors.SlackClientError:
         logging.exception("Failed to send Slack message")
 
