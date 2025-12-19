@@ -164,6 +164,14 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
         )
     )
 
+    if slack_config is not None:
+        my_lib.notify.slack.send(
+            slack_config["bot_token"],
+            slack_config["captcha"]["channel"]["name"],
+            my_lib.notify.slack.format_simple("CAPTCHA", "成功しました"),
+            thread_ts=ts,
+        )
+
     logging.info("ログインに成功しました。")
 
 
