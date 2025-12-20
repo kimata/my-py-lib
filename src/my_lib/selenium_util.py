@@ -85,6 +85,9 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
 
+    # NOTE: Accept-Language ヘッダーを日本語優先に設定
+    options.add_experimental_option("prefs", {"intl.accept_languages": "ja-JP,ja,en-US,en"})
+
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
     if not is_headless:
