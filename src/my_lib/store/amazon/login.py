@@ -48,7 +48,7 @@ def resolve_puzzle(driver, wait, config):
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
                 selenium.webdriver.common.by.By.XPATH,
-                "//body",
+                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
             )
         )
     )
@@ -116,11 +116,10 @@ def handle_password_input(driver, wait, config):
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
                 selenium.webdriver.common.by.By.XPATH,
-                "//body",
+                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
             )
         )
     )
-    time.sleep(3)
 
 
 def handle_quiz(driver, config):
@@ -214,11 +213,10 @@ def execute_impl(driver, wait, config, login_mark_xpath):
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
                 selenium.webdriver.common.by.By.XPATH,
-                "//body",
+                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
             )
         )
     )
-    time.sleep(2)
 
     if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
         logging.info("Login succeeded")
@@ -236,7 +234,7 @@ def execute_impl(driver, wait, config, login_mark_xpath):
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
                 selenium.webdriver.common.by.By.XPATH,
-                "//body",
+                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
             )
         )
     )

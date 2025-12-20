@@ -167,7 +167,7 @@ def fetch_price(driver, wait, config, item):
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (
                         selenium.webdriver.common.by.By.XPATH,
-                        "//body",
+                        '//div[contains(@class, "footer") or contains(@class, "Footer")]',
                     )
                 )
             )
