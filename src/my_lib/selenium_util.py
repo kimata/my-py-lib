@@ -517,7 +517,7 @@ def quit_driver_gracefully(driver):  # noqa: C901, PLR0912
         logging.exception("Failed to quit driver normally")
 
     # quit後に残存プロセスをチェック
-    time.sleep(0.5)
+    time.sleep(2)
     remaining_pids = []
     for pid in chrome_pids_before:
         try:
