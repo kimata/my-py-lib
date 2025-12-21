@@ -307,12 +307,13 @@ def dump_page(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     index: int,
     dump_path: pathlib.Path | None = None,
-    stack: int = 1,
+    stack_index: int = 1,
 ) -> None:
     if dump_path is None:
+        logging.warning("dump_path is None, skipping page dump")
         return
 
-    name = inspect.stack()[stack].function.replace("<", "").replace(">", "")
+    name = inspect.stack()[stack_index].function.replace("<", "").replace(">", "")
 
     dump_path.mkdir(parents=True, exist_ok=True)
 
@@ -327,9 +328,9 @@ def dump_page(
     logging.info(
         "page dump: %02d from %s in %s line %d",
         index,
-        inspect.stack()[stack].function,
-        inspect.stack()[stack].filename,
-        inspect.stack()[stack].lineno,
+        inspect.stack()[stack_index].function,
+        inspect.stack()[stack_index].filename,
+        inspect.stack()[stack_index].lineno,
     )
 
 
@@ -404,9 +405,7 @@ def warmup(
 
 
 class browser_tab:  # noqa: N801
-    def __init__(
-        self, driver: selenium.webdriver.remote.webdriver.WebDriver, url: str
-    ) -> None:  # noqa: D107
+    def __init__(self, driver: selenium.webdriver.remote.webdriver.WebDriver, url: str) -> None:  # noqa: D107
         self.driver = driver
         self.url = url
         self.original_window: str | None = None
@@ -494,7 +493,9 @@ def get_chrome_related_processes(driver: selenium.webdriver.remote.webdriver.Web
                 for child in children:
                     chrome_pids.add(child.pid)
                     logging.debug(
-                        "Found Chrome-related process (service child): PID %d, name: %s", child.pid, child.name()
+                        "Found Chrome-related process (service child): PID %d, name: %s",
+                        child.pid,
+                        child.name(),
                     )
     except Exception:
         logging.exception("Failed to get Chrome-related processes from service")
@@ -511,7 +512,9 @@ def get_chrome_related_processes(driver: selenium.webdriver.remote.webdriver.Web
                 if _is_chrome_related_process(child):
                     chrome_pids.add(child.pid)
                     logging.debug(
-                        "Found Chrome-related process (python child): PID %d, name: %s", child.pid, child.name()
+                        "Found Chrome-related process (python child): PID %d, name: %s",
+                        child.pid,
+                        child.name(),
                     )
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
