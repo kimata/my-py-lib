@@ -12,6 +12,8 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import io
 import logging
 import pathlib
@@ -19,17 +21,26 @@ import random
 import re
 import time
 import traceback
+from typing import Any
 
 import PIL.Image
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
+import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
+import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 
 
-def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
-    PRICE_ELEM_LIST = [
+def fetch_price_impl(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+    item: dict[str, Any],
+) -> dict[str, Any]:  # noqa: C901, PLR0912
+    PRICE_ELEM_LIST: list[dict[str, str]] = [
         {
             "xpath": '//span[contains(@class, "apexPriceToPay")]/span[@aria-hidden]',
             "type": "html",
@@ -65,6 +76,7 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
 
     # my_lib.store.amazon.captcha.resolve(driver, wait, config)
 
+    category: str | None = None
     try:
         breadcrumb_list = driver.find_elements(
             selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
@@ -73,7 +85,6 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
 
     except Exception:
         logging.exception("Failed to fetch category")
-        category = None
 
     price_text = ""
     for price_elem in PRICE_ELEM_LIST:
@@ -160,7 +171,12 @@ def fetch_price_impl(driver, wait, config, item):  # noqa: C901, PLR0912
     return {"price": price, "category": category}
 
 
-def fetch_price(driver, wait, config, item):
+def fetch_price(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+    item: dict[str, Any],
+) -> dict[str, Any]:
     try:
         with my_lib.selenium_util.browser_tab(driver, item["url"]):
             wait.until(

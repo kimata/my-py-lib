@@ -11,9 +11,12 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import time
+from typing import Any
 
 import paapi5_python_sdk.api.default_api
 import paapi5_python_sdk.condition
@@ -22,10 +25,10 @@ import paapi5_python_sdk.get_items_resource
 import paapi5_python_sdk.merchant
 import paapi5_python_sdk.partner_type
 
-PAAPI_SPLIT = 10
+PAAPI_SPLIT: int = 10
 
 
-def get_paapi(config):
+def get_paapi(config: dict[str, Any]) -> paapi5_python_sdk.api.default_api.DefaultApi:
     return paapi5_python_sdk.api.default_api.DefaultApi(
         access_key=config["store"]["amazon"]["access_key"],
         secret_key=config["store"]["amazon"]["secret_key"],
@@ -34,7 +37,7 @@ def get_paapi(config):
     )
 
 
-def item_prop(item, data):
+def item_prop(item: dict[str, Any], data: Any) -> None:
     try:
         item["category"] = data.item_info.classifications.product_group.display_value
     except Exception:
@@ -43,7 +46,7 @@ def item_prop(item, data):
     item["thumb_url"] = data.images.primary.medium.url
 
 
-def fetch_price_outlet(config, asin_list):
+def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:
     if len(asin_list) == 0:
         return {}
 
@@ -51,7 +54,7 @@ def fetch_price_outlet(config, asin_list):
 
     default_api = get_paapi(config)
 
-    price_map = {}
+    price_map: dict[str, dict[str, Any]] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : (i + PAAPI_SPLIT)] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -85,7 +88,7 @@ def fetch_price_outlet(config, asin_list):
                 if item_data.offers is None:
                     continue
 
-                item = {}
+                item: dict[str, Any] = {}
 
                 # NOTE: Amazonアウトレットのみ対象にする
                 for listing in item_data.offers.listings:
@@ -106,7 +109,7 @@ def fetch_price_outlet(config, asin_list):
     return price_map
 
 
-def fetch_price_new(config, asin_list):  # noqa: C901
+def fetch_price_new(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:  # noqa: C901
     if len(asin_list) == 0:
         return {}
 
@@ -119,7 +122,7 @@ def fetch_price_new(config, asin_list):  # noqa: C901
         region=config["store"]["amazon"]["region"],
     )
 
-    price_map = {}
+    price_map: dict[str, dict[str, Any]] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : i + PAAPI_SPLIT] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -151,7 +154,7 @@ def fetch_price_new(config, asin_list):  # noqa: C901
                 if item_data.offers is None:
                     continue
 
-                item = {}
+                item: dict[str, Any] = {}
 
                 for offer in item_data.offers.summaries:
                     if offer.condition.value != "New":
@@ -177,14 +180,16 @@ def fetch_price_new(config, asin_list):  # noqa: C901
     return price_map
 
 
-def fetch_price(config, asin_list):
+def fetch_price(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:
     price_map = fetch_price_outlet(config, asin_list)
     price_map |= fetch_price_new(config, list(set(asin_list) - set(price_map.keys())))
 
     return price_map
 
 
-def check_item_list(config, item_list):
+def check_item_list(
+    config: dict[str, Any], item_list: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     try:
         price_map = fetch_price(config, [item["asin"] for item in item_list])
         for item in item_list:

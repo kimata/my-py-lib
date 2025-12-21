@@ -11,28 +11,33 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import pathlib
 import tempfile
 import time
 import urllib
+from typing import Any
 
 import pydub
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
 import selenium.webdriver.support
+import selenium.webdriver.support.wait
 import slack_sdk
-import speech_recognition
 
 import my_lib.notify.mail
 import my_lib.notify.slack
 import my_lib.selenium_util
 
-RESPONSE_WAIT_SEC = 5
-RESPONSE_TIMEOUT_SEC = 300
+RESPONSE_WAIT_SEC: int = 5
+RESPONSE_TIMEOUT_SEC: int = 300
 
 
-def recognize_audio(audio_url):
+def recognize_audio(audio_url: str) -> str:
+    import speech_recognition
+
     with tempfile.NamedTemporaryFile(mode="wb", delete=False) as mp3_file:
         mp3_file_name = mp3_file.name
     with tempfile.NamedTemporaryFile(mode="wb", delete=False) as wav_file:
@@ -57,7 +62,10 @@ def recognize_audio(audio_url):
         pathlib.Path(wav_file_name).unlink(missing_ok=True)
 
 
-def resolve_recaptcha_auto(driver, wait):
+def resolve_recaptcha_auto(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> None:
     wait.until(
         selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
             (selenium.webdriver.common.by.By.XPATH, '//iframe[@title="reCAPTCHA"]')
@@ -95,7 +103,11 @@ def resolve_recaptcha_auto(driver, wait):
     driver.switch_to.default_content()
 
 
-def resolve_recaptcha_mail(driver, wait, config):
+def resolve_recaptcha_mail(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+) -> None:
     wait.until(
         selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
             (selenium.webdriver.common.by.By.XPATH, '//iframe[@title="reCAPTCHA"]')
@@ -186,7 +198,7 @@ def resolve_recaptcha_mail(driver, wait, config):
     driver.switch_to.default_content()
 
 
-def send_request_text_slack(token, ch_name, title, message):
+def send_request_text_slack(token: str, ch_name: str, title: str, message: str) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
     try:
@@ -198,14 +210,16 @@ def send_request_text_slack(token, ch_name, title, message):
         return None
 
 
-def recv_response_text_slack(token, ch_id, ts, timeout_sec=RESPONSE_TIMEOUT_SEC):
+def recv_response_text_slack(
+    token: str, ch_id: str, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+) -> str | None:
     logging.info("CAPTCHA: receive response [text]")
 
     time.sleep(RESPONSE_WAIT_SEC)
     try:
         client = slack_sdk.WebClient(token=token)
         count = 0
-        thread_ts = None
+        thread_ts: str | None = None
         while True:
             resp = client.conversations_history(channel=ch_id, limit=3)
 
@@ -229,15 +243,20 @@ def recv_response_text_slack(token, ch_id, ts, timeout_sec=RESPONSE_TIMEOUT_SEC)
         return resp["messages"][-1]["text"].strip()
     except slack_sdk.errors.SlackApiError:
         logging.exception("Failed to receive response")
+        return None
 
 
-def send_challenge_image_slack(token, ch_id, title, img, text):
+def send_challenge_image_slack(
+    token: str, ch_id: str, title: str, img: Any, text: str
+) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 
     return my_lib.notify.slack.upload_image(token, ch_id, title, img, text)
 
 
-def recv_response_image_slack(token, ch_id, file_id, timeout_sec=RESPONSE_TIMEOUT_SEC):
+def recv_response_image_slack(
+    token: str, ch_id: str, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+) -> str | None:
     logging.info("CAPTCHA: receive response [image]")
 
     time.sleep(RESPONSE_WAIT_SEC)
@@ -245,7 +264,7 @@ def recv_response_image_slack(token, ch_id, file_id, timeout_sec=RESPONSE_TIMEOU
         client = slack_sdk.WebClient(token=token)
 
         count = 0
-        thread_ts = None
+        thread_ts: str | None = None
         while True:
             resp = client.conversations_history(channel=ch_id, limit=3)
 
@@ -277,6 +296,7 @@ def recv_response_image_slack(token, ch_id, file_id, timeout_sec=RESPONSE_TIMEOU
         return text
     except slack_sdk.errors.SlackApiError:
         logging.exception("Failed to receive response")
+        return None
 
 
 if __name__ == "__main__":

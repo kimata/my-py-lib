@@ -1,23 +1,37 @@
 #!/usr/bin/env python3
+
+from __future__ import annotations
+
 import logging
+import pathlib
 import random
 import time
+from typing import Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
+import selenium.webdriver.remote.webelement
 import selenium.webdriver.support
 import selenium.webdriver.support.ui
+import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.captcha
 
-LINE_LOGIN_TIMEOUT = 30
+LINE_LOGIN_TIMEOUT: int = 30
 
-LOGIN_URL = "https://jp.mercari.com"
+LOGIN_URL: str = "https://jp.mercari.com"
 
 
-def login_via_line(driver, wait, line_use, line_pass, slack_config):
+def login_via_line(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    line_use: str,
+    line_pass: str,
+    slack_config: dict[str, Any] | None,
+) -> None:
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 
     wait.until(selenium.webdriver.support.expected_conditions.title_contains("LINE Login"))
@@ -49,7 +63,7 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
 
         login_wait = selenium.webdriver.support.ui.WebDriverWait(driver, LINE_LOGIN_TIMEOUT)
 
-        elem = login_wait.until(
+        elem: selenium.webdriver.remote.webelement.WebElement = login_wait.until(
             selenium.webdriver.support.expected_conditions.any_of(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (
@@ -77,7 +91,14 @@ def login_via_line(driver, wait, line_use, line_pass, slack_config):
         )
 
 
-def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
+def execute_impl(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    line_use: str,
+    line_pass: str,
+    slack_config: dict[str, Any] | None,
+    dump_path: pathlib.Path | None,
+) -> None:
     logging.info("ログインを行います。")
     driver.get(LOGIN_URL)
 
@@ -127,6 +148,8 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
 
     logging.info("認証番号の対応を行います。")
 
+    ts: str | None = None
+    code: str | None = None
     if slack_config is not None:
         logging.info("Slack に SMS で送られてきた認証番号を入力してください")
         ts = my_lib.store.captcha.send_request_text_slack(
@@ -164,7 +187,7 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
         )
     )
 
-    if slack_config is not None:
+    if slack_config is not None and ts is not None:
         my_lib.notify.slack.send(
             slack_config["bot_token"],
             slack_config["captcha"]["channel"]["name"],
@@ -175,7 +198,14 @@ def execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path):
     logging.info("ログインに成功しました。")
 
 
-def execute(driver, wait, line_use, line_pass, slack_config, dump_path):  # noqa: PLR0913
+def execute(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    line_use: str,
+    line_pass: str,
+    slack_config: dict[str, Any] | None,
+    dump_path: pathlib.Path | None,
+) -> None:  # noqa: PLR0913
     try:
         # NOTE: エラーが起きた後とかだと、一発でページが表示されないことがあるので、事前に一回アクセスさせる。
         logging.info("メルカリにアクセスします。")

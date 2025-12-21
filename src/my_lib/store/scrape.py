@@ -11,6 +11,8 @@ Options:n
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import pathlib
 import random
@@ -18,23 +20,31 @@ import re
 import string
 import time
 import urllib
+from typing import Any
 
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.selenium_util
 import my_lib.store.captcha
 
-TIMEOUT_SEC = 4
+TIMEOUT_SEC: int = 4
 
 
-def resolve_template(template, item):
+def resolve_template(template: str, item: dict[str, Any]) -> str:
     tmpl = string.Template(template)
     return tmpl.safe_substitute(item_name=item["name"])
 
 
-def process_action(driver, wait, item, action_list, name="action"):  # noqa:C901
+def process_action(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    item: dict[str, Any],
+    action_list: list[dict[str, Any]],
+    name: str = "action",
+) -> None:  # noqa:C901
     logging.info("Process action: %s", name)
 
     for action in action_list:
@@ -82,7 +92,12 @@ def process_action(driver, wait, item, action_list, name="action"):  # noqa:C901
         time.sleep(4)
 
 
-def process_preload(driver, wait, item, loop):
+def process_preload(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    item: dict[str, Any],
+    loop: int,
+) -> None:
     logging.info("Process preload: %s", item["name"])
 
     if "preload" not in item:
@@ -98,7 +113,12 @@ def process_preload(driver, wait, item, loop):
     process_action(driver, wait, item, item["preload"]["action"], "preload action")
 
 
-def fetch_price_impl(driver, item, dump_path, loop):  # noqa: PLR0912, C901
+def fetch_price_impl(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    item: dict[str, Any],
+    dump_path: pathlib.Path | None,
+    loop: int,
+) -> dict[str, Any] | bool:  # noqa: PLR0912, C901
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, TIMEOUT_SEC)
 
     process_preload(driver, wait, item, loop)
@@ -169,7 +189,12 @@ def fetch_price_impl(driver, item, dump_path, loop):  # noqa: PLR0912, C901
     return item
 
 
-def fetch_price(driver, item, dump_path, loop=0):
+def fetch_price(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    item: dict[str, Any],
+    dump_path: pathlib.Path | None,
+    loop: int = 0,
+) -> dict[str, Any] | bool:
     try:
         logging.info("Check %s", item["name"])
 

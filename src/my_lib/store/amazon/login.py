@@ -10,27 +10,36 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import io
 import logging
 import pathlib
 import random
 import time
+from typing import Any
 
 import PIL
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
+import my_lib.store.captcha
 
-LOGIN_URL = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
+LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
-LOGIN_MARK_XPATH = '//span[contains(text(), "アカウント＆リスト")]'
-WAIT_COUNT = 40
+LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
+WAIT_COUNT: int = 40
 
 
-def resolve_puzzle(driver, wait, config):
+def resolve_puzzle(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+) -> None:
     logging.info("Try to resolve PUZZLE")
 
     my_lib.store.amazon.captcha.resolve(
@@ -55,7 +64,10 @@ def resolve_puzzle(driver, wait, config):
     time.sleep(0.1)
 
 
-def handle_email_input(driver, config):
+def handle_email_input(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    config: dict[str, Any],
+) -> None:
     """メールアドレス入力処理"""
     email_xpath = '//input[@type="email" and (@id="ap_email_login" or @id="ap_email")]'
     if my_lib.selenium_util.xpath_exists(driver, email_xpath):
@@ -70,7 +82,11 @@ def handle_email_input(driver, config):
             time.sleep(3)
 
 
-def handle_password_input(driver, wait, config):
+def handle_password_input(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+) -> None:
     """パスワード入力処理"""
     if not my_lib.selenium_util.xpath_exists(driver, '//input[@id="ap_password"]'):
         return
@@ -122,7 +138,10 @@ def handle_password_input(driver, wait, config):
     )
 
 
-def handle_quiz(driver, config):
+def handle_quiz(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    config: dict[str, Any],
+) -> None:
     quiz_xpath = (
         '//span[contains(@class, "a-size-base-plus") and '
         '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
@@ -170,7 +189,10 @@ def handle_quiz(driver, config):
     time.sleep(2)
 
 
-def handle_security_check(driver, config):
+def handle_security_check(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    config: dict[str, Any],
+) -> None:
     """セキュリティチェック画面の処理"""
     security_xpath = (
         '//span[contains(@class, "a-size-base-plus") and '
@@ -208,7 +230,12 @@ def handle_security_check(driver, config):
         time.sleep(2)
 
 
-def execute_impl(driver, wait, config, login_mark_xpath):
+def execute_impl(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+    login_mark_xpath: str,
+) -> None:
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
@@ -241,7 +268,14 @@ def execute_impl(driver, wait, config, login_mark_xpath):
     time.sleep(0.1)
 
 
-def execute(driver, wait, config, login_url=LOGIN_URL, login_mark_xpath=LOGIN_MARK_XPATH, retry=2):  # noqa: PLR0913
+def execute(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+    login_url: str = LOGIN_URL,
+    login_mark_xpath: str = LOGIN_MARK_XPATH,
+    retry: int = 2,
+) -> bool:  # noqa: PLR0913
     logging.info("Login start")
 
     driver.get(login_url)

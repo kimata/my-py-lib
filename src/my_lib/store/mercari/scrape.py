@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
+
+from __future__ import annotations
+
 import contextlib
 import logging
 import re
 import time
+from typing import Any, Callable
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
+import selenium.webdriver.remote.webelement
 import selenium.webdriver.support
 import selenium.webdriver.support.ui
+import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.captcha
 
-TRY_COUNT = 3
-ITEM_LIST_XPATH = '//ul[@data-testid="listed-item-list"]//li'
-POPUP_CLOSE_XPATHS = [
+TRY_COUNT: int = 3
+ITEM_LIST_XPATH: str = '//ul[@data-testid="listed-item-list"]//li'
+POPUP_CLOSE_XPATHS: list[str] = [
     # NOTE: 右上のポップアップの閉じるボタン（オークション案内など）
     '//div[contains(@class, "merIconButton")][@aria-label="close"]/button',
     # NOTE: モーダルダイアログのキャンセルボタン（アンバサダーツールバー非表示確認など）
@@ -23,7 +30,7 @@ POPUP_CLOSE_XPATHS = [
 ]
 
 
-def close_popup(driver):
+def close_popup(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     by_xpath = selenium.webdriver.common.by.By.XPATH
     for xpath in POPUP_CLOSE_XPATHS:
         for button in driver.find_elements(by_xpath, xpath):
@@ -33,7 +40,10 @@ def close_popup(driver):
                     time.sleep(0.5)
 
 
-def parse_item(driver, index):
+def parse_item(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    index: int,
+) -> tuple[dict[str, Any], selenium.webdriver.remote.webelement.WebElement, selenium.webdriver.remote.webelement.WebElement]:
     time.sleep(5)
     item_xpath = f"{ITEM_LIST_XPATH}[{index}]"
 
@@ -42,7 +52,7 @@ def parse_item(driver, index):
     item_element = driver.find_element(by_xpath, item_xpath)
 
     # 全ての子要素を一度に取得してキャッシュ
-    elements_cache = {}
+    elements_cache: dict[str, Any] = {}
 
     try:
         # 必須要素を一括取得
@@ -76,9 +86,9 @@ def parse_item(driver, index):
         return parse_item(driver, index)
 
     # キャッシュした要素から値を抽出
-    item_url = elements_cache["link"].get_attribute("href")
+    item_url: str = elements_cache["link"].get_attribute("href")
     item_id = item_url.split("/")[-1]
-    name = elements_cache["name"].text
+    name: str = elements_cache["name"].text
     price = int(elements_cache["price"].text.replace(",", ""))
 
     # オプション値の取得（デフォルト値で初期化）
@@ -95,7 +105,7 @@ def parse_item(driver, index):
 
     is_stop = 1 if elements_cache["private"] else 0
 
-    item = {
+    item: dict[str, Any] = {
         "id": item_id,
         "url": item_url,
         "name": name,
@@ -108,7 +118,10 @@ def parse_item(driver, index):
     return item, item_element, elements_cache["link"]
 
 
-def auto_reload(driver, wait):
+def auto_reload(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> None:
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
             (selenium.webdriver.common.by.By.XPATH, "//body")
@@ -122,7 +135,15 @@ def auto_reload(driver, wait):
         driver.refresh()
 
 
-def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, item_func_list):  # noqa: PLR0913
+def execute_item(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    scrape_config: dict[str, Any],
+    debug_mode: bool,
+    item_count: int,
+    index: int,
+    item_func_list: list[Callable[..., Any]],
+) -> None:  # noqa: PLR0913
     item, item_element, item_link = parse_item(driver, index)
 
     logging.info(
@@ -186,7 +207,10 @@ def execute_item(driver, wait, scrape_config, debug_mode, item_count, index, ite
         time.sleep(10)
 
 
-def expand_all(driver, wait):
+def expand_all(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> None:
     MORE_BUTTON_XPATH = '//div[contains(@class, "merButton")]/button[contains(text(), "もっと見る")]'
 
     while len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, MORE_BUTTON_XPATH)) != 0:
@@ -200,7 +224,11 @@ def expand_all(driver, wait):
         time.sleep(2)
 
 
-def load_url(driver, wait, url):
+def load_url(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    url: str,
+) -> None:
     for retry in range(TRY_COUNT):
         try:
             driver.execute_script(f'window.location.href = "{url}";')
@@ -220,7 +248,13 @@ def load_url(driver, wait, url):
             logging.warning("リトライします。(retry=%d)", retry + 1)
 
 
-def iter_items_on_display(driver, wait, scrape_config, debug_mode, item_func_list):
+def iter_items_on_display(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    scrape_config: dict[str, Any],
+    debug_mode: bool,
+    item_func_list: list[Callable[..., Any]],
+) -> None:
     my_lib.selenium_util.click_xpath(
         driver,
         '//button[@data-testid="account-button"]',

@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
+
+from __future__ import annotations
+
 import io
+from typing import Any
 
 import PIL.Image
 import selenium.webdriver.common.by
+import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
+import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
 import my_lib.store.captcha
 
 
-def resolve(driver, wait, config, xpath):  # noqa: ARG001
+def resolve(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    config: dict[str, Any],
+    xpath: dict[str, str],
+) -> None:  # noqa: ARG001
     file_id = my_lib.store.captcha.send_challenge_image_slack(
         config["slack"]["bot_token"],
         config["slack"]["captcha"]["channel"]["id"],
