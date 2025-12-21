@@ -19,7 +19,27 @@ import email.mime.text
 import logging
 import pathlib
 import smtplib
+from dataclasses import dataclass
 from typing import Any, TypedDict
+
+
+@dataclass(frozen=True)
+class MailSmtpConfig:
+    """SMTP 設定"""
+
+    host: str
+    port: int
+    user: str
+    password: str
+
+
+@dataclass(frozen=True)
+class MailConfig:
+    """メール設定"""
+
+    smtp: MailSmtpConfig
+    from_address: str
+    to: str
 
 
 class ImageAttachment(TypedDict, total=False):
@@ -47,15 +67,22 @@ def build_message(subject: str, message: str, image: ImageAttachment | None = No
     return msg.as_string()
 
 
-def send_impl(mail_config: dict[str, Any], message: str) -> None:
-    smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
-    smtp.starttls()
-    smtp.login(mail_config["user"], mail_config["pass"])
-    smtp.sendmail(mail_config["from"], mail_config["to"], message)
+def send_impl(mail_config: MailConfig | dict[str, Any], message: str) -> None:
+    if isinstance(mail_config, MailConfig):
+        smtp = smtplib.SMTP(mail_config.smtp.host, mail_config.smtp.port)
+        smtp.starttls()
+        smtp.login(mail_config.smtp.user, mail_config.smtp.password)
+        smtp.sendmail(mail_config.from_address, mail_config.to, message)
+    else:
+        # 後方互換性のため辞書形式もサポート
+        smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
+        smtp.starttls()
+        smtp.login(mail_config["user"], mail_config["pass"])
+        smtp.sendmail(mail_config["from"], mail_config["to"], message)
     smtp.quit()
 
 
-def send(mail_config: dict[str, Any], message: str) -> None:
+def send(mail_config: MailConfig | dict[str, Any], message: str) -> None:
     try:
         send_impl(mail_config, message)
     except Exception:
