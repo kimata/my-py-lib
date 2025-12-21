@@ -45,11 +45,13 @@ def get_path(
     return pathlib.Path(get_data(config, conf_path, suffix_path))
 
 
-def abs_path(config_path: str = CONFIG_PATH) -> pathlib.Path:
+def abs_path(config_path: str | pathlib.Path = CONFIG_PATH) -> pathlib.Path:
     return pathlib.Path(pathlib.Path.cwd(), config_path)
 
 
-def load(config_path: str = CONFIG_PATH, schema_path: str | None = None) -> dict[str, Any]:
+def load(
+    config_path: str | pathlib.Path = CONFIG_PATH, schema_path: str | pathlib.Path | None = None
+) -> dict[str, Any]:
     config_path_obj = pathlib.Path(config_path).resolve()
 
     schema_path_obj: pathlib.Path | None = None
@@ -80,7 +82,7 @@ def load(config_path: str = CONFIG_PATH, schema_path: str | None = None) -> dict
 
 
 # NOTE: スキーマの雛形を生成
-def generate_schema(config_path: str) -> None:
+def generate_schema(config_path: str | pathlib.Path) -> None:
     with pathlib.Path(config_path).open() as file:
         builder = genson.SchemaBuilder("https://json-schema.org/draft/2020-12/schema")
         builder.add_object(yaml.load(file, Loader=yaml.SafeLoader))
