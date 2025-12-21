@@ -411,9 +411,14 @@ def _get_chrome_processes_by_pgid(chromedriver_pid, existing_pids):
 
 
 def get_chrome_related_processes(driver):
-    """Chrome関連の全子プロセスを取得"""
-    chrome_pids = []
+    """Chrome関連の全子プロセスを取得
 
+    undetected_chromedriver 使用時、Chrome プロセスは chromedriver の子ではなく
+    Python プロセスの直接の子として起動されることがあるため、両方を検索する。
+    """
+    chrome_pids = set()
+
+    # 1. driver.service.process の子プロセスを検索
     try:
         if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):
             process = driver.service.process
@@ -425,17 +430,33 @@ def get_chrome_related_processes(driver):
                 children = parent_process.children(recursive=True)
 
                 for child in children:
-                    chrome_pids.append(child.pid)
-                    logging.debug("Found Chrome-related process: PID %d, name: %s", child.pid, child.name())
-
-                # # プロセスグループIDでの検索を追加
-                # additional_pids = _get_chrome_processes_by_pgid(chromedriver_pid, chrome_pids)
-                # chrome_pids.extend(additional_pids)
-
+                    chrome_pids.add(child.pid)
+                    logging.debug(
+                        "Found Chrome-related process (service child): PID %d, name: %s", child.pid, child.name()
+                    )
     except Exception:
-        logging.exception("Failed to get Chrome-related processes")
+        logging.exception("Failed to get Chrome-related processes from service")
 
-    return chrome_pids
+    # 2. 現在の Python プロセスの全子孫から Chrome 関連プロセスを検索
+    try:
+        current_process = psutil.Process()
+        all_children = current_process.children(recursive=True)
+
+        for child in all_children:
+            if child.pid in chrome_pids:
+                continue
+            try:
+                if _is_chrome_related_process(child):
+                    chrome_pids.add(child.pid)
+                    logging.debug(
+                        "Found Chrome-related process (python child): PID %d, name: %s", child.pid, child.name()
+                    )
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception:
+        logging.exception("Failed to get Chrome-related processes from python children")
+
+    return list(chrome_pids)
 
 
 def _send_signal_to_processes(pids, sig, signal_name):
