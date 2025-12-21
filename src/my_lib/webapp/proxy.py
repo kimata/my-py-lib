@@ -175,12 +175,13 @@ def test_run(api_base_url_: str, port: int, debug_mode: bool) -> None:
     # NOTE: アクセスログは無効にする
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    init(api_base_url)
+    init(api_base_url_)
 
     flask_cors.CORS(app)
 
     app.config["TEST"] = True
-    app.json.compat = True
+    if hasattr(app.json, "compat"):
+        app.json.compat = True  # type: ignore[attr-defined]
 
     app.register_blueprint(my_lib.webapp.proxy.blueprint)
 
@@ -292,6 +293,7 @@ if __name__ == "__main__":
     proc.terminate()
     proc.join()
 
-    os.kill(log_proc.pid, signal.SIGUSR1)
+    if log_proc.pid is not None:
+        os.kill(log_proc.pid, signal.SIGUSR1)
     log_proc.terminate()
     log_proc.join()

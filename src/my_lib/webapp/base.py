@@ -12,7 +12,9 @@ blueprint = flask.Blueprint("webapp-base", __name__)
 
 
 def _get_file_path(filename: str) -> str | None:
-    static_dir = pathlib.Path(my_lib.webapp.config.STATIC_DIR_PATH).resolve()
+    if my_lib.webapp.config.STATIC_DIR_PATH is None:
+        return None
+    static_dir = my_lib.webapp.config.STATIC_DIR_PATH.resolve()
     requested_path = (static_dir / filename).resolve()
 
     if not str(requested_path).startswith(str(static_dir)):
@@ -27,7 +29,10 @@ def _get_file_path(filename: str) -> str | None:
 @my_lib.flask_util.gzipped
 def webapp(filename: str) -> flask.Response:
     try:
-        static_dir = pathlib.Path(my_lib.webapp.config.STATIC_DIR_PATH).resolve()
+        if my_lib.webapp.config.STATIC_DIR_PATH is None:
+            flask.abort(500)
+
+        static_dir = my_lib.webapp.config.STATIC_DIR_PATH.resolve()
         requested_path = (static_dir / filename).resolve()
 
         if not str(requested_path).startswith(str(static_dir)):
@@ -61,4 +66,4 @@ blueprint_default = flask.Blueprint("webapp-default", __name__)
 @blueprint_default.route("/")
 @my_lib.flask_util.gzipped
 def root() -> flask.Response:
-    return flask.redirect(f"{my_lib.webapp.config.URL_PREFIX}/")
+    return flask.redirect(f"{my_lib.webapp.config.URL_PREFIX}/")  # type: ignore[return-value]

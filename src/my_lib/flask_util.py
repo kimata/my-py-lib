@@ -59,7 +59,7 @@ def gzipped(f: F) -> F:
 def support_jsonp(f: F) -> F:
     @functools.wraps(f)
     def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
-        callback = flask.request.args.get("callback", False)
+        callback = flask.request.args.get("callback")
         if callback:
             content = callback + "(" + f().data.decode().strip() + ")"
             return flask.current_app.response_class(content, mimetype="text/javascript")
@@ -70,10 +70,13 @@ def support_jsonp(f: F) -> F:
 
 
 def remote_host(request: flask.Request) -> str:
+    remote_addr = request.remote_addr
+    if remote_addr is None:
+        return "unknown"
     try:
-        return socket.gethostbyaddr(request.remote_addr)[0]
+        return socket.gethostbyaddr(remote_addr)[0]
     except Exception:
-        return request.remote_addr
+        return remote_addr
 
 
 def auth_user(request: flask.Request) -> str:
@@ -97,7 +100,7 @@ def calculate_etag(
     return f'W/"{etag}"' if weak else f'"{etag}"'
 
 
-def check_etag(etag: str | None, request_headers: flask.datastructures.Headers) -> bool:
+def check_etag(etag: str | None, request_headers: Any) -> bool:
     if not etag:
         return False
 
@@ -248,7 +251,7 @@ def etag_conditional(
 
 
 def file_etag(
-    filename_func: Callable[..., str | Path] | None = None,
+    filename_func: Callable[..., str | Path | None] | None = None,
     cache_control: str = "max-age=86400, must-revalidate",
 ) -> Callable[[F], F]:
     """
