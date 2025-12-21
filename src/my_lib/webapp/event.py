@@ -25,7 +25,7 @@ blueprint = flask.Blueprint("webapp-event", __name__)
 
 
 # NOTE: サイズは上の Enum の個数+1 にしておく
-event_count: multiprocessing.Array = multiprocessing.Array("i", 4)
+event_count = multiprocessing.Array("i", 4)  # type: ignore[type-arg]
 
 should_terminate: bool = False
 watch_thread: threading.Thread | None = None
@@ -90,7 +90,7 @@ def event_index(event_type: EVENT_TYPE) -> int:
 
 def notify_event(event_type: EVENT_TYPE) -> None:
     global event_count
-    event_count[event_index(event_type)] += 1
+    event_count[event_index(event_type)] += 1  # type: ignore[index]
 
 
 @blueprint.route("/api/event", methods=["GET"])
@@ -100,7 +100,7 @@ def api_event() -> flask.Response:
     def event_stream() -> Any:
         global event_count
 
-        last_count = event_count[:]
+        last_count = event_count[:]  # type: ignore[index]
 
         i = 0
         j = 0
@@ -109,10 +109,10 @@ def api_event() -> flask.Response:
             for event_type in EVENT_TYPE.__members__.values():
                 index = event_index(event_type)
 
-                if last_count[index] != event_count[index]:
+                if last_count[index] != event_count[index]:  # type: ignore[index]
                     logging.debug("notify event: %s", event_type.value)
                     yield f"data: {event_type.value}\n\n"
-                    last_count[index] = event_count[index]
+                    last_count[index] = event_count[index]  # type: ignore[index]
 
                     i += 1
                     if i == count:

@@ -42,7 +42,7 @@ else:
         logging.warning("Using dummy GPIO")
 
     # NOTE: 本物の GPIO のように振る舞うダミーのライブラリ
-    class gpio:  # noqa: N801
+    class gpio:  # type: ignore[no-redef]  # noqa: N801
         IS_DUMMY: bool = True
         BCM: int = 0
         OUT: int = 0
@@ -64,6 +64,7 @@ else:
             if pin_num not in gpio.VALID_PINS:
                 raise ValueError(f"Pin {pin_num} is not a valid GPIO pin number")
 
+        @staticmethod
         def get_state() -> dict[str, Any]:
             # NOTE: Pytest を並列実行できるようにする
             worker = os.environ.get("PYTEST_XDIST_WORKER", "")
@@ -135,4 +136,4 @@ else:
             return
 
 
-gpio.level = enum.Enum("gpio.level", {"HIGH": 1, "LOW": 0})
+gpio.level = enum.Enum("level", {"HIGH": 1, "LOW": 0})  # type: ignore[misc]
