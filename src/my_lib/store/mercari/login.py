@@ -19,6 +19,7 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.captcha
+from my_lib.store.mercari.config import LineLoginConfig, MercariLoginConfig
 
 LINE_LOGIN_TIMEOUT: int = 30
 
@@ -28,8 +29,7 @@ LOGIN_URL: str = "https://jp.mercari.com"
 def login_via_line(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    line_use: str,
-    line_pass: str,
+    line_login: LineLoginConfig,
     slack_config: dict[str, Any] | None,
 ) -> None:
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
@@ -37,8 +37,8 @@ def login_via_line(
     wait.until(selenium.webdriver.support.expected_conditions.title_contains("LINE Login"))
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@name="tid"]'):
-        my_lib.selenium_util.input_xpath(driver, '//input[@name="tid"]', line_use)
-        my_lib.selenium_util.input_xpath(driver, '//input[@name="tpasswd"]', line_pass)
+        my_lib.selenium_util.input_xpath(driver, '//input[@name="tid"]', line_login.user)
+        my_lib.selenium_util.input_xpath(driver, '//input[@name="tpasswd"]', line_login.password)
         my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
     else:
         my_lib.selenium_util.click_xpath(driver, '//button[.//span[normalize-space()="ログイン"]]', wait)
@@ -94,8 +94,8 @@ def login_via_line(
 def execute_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    line_use: str,
-    line_pass: str,
+    mercari_login: MercariLoginConfig,  # noqa: ARG001
+    line_login: LineLoginConfig,
     slack_config: dict[str, Any] | None,
     dump_path: pathlib.Path | None,
 ) -> None:
@@ -131,7 +131,7 @@ def execute_impl(
         )
     )
 
-    login_via_line(driver, wait, line_use, line_pass, slack_config)
+    login_via_line(driver, wait, line_login, slack_config)
 
     # time.sleep(2)
     # if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//div[@id="recaptchaV2"]')) != 0:
@@ -204,8 +204,8 @@ def execute_impl(
 def execute(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    line_use: str,
-    line_pass: str,
+    mercari_login: MercariLoginConfig,
+    line_login: LineLoginConfig,
     slack_config: dict[str, Any] | None,
     dump_path: pathlib.Path | None,
 ) -> None:  # noqa: PLR0913
@@ -219,10 +219,10 @@ def execute(
             )
         )
 
-        execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path)
+        execute_impl(driver, wait, mercari_login, line_login, slack_config, dump_path)
     except Exception:
         logging.exception("ログインをリトライします。")
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
         # NOTE: 1回だけリトライする
         time.sleep(10)
-        execute_impl(driver, wait, line_use, line_pass, slack_config, dump_path)
+        execute_impl(driver, wait, mercari_login, line_login, slack_config, dump_path)
