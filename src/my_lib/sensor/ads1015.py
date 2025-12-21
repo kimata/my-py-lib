@@ -11,6 +11,8 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -18,28 +20,28 @@ from my_lib.sensor import i2cbus
 
 
 class ADS1015:
-    NAME = "ADS1015"
-    TYPE = "I2C"
-    DEV_ADDR = 0x4A  # 7bit
+    NAME: str = "ADS1015"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x4A  # 7bit
 
-    REG_CONFIG = 0x01
-    REG_VALUE = 0x00
+    REG_CONFIG: int = 0x01
+    REG_VALUE: int = 0x00
 
-    REG_CONFIG_FSR_0256 = 5
-    REG_CONFIG_FSR_2048 = 2
+    REG_CONFIG_FSR_0256: int = 5
+    REG_CONFIG_FSR_2048: int = 2
 
-    REG_CONFIG_MUX_01 = 0
-    REG_CONFIG_MUX_0G = 4
+    REG_CONFIG_MUX_01: int = 0
+    REG_CONFIG_MUX_0G: int = 4
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
 
-        self.mux = self.REG_CONFIG_MUX_01
-        self.pga = self.REG_CONFIG_FSR_0256
+        self.mux: int = self.REG_CONFIG_MUX_01
+        self.pga: int = self.REG_CONFIG_FSR_0256
 
-    def init(self):
+    def init(self) -> None:
         os = 1
         self.i2cbus.i2c_rdwr(
             self.i2cbus.msg.write(
@@ -48,13 +50,13 @@ class ADS1015:
             )
         )
 
-    def set_mux(self, mux):
+    def set_mux(self, mux: int) -> None:
         self.mux = mux
 
-    def set_pga(self, pga):
+    def set_pga(self, pga: int) -> None:
         self.pga = pga
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             read = self.i2cbus.msg.read(self.dev_addr, 2)
             self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, [self.REG_CONFIG]), read)
@@ -63,7 +65,7 @@ class ADS1015:
         except Exception:
             return False
 
-    def get_value(self):
+    def get_value(self) -> list[float]:
         self.init()
         time.sleep(0.1)
 
@@ -78,7 +80,7 @@ class ADS1015:
 
         return [round(mvolt, 3)]
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, float]:
         value = self.get_value()
 
         return {"mvolt": value[0]}

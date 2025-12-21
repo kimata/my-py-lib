@@ -10,28 +10,31 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import re
 import time
+from typing import Any
 
 import serial
 
 
 class RG_15:  # noqa: N801
-    NAME = "RG_15"
-    TYPE = "UART"
-    DEV = "/dev/ttyAMA0"
-    BAUDRATE = 9600
+    NAME: str = "RG_15"
+    TYPE: str = "UART"
+    DEV: str = "/dev/ttyAMA0"
+    BAUDRATE: int = 9600
 
-    RAIN_START_INTERVAL_SEC = 30
-    RAIN_START_ACC_SUM = 0.04
-    RAIN_STOP_INTERVAL_SEC = 120
+    RAIN_START_INTERVAL_SEC: int = 30
+    RAIN_START_ACC_SUM: float = 0.04
+    RAIN_STOP_INTERVAL_SEC: int = 120
 
-    def __init__(self, dev=DEV):  # noqa: D107
-        self.dev = dev
-        self.ser = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
-        self.sum_by_minute = {}
-        self.event = {
+    def __init__(self, dev: str = DEV) -> None:  # noqa: D107
+        self.dev: str = dev
+        self.ser: serial.Serial = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
+        self.sum_by_minute: dict[int, float] = {}
+        self.event: dict[str, Any] = {
             "fall_sum": 0,
             "fall_time_last": None,
             "fall_time_start": None,
@@ -39,7 +42,7 @@ class RG_15:  # noqa: N801
             "fall_start": False,
         }
 
-    def update_stat(self, data):
+    def update_stat(self, data: dict[str, float]) -> list[float | bool]:
         minute = int(time.time() / 60)
 
         if data["acc"] == 0:
@@ -79,7 +82,7 @@ class RG_15:  # noqa: N801
 
         return [rain, self.event["fall_start"]]
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             self.ser.reset_input_buffer()
             self.ser.write("P\r\n".encode(encoding="utf-8"))  # noqa: UP012
@@ -91,7 +94,7 @@ class RG_15:  # noqa: N801
         except Exception:
             return False
 
-    def get_value(self):
+    def get_value(self) -> list[float | bool]:
         self.ser.write("R\r\n".encode(encoding="utf-8"))  # noqa: UP012
         self.ser.flush()
 
@@ -99,7 +102,7 @@ class RG_15:  # noqa: N801
 
         logging.debug(res)
 
-        data = {
+        data: dict[str, float] = {
             label.lower(): float(value)
             for label, value in re.findall(r"(Acc|EventAcc|TotalAcc|RInt)\s+(\d+\.\d+)", res)
         }
@@ -108,7 +111,7 @@ class RG_15:  # noqa: N801
 
         return self.update_stat(data)
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, float | bool]:
         value = self.get_value()
 
         return {"rain": value[0], "raining": value[1]}

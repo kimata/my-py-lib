@@ -15,6 +15,8 @@ Options:
 # 「SHT35-D (Digital) Humidity & Temperature Sensor」。
 # https://www.tindie.com/products/closedcube/sht35-d-digital-humidity-temperature-sensor/
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -22,16 +24,16 @@ from my_lib.sensor import i2cbus
 
 
 class SHT35:
-    NAME = "SHT-35"
-    TYPE = "I2C"
-    DEV_ADDR = 0x44  # 7bit
+    NAME: str = "SHT-35"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x44  # 7bit
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
 
-    def crc(self, data):
+    def crc(self, data: bytes | list[int]) -> int:
         crc = 0xFF
         for s in data:
             crc ^= s
@@ -43,7 +45,7 @@ class SHT35:
                     crc <<= 1
         return crc
 
-    def ping(self):
+    def ping(self) -> bool:
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
 
         try:
@@ -55,7 +57,7 @@ class SHT35:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
-    def get_value(self):
+    def get_value(self) -> list[float]:
         self.i2cbus.write_byte_data(self.dev_addr, 0x24, 0x16)
 
         time.sleep(0.1)
@@ -73,7 +75,7 @@ class SHT35:
 
         return [round(temp, 2), round(humi, 2)]
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, float]:
         value = self.get_value()
 
         return {"temp": value[0], "humi": value[1]}

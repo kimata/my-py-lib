@@ -1,27 +1,30 @@
 #!/usr/bin/env python
 
+from __future__ import annotations
+
 import logging
 import pprint
+from typing import Any
 
 import serial
 
-RETRY_COUNT = 10
-WAIT_COUNT = 30
+RETRY_COUNT: int = 10
+WAIT_COUNT: int = 30
 
 
 class BP35A1:
-    NAME = "BP35A1"
+    NAME: str = "BP35A1"
 
-    def __init__(self, port="/dev/ttyAMA0", debug=False):  # noqa: D107
-        self.ser = serial.Serial(port=port, baudrate=115200, timeout=5)
-        self.opt = None
+    def __init__(self, port: str = "/dev/ttyAMA0", debug: bool = False) -> None:  # noqa: D107
+        self.ser: serial.Serial = serial.Serial(port=port, baudrate=115200, timeout=5)
+        self.opt: int | None = None
         self.ser.flushInput()
 
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         self.logger.addHandler(logging.NullHandler())
         self.logger.setLevel(logging.DEBUG if debug else logging.WARNING)
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             self.reset()
 
@@ -33,7 +36,7 @@ class BP35A1:
         except Exception:
             return False
 
-    def write(self, data):
+    def write(self, data: str | bytes) -> None:
         self.logger.debug("SEND: [%s]", pprint.pformat(data))
 
         if type(data) is str:
@@ -41,12 +44,12 @@ class BP35A1:
 
         self.ser.write(data)
 
-    def read(self):
+    def read(self) -> str:
         data = self.ser.readline().decode()
         self.logger.debug("RECV: [%s]", pprint.pformat(data))
         return data
 
-    def reset(self):
+    def reset(self) -> None:
         # Clear buffer
         self.ser.flushInput()
         self.ser.flushOutput()
@@ -55,23 +58,23 @@ class BP35A1:
         self.__send_command_without_check("SKRESET")
         self.__expect("OK")
 
-    def get_option(self):
+    def get_option(self) -> None:
         ret = self.__send_command("ROPT")
         val = int(ret, 16)
 
         self.opt = val
 
-    def set_id(self, b_id):
+    def set_id(self, b_id: str) -> None:
         command = f"SKSETRBID {b_id}"
         self.__send_command(command)
 
-    def set_password(self, b_pass):
+    def set_password(self, b_pass: str) -> None:
         command = f"SKSETPWD {len(b_pass):X} {b_pass}"
         self.__send_command(command)
 
-    def scan_channel(self, start_duration=3):
+    def scan_channel(self, start_duration: int = 3) -> dict[str, str] | None:
         duration = start_duration
-        pan_info = None
+        pan_info: dict[str, str] | None = None
         for _ in range(RETRY_COUNT):
             command = f"SKSCAN 2 {((1 << 32) - 1):X} {duration}"
             self.__send_command(command)
@@ -94,7 +97,7 @@ class BP35A1:
 
         return None
 
-    def connect(self, pan_desc):
+    def connect(self, pan_desc: dict[str, str]) -> str | None:
         command = f"SKSREG S2 {pan_desc['Channel']}"
         self.__send_command(command)
 
@@ -120,7 +123,7 @@ class BP35A1:
         # タイムアウト
         return None
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self.__send_command_without_check("SKTERM")
         try:
             self.__expect("OK")
@@ -128,7 +131,7 @@ class BP35A1:
         except Exception:
             return
 
-    def recv_udp(self, ipv6_addr, wait_count=10):
+    def recv_udp(self, ipv6_addr: str, wait_count: int = 10) -> bytes | None:
         for _ in range(wait_count):
             line = self.read().rstrip()
             if line == "":
@@ -142,15 +145,17 @@ class BP35A1:
                 return bytes.fromhex(line[8])
         return None
 
-    def send_udp(self, ipv6_addr, port, data, handle=1, security=True):
+    def send_udp(
+        self, ipv6_addr: str, port: int, data: bytes, handle: int = 1, security: bool = True
+    ) -> None:
         command = f"SKSENDTO {handle} {ipv6_addr} {port:04X} {1 if security else 2} {len(data):04X} "
         self.__send_command_without_check(command.encode() + data)
         while self.read().rstrip() != "OK":
             pass
 
-    def __parse_pan_desc(self):
+    def __parse_pan_desc(self) -> dict[str, str]:
         self.__expect("EPANDESC")
-        pan_desc = {}
+        pan_desc: dict[str, str] = {}
         for _ in range(WAIT_COUNT):
             line = self.read()
 
@@ -165,7 +170,9 @@ class BP35A1:
 
         return pan_desc
 
-    def __send_command_raw(self, command, echo_back=lambda command: command):
+    def __send_command_raw(
+        self, command: str, echo_back: Any = lambda command: command
+    ) -> str:
         self.write(command)
         self.write("\r\n")
         # NOTE: echo_back はコマンドからエコーバック文字列を生成する関数。
@@ -174,12 +181,12 @@ class BP35A1:
 
         return self.read().rstrip()
 
-    def __send_command_without_check(self, command):
+    def __send_command_without_check(self, command: str | bytes) -> None:
         self.write(command)
         self.write("\r\n")
         self.read()
 
-    def __send_command(self, command):
+    def __send_command(self, command: str) -> str | None:
         ret = self.__send_command_raw(command)
         ret = ret.split(" ", 1)
 
@@ -188,7 +195,7 @@ class BP35A1:
 
         return None if len(ret) == 1 else ret[1]
 
-    def __expect(self, text):
+    def __expect(self, text: str) -> None:
         line = ""
         for _ in range(WAIT_COUNT):
             line = self.read().rstrip()

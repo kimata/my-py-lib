@@ -11,23 +11,25 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 
 from my_lib.sensor import i2cbus
 
 
 class APDS9250:
-    NAME = "APDS9250"
-    TYPE = "I2C"
-    DEV_ADDR = 0x52  # 7bit
+    NAME: str = "APDS9250"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x52  # 7bit
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
-        self.is_init = False
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+        self.is_init: bool = False
 
-    def ping(self):
+    def ping(self) -> bool:
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
 
         try:
@@ -37,7 +39,7 @@ class APDS9250:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
-    def get_value(self):
+    def get_value(self) -> float:
         # Resolution = 20bit/400ms, Rate = 1000ms
         self.i2cbus.write_byte_data(self.dev_addr, 0x04, 0x05)
         # Gain = 1
@@ -55,7 +57,7 @@ class APDS9250:
         else:
             return als * 35.0 / 400
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, float]:
         value = self.get_value()
 
         return {"lux": value}

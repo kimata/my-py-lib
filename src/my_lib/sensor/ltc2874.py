@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
 # ADI の LTC2874 を使って、IO-LINK 通信を行うライブラリです。
 
+from __future__ import annotations
+
 import logging
 import pprint
 import time
+from typing import Any
 
 import serial
 import spidev
 
 import my_lib.sensor
 
-DEBUG = True
+DEBUG: bool = True
 
-DATA_TYPE_RAW = 0
-DATA_TYPE_STRING = 1
-DATA_TYPE_UINT16 = 2
+DATA_TYPE_RAW: int = 0
+DATA_TYPE_STRING: int = 1
+DATA_TYPE_UINT16: int = 2
 
 
-def dump_byte_list(label, byte_list):
+def dump_byte_list(label: str, byte_list: list[int]) -> None:
     logging.debug("%s: %s", label, ", ".join(f"0x{v:02X}" for v in byte_list))
 
 
-def ltc2874_reg_read(spi, reg):
+def ltc2874_reg_read(spi: spidev.SpiDev, reg: int) -> int:
     recv = spi.xfer2([(0x00 << 5) | (reg << 1), 0x00])
 
     dump_byte_list("SPI READ", recv)
@@ -29,16 +32,16 @@ def ltc2874_reg_read(spi, reg):
     return recv[1]
 
 
-def ltc2874_reg_write(spi, reg, data):
+def ltc2874_reg_write(spi: spidev.SpiDev, reg: int, data: int) -> None:
     spi.xfer2([(0x03 << 5) | (reg << 1), data])
 
 
-def ltc2874_reset(spi):
+def ltc2874_reset(spi: spidev.SpiDev) -> None:
     logging.info("Reset LTC2874")
     spi.xfer2([0x07 << 5, 0x00])
 
 
-def msq_checksum(data):
+def msq_checksum(data: list[int]) -> int:
     chk = 0x52
     for d in data:
         chk ^= d
@@ -53,11 +56,11 @@ def msq_checksum(data):
     )
 
 
-def msq_build(rw, ch, addr, mtype, data):
+def msq_build(rw: int, ch: int, addr: int, mtype: int, data: list[int] | None) -> list[int]:
     mc = (rw << 7) | (ch << 5) | (addr)
     cht = mtype << 6
 
-    msq = [mc, cht]
+    msq: list[int] = [mc, cht]
 
     if data is not None:
         msq.extend(data)
@@ -68,7 +71,7 @@ def msq_build(rw, ch, addr, mtype, data):
     return msq
 
 
-def com_open():
+def com_open() -> spidev.SpiDev:
     spi = spidev.SpiDev()
     spi.open(0, 0)
     spi.max_speed_hz = 1000
@@ -77,20 +80,20 @@ def com_open():
     return spi
 
 
-def com_close(spi, is_reset=False):
+def com_close(spi: spidev.SpiDev, is_reset: bool = False) -> None:
     if is_reset:
         ltc2874_reset(spi)
 
     spi.close()
 
 
-def com_status(spi):
+def com_status(spi: spidev.SpiDev) -> bool:
     enl1 = ltc2874_reg_read(spi, 0x0E)
 
     return enl1 == 0x11
 
 
-def com_start(spi):
+def com_start(spi: spidev.SpiDev) -> serial.Serial:
     BOOT_WAIT_SEC = 5
     if com_status(spi):
         logging.debug("IO-Link is already Powered-ON")
@@ -117,7 +120,7 @@ def com_start(spi):
     )
 
 
-def com_stop(spi, ser=None, is_power_off=False):
+def com_stop(spi: spidev.SpiDev, ser: serial.Serial | None = None, is_power_off: bool = False) -> None:
     if ser is not None:
         ser.close()
 
@@ -130,7 +133,7 @@ def com_stop(spi, ser=None, is_power_off=False):
         ltc2874_reg_write(spi, 0x0E, 0x00)
 
 
-def com_write(spi, ser, byte_list):
+def com_write(spi: spidev.SpiDev, ser: serial.Serial, byte_list: list[int]) -> None:
     # Drive enable
     ltc2874_reg_write(spi, 0x0D, 0x01)
 
@@ -143,7 +146,7 @@ def com_write(spi, ser, byte_list):
     ltc2874_reg_write(spi, 0x0D, 0x00)
 
 
-def com_read(spi, ser, length):  # noqa: ARG001
+def com_read(spi: spidev.SpiDev, ser: serial.Serial, length: int) -> list[int]:  # noqa: ARG001
     recv = ser.read(length)
     byte_list = list(recv)
 
@@ -152,7 +155,7 @@ def com_read(spi, ser, length):  # noqa: ARG001
     return byte_list
 
 
-def dir_param_read(spi, ser, addr):
+def dir_param_read(spi: spidev.SpiDev, ser: serial.Serial, addr: int) -> int:
     logging.debug("***** CALL: dir_param_read(addr: 0x%02X) ****", addr)
 
     msq = msq_build(
@@ -174,7 +177,7 @@ def dir_param_read(spi, ser, addr):
     return data[0]
 
 
-def dir_param_write(spi, ser, addr, value):
+def dir_param_write(spi: spidev.SpiDev, ser: serial.Serial, addr: int, value: int) -> None:
     logging.debug("***** CALL: dir_param_write(addr: 0x%02X, value: 0x%02X) ****", addr, value)
 
     msq = msq_build(
@@ -194,7 +197,7 @@ def dir_param_write(spi, ser, addr, value):
         raise OSError("checksum unmatch")
 
 
-def isdu_req_build(index, length):
+def isdu_req_build(index: int, length: int) -> list[list[int]]:
     rw = my_lib.sensor.io_link.MSQ_RW_WRITE
     isrv = my_lib.sensor.io_link.ISDU_ISRV_READ_8BIT_IDX
 
@@ -217,7 +220,7 @@ def isdu_req_build(index, length):
     ]
 
 
-def isdu_res_read(spi, ser, flow):
+def isdu_res_read(spi: spidev.SpiDev, ser: serial.Serial, flow: int) -> int:
     msq = msq_build(
         my_lib.sensor.io_link.MSQ_RW_READ,
         my_lib.sensor.io_link.MSQ_CH_ISDU,
@@ -237,7 +240,7 @@ def isdu_res_read(spi, ser, flow):
     return data[0]
 
 
-def isdu_read(spi, ser, index, data_type):  # noqa: PLR0912, C901
+def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int) -> str | int | list[int]:  # noqa: PLR0912, C901
     logging.debug("***** CALL: isdu_read(index: 0x%02X) ****", (index))
     length = 3
 
@@ -249,7 +252,7 @@ def isdu_read(spi, ser, index, data_type):  # noqa: PLR0912, C901
 
     chk = 0x00
     flow = 1
-    data_list = []
+    data_list: list[int] = []
     while True:
         header = isdu_res_read(spi, ser, 0x10)
         chk = header

@@ -11,6 +11,8 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -18,16 +20,16 @@ from my_lib.sensor import i2cbus
 
 
 class EZO_RTD:  # noqa: N801
-    NAME = "EZO-RTD"
-    TYPE = "I2C"
-    DEV_ADDR = 0x66  # 7bit
+    NAME: str = "EZO-RTD"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x66  # 7bit
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
 
-    def ping(self):
+    def ping(self) -> bool:
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
 
         try:
@@ -38,12 +40,12 @@ class EZO_RTD:  # noqa: N801
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
-    def get_value(self):
+    def get_value(self) -> float:
         value = self.exec_command("R")
 
         return float(value[1:].decode().rstrip("\x00"))
 
-    def exec_command(self, cmd):
+    def exec_command(self, cmd: str) -> bytes:
         command = list(cmd.encode())
 
         self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, command))
@@ -55,7 +57,7 @@ class EZO_RTD:  # noqa: N801
 
         return bytes(read)
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, float]:
         value = self.get_value()
 
         return {"temp": value}

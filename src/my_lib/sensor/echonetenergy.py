@@ -12,41 +12,44 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import pathlib
 import pickle
 import pprint
 import struct
 import tempfile
+from typing import Any
 
 import my_lib.sensor.echonetlite
 
-PAN_DESC_DAT_PATH = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
-RETRY_COUNT = 5
+PAN_DESC_DAT_PATH: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
+RETRY_COUNT: int = 5
 
 
 class EchonetEnergy:
-    NAME = "EchonetEnergy"
-    TYPE = "UART"
+    NAME: str = "EchonetEnergy"
+    TYPE: str = "UART"
 
-    def __init__(self, dev_file, param, debug=False):  # noqa: D107
+    def __init__(self, dev_file: str, param: dict[str, Any], debug: bool = False) -> None:  # noqa: D107
         echonet_if = getattr(my_lib.sensor, param["if"].lower())(dev_file, debug)
 
-        self.b_id = param["id"]
-        self.b_pass = param["pass"]
+        self.b_id: str = param["id"]
+        self.b_pass: str = param["pass"]
 
-        self.echonet_if = echonet_if
-        self.ipv6_addr = None
-        self.is_connected = False
+        self.echonet_if: Any = echonet_if
+        self.ipv6_addr: str | None = None
+        self.is_connected: bool = False
 
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         self.logger.addHandler(logging.NullHandler())
         self.logger.setLevel(logging.DEBUG if debug else logging.WARNING)
 
-    def ping(self):
+    def ping(self) -> bool:
         return self.echonet_if.ping()
 
-    def parse_frame(self, recv_packet):
+    def parse_frame(self, recv_packet: bytes) -> dict[str, Any]:
         self.logger.debug("recv_packet = \n%s", pprint.pformat(recv_packet, indent=2))
         frame = my_lib.sensor.echonetlite.parse_frame(recv_packet)
         self.logger.debug("frame = \n%s", pprint.pformat(frame, indent=2))
@@ -54,7 +57,7 @@ class EchonetEnergy:
         return frame
 
     # PAN ID の探索 (キャッシュ付き)
-    def get_pan_info(self):
+    def get_pan_info(self) -> dict[str, str] | None:
         if PAN_DESC_DAT_PATH.exists():
             with PAN_DESC_DAT_PATH.open(mode="rb") as f:
                 try:
@@ -71,10 +74,10 @@ class EchonetEnergy:
 
         return pan_info
 
-    def get_pan_info_impl(self):
+    def get_pan_info_impl(self) -> dict[str, str] | None:
         return self.echonet_if.scan_channel()
 
-    def connect(self, pan_info):
+    def connect(self, pan_info: dict[str, str]) -> None:
         self.echonet_if.set_id(self.b_id)
         self.echonet_if.set_password(self.b_pass)
 
@@ -104,10 +107,10 @@ class EchonetEnergy:
         # if not is_meter_exit:
         #     raise Exception('Meter not fount')
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self.echonet_if.disconnect()
 
-    def get_value(self):
+    def get_value(self) -> list[int]:
         if not self.is_connected:
             self.connect(self.get_pan_info())
             self.is_connected = True
@@ -147,7 +150,7 @@ class EchonetEnergy:
                     continue
                 return [struct.unpack(">I", prop["EDT"])[0]]
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, int]:
         value = self.get_value()
 
         return {"power": value[0]}

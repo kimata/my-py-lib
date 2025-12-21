@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-MSQ_RW_READ = 1
-MSQ_RW_WRITE = 0
 
-MSQ_CH_PROCESS = 0
-MSQ_CH_PAGE = 1
-MSQ_CH_DIAG = 2
-MSQ_CH_ISDU = 3
+from __future__ import annotations
 
-MSQ_TYPE_0 = 0
-MSQ_TYPE_1 = 1
-MSQ_TYPE_2 = 2
+MSQ_RW_READ: int = 1
+MSQ_RW_WRITE: int = 0
 
-ISDU_ISRV_READ_8BIT_IDX = 0b1001
+MSQ_CH_PROCESS: int = 0
+MSQ_CH_PAGE: int = 1
+MSQ_CH_DIAG: int = 2
+MSQ_CH_ISDU: int = 3
 
-ISDU_IDX_VENDOR_NAME = 0x10
-ISDU_IDX_VENDOR_TEXT = 0x11
+MSQ_TYPE_0: int = 0
+MSQ_TYPE_1: int = 1
+MSQ_TYPE_2: int = 2
+
+ISDU_ISRV_READ_8BIT_IDX: int = 0b1001
+
+ISDU_IDX_VENDOR_NAME: int = 0x10
+ISDU_IDX_VENDOR_TEXT: int = 0x11

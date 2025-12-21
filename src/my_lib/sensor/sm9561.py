@@ -18,6 +18,8 @@ Options:
 # https://www.switch-science.com/products/7395
 # https://github.com/meerstern/I2C_RS422_RS485_Converter
 
+from __future__ import annotations
+
 import contextlib
 import logging
 import time
@@ -26,38 +28,38 @@ from my_lib.sensor import i2cbus
 
 
 class SM9561:
-    NAME = "SM9561"
-    TYPE = "I2C"
-    DEV_ADDR = 0x4D  # 7bit
+    NAME: str = "SM9561"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x4D  # 7bit
 
-    DEV_CRYSTCAL_FREQ = 7372800
+    DEV_CRYSTCAL_FREQ: int = 7372800
 
-    REG_RHR = 0x00 << 3
-    REG_THR = 0x00 << 3
-    REG_FCR = 0x02 << 3
-    REG_LCR = 0x03 << 3
-    REG_MCR = 0x04 << 3
-    REG_LSR = 0x05 << 3
-    REG_MSR = 0x06 << 3
-    REG_SPR = 0x07 << 3
-    REG_TXLVL = 0x08 << 3
-    REG_RXLVL = 0x09 << 3
-    REG_IOC = 0x0E << 3
+    REG_RHR: int = 0x00 << 3
+    REG_THR: int = 0x00 << 3
+    REG_FCR: int = 0x02 << 3
+    REG_LCR: int = 0x03 << 3
+    REG_MCR: int = 0x04 << 3
+    REG_LSR: int = 0x05 << 3
+    REG_MSR: int = 0x06 << 3
+    REG_SPR: int = 0x07 << 3
+    REG_TXLVL: int = 0x08 << 3
+    REG_RXLVL: int = 0x09 << 3
+    REG_IOC: int = 0x0E << 3
 
-    REG_DLL = 0x00 << 3
-    REG_DLH = 0x01 << 3
+    REG_DLL: int = 0x00 << 3
+    REG_DLH: int = 0x01 << 3
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
 
-    def init(self):
+    def init(self) -> None:
         self.reset()
         self.set_link()
         self.set_baudrate(9600)
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_SPR)
 
@@ -70,7 +72,7 @@ class SM9561:
         except Exception:
             return False
 
-    def reset(self):
+    def reset(self) -> None:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_IOC)
         data |= 0x08
 
@@ -80,7 +82,7 @@ class SM9561:
 
         time.sleep(0.1)
 
-    def set_baudrate(self, baudrate):
+    def set_baudrate(self, baudrate: int) -> None:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_MCR)
 
         prescaler = 1 if (data & 0x80) == 0 else 4
@@ -102,7 +104,7 @@ class SM9561:
         logging.debug("set LCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_LCR, data)
 
-    def set_link(self):
+    def set_link(self) -> None:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_LCR)
         data &= 0xC0
 
@@ -116,7 +118,7 @@ class SM9561:
         logging.debug("set LCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_LCR, data)
 
-    def clear_fifo(self, is_enable=True):
+    def clear_fifo(self, is_enable: bool = True) -> None:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_FCR)
         if is_enable:
             data |= 0x01
@@ -129,7 +131,7 @@ class SM9561:
         logging.debug("set FCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_FCR, data)
 
-    def set_rts(self, state):
+    def set_rts(self, state: bool) -> None:
         data = self.i2cbus.read_byte_data(self.dev_addr, self.REG_MCR)
 
         if state:
@@ -140,7 +142,7 @@ class SM9561:
         logging.debug("set MCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_MCR, data)
 
-    def calc_crc(self, data_list):
+    def calc_crc(self, data_list: list[int]) -> list[int]:
         POLY = 0xA001
 
         crc = 0xFFFF
@@ -155,10 +157,10 @@ class SM9561:
 
         return [crc & 0xFF, crc >> 8]
 
-    def append_crc(self, data_list):
+    def append_crc(self, data_list: list[int]) -> list[int]:
         return data_list + self.calc_crc(data_list)
 
-    def write_bytes(self, data_list):
+    def write_bytes(self, data_list: list[int]) -> None:
         self.set_rts(True)
 
         for data in data_list:
@@ -171,8 +173,8 @@ class SM9561:
 
         self.set_rts(False)
 
-    def read_bytes(self, length):
-        data_list = []
+    def read_bytes(self, length: int) -> list[int]:
+        data_list: list[int] = []
         for _ in range(length):
             while self.i2cbus.read_byte_data(self.dev_addr, self.REG_RXLVL) == 0:
                 logging.debug("Wait for RX FIFO data available")
@@ -184,7 +186,7 @@ class SM9561:
 
         return data_list
 
-    def modbus_rtu_func3(self, dev_addr, start_addr, length):
+    def modbus_rtu_func3(self, dev_addr: int, start_addr: int, length: int) -> int:
         self.clear_fifo()
 
         self.write_bytes(
@@ -203,7 +205,7 @@ class SM9561:
 
         return (data[0] << 8) + data[1]
 
-    def get_value(self):
+    def get_value(self) -> list[int]:
         self.init()
         time.sleep(0.1)
 
@@ -212,7 +214,7 @@ class SM9561:
 
         return [value]
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, int]:
         value = self.get_value()
 
         return {"lux": value[0]}

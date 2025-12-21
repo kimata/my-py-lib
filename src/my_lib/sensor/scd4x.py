@@ -15,6 +15,8 @@ Options:
 # https://www.sensirion.com/en/environmental-sensors/evaluation-kit-sek-environmental-sensing/evaluation-kit-sek-scd41/
 # 明示的に start_periodic_measurement を呼ばなくても済むように少し工夫しています。
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -22,17 +24,17 @@ from my_lib.sensor import i2cbus
 
 
 class SCD4X:
-    NAME = "SCD4X"
-    TYPE = "I2C"
-    DEV_ADDR = 0x62  # 7bit
+    NAME: str = "SCD4X"
+    TYPE: str = "I2C"
+    DEV_ADDR: int = 0x62  # 7bit
 
-    def __init__(self, bus_id=i2cbus.I2CBUS.ARM, dev_addr=DEV_ADDR):  # noqa: D107
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.i2cbus = i2cbus.I2CBUS(bus_id)
-        self.is_init = False
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+        self.is_init: bool = False
 
-    def ping(self):
+    def ping(self) -> bool:
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
         try:
             self.__get_data_ready()
@@ -42,7 +44,7 @@ class SCD4X:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
-    def __reset(self):
+    def __reset(self) -> None:
         # sto_periodic_measurement
         self.i2cbus.write_byte_data(self.dev_addr, 0x3F, 0x86)
         time.sleep(0.5)
@@ -50,7 +52,7 @@ class SCD4X:
         self.i2cbus.write_byte_data(self.dev_addr, 0x36, 0x46)
         time.sleep(0.02)
 
-    def __crc(self, msg):
+    def __crc(self, msg: bytes | list[int]) -> int:
         poly = 0x31
         crc = 0xFF
 
@@ -65,15 +67,15 @@ class SCD4X:
 
         return crc
 
-    def __decode_response(self, data):
-        resp = []
+    def __decode_response(self, data: bytes) -> list[int]:
+        resp: list[int] = []
         for word in zip(*[iter(data)] * 3, strict=False):
             if self.__crc(word[0:2]) != word[2]:
                 raise OSError("CRC unmatch")
             resp.extend(word[0:2])
         return resp
 
-    def __get_data_ready(self):
+    def __get_data_ready(self) -> bool:
         # get_data_ready_status
 
         read = self.i2cbus.msg.read(self.dev_addr, 3)
@@ -82,7 +84,7 @@ class SCD4X:
 
         return (int.from_bytes(resp[0:2], byteorder="big") & 0x7F) != 0
 
-    def __start_measurement(self):
+    def __start_measurement(self) -> None:
         # NOTE: まず待ってみて、それでもデータが準備できないようだったら
         # 計測が始まっていないと判断する
         for _ in range(10):
@@ -98,7 +100,7 @@ class SCD4X:
                 return
             time.sleep(0.5)
 
-    def get_value(self):
+    def get_value(self) -> list[int | float]:
         self.__start_measurement()
 
         read = self.i2cbus.msg.read(self.dev_addr, 9)
@@ -111,7 +113,7 @@ class SCD4X:
 
         return [co2, round(temp, 4), round(humi, 1)]
 
-    def get_value_map(self):
+    def get_value_map(self) -> dict[str, int | float]:
         value = self.get_value()
 
         return {"co2": value[0], "temp": value[1], "humi": value[2]}

@@ -11,36 +11,38 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 
 from my_lib.sensor import ads1115
 
 
 class GROVE_TDS:  # noqa: N801
-    NAME = "GROVE-TDS"
-    TYPE = "I2C"
+    NAME: str = "GROVE-TDS"
+    TYPE: str = "I2C"
 
     def __init__(  # noqa: D107
-        self, bus_id=ads1115.i2cbus.I2CBUS.ARM, dev_addr=ads1115.ADS1115.DEV_ADDR
-    ):
-        self.bus_id = bus_id
-        self.dev_addr = dev_addr
-        self.adc = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+        self, bus_id: int = ads1115.i2cbus.I2CBUS.ARM, dev_addr: int = ads1115.ADS1115.DEV_ADDR
+    ) -> None:
+        self.bus_id: int = bus_id
+        self.dev_addr: int = dev_addr
+        self.adc: ads1115.ADS1115 = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
 
         self.adc.set_mux(self.adc.REG_CONFIG_MUX_0G)
         self.adc.set_pga(self.adc.REG_CONFIG_FSR_2048)
 
-    def ping(self):
+    def ping(self) -> bool:
         return self.adc.ping()
 
-    def get_value(self, temp=26.0):
+    def get_value(self, temp: float = 26.0) -> list[float]:
         volt = self.adc.get_value()[0] / 1000.0
         tds = (133.42 * volt * volt * volt - 255.86 * volt * volt + 857.39 * volt) * 0.5
         tds /= 1 + 0.018 * (temp - 25)  # 0.018 は実測データから算出
 
         return [round(tds, 3)]
 
-    def get_value_map(self, temp=25.0):
+    def get_value_map(self, temp: float = 25.0) -> dict[str, float]:
         value = self.get_value(temp)
 
         return {"tds": value[0]}

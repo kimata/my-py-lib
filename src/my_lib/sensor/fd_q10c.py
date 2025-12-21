@@ -10,25 +10,29 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import fcntl
 import logging
 import os
 import pathlib
 import time
 import traceback
+from types import TracebackType
+from typing import Any
 
 import my_lib.sensor.ltc2874 as driver
 
 
 class Lock:
-    LOCK_FILE = "/dev/shm/fd_q10c.lock"  # noqa: S108
-    TIMEOUT = 5
+    LOCK_FILE: str = "/dev/shm/fd_q10c.lock"  # noqa: S108
+    TIMEOUT: int = 5
 
-    def __init__(self):  # noqa: D107
-        self.lock_file = str(Lock.get_file_path())
-        self.lock_fd = None
+    def __init__(self) -> None:  # noqa: D107
+        self.lock_file: str = str(Lock.get_file_path())
+        self.lock_fd: int | None = None
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self) -> bool:  # noqa: D105
         self.lock_fd = os.open(self.lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
 
         time_start = time.time()
@@ -46,7 +50,12 @@ class Lock:
 
         raise RuntimeError(f"Unable to acquire the lock of {self.lock_file}")
 
-    def __exit__(self, exc_type, exc_value, traceback):  # noqa: D105
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:  # noqa: D105
         if self.lock_fd is None:
             raise RuntimeError("Not Locked")
 
@@ -57,7 +66,7 @@ class Lock:
 
     # NOTE: Pytest の並列実行ができるようにする
     @staticmethod
-    def get_file_path():
+    def get_file_path() -> pathlib.Path:
         suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
         path = pathlib.Path(Lock.LOCK_FILE)
 
@@ -68,19 +77,19 @@ class Lock:
 
 
 class FD_Q10C:  # noqa: N801
-    NAME = "FD_Q10C"
-    TYPE = "IO_LINK"
+    NAME: str = "FD_Q10C"
+    TYPE: str = "IO_LINK"
 
-    def __init__(self):  # noqa:D107
-        self.dev_addr = None
+    def __init__(self) -> None:  # noqa:D107
+        self.dev_addr: int | None = None
 
-    def ping(self):
+    def ping(self) -> bool:
         try:
             return self.read_param(0x12, driver.DATA_TYPE_STRING)[0:4] == "FD-Q"
         except Exception:
             return False
 
-    def get_value(self, force_power_on=True):
+    def get_value(self, force_power_on: bool = True) -> float | None:
         try:
             raw = self.read_param(0x94, driver.DATA_TYPE_UINT16, force_power_on)
 
@@ -97,7 +106,7 @@ class FD_Q10C:  # noqa: N801
             logging.warning(traceback.format_exc())
             return None
 
-    def get_state(self):
+    def get_state(self) -> bool:
         with Lock():
             try:
                 spi = driver.com_open()
@@ -109,7 +118,7 @@ class FD_Q10C:  # noqa: N801
             finally:
                 driver.com_close(spi)
 
-    def read_param(self, index, data_type, force_power_on=True):
+    def read_param(self, index: int, data_type: int, force_power_on: bool = True) -> Any:
         with Lock():
             try:
                 spi = driver.com_open()
@@ -127,7 +136,7 @@ class FD_Q10C:  # noqa: N801
             finally:
                 driver.com_close(spi)
 
-    def stop(self):
+    def stop(self) -> None:
         with Lock():
             spi = None
             try:
@@ -140,7 +149,7 @@ class FD_Q10C:  # noqa: N801
                     driver.com_close(spi, is_reset=True)
                     raise
 
-    def get_value_map(self, force_power_on=True):
+    def get_value_map(self, force_power_on: bool = True) -> dict[str, float | None]:
         value = self.get_value(force_power_on)
 
         return {"flow": value}

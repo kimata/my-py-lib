@@ -1,7 +1,10 @@
 # noqa: D104
+from __future__ import annotations
+
 import importlib
 import logging
 import pathlib
+from typing import TYPE_CHECKING, Any
 
 import my_lib.sensor
 import my_lib.sensor.i2cbus
@@ -20,6 +23,17 @@ from .rg_15 import RG_15 as rg_15  # noqa: N811
 from .scd4x import SCD4X as scd4x  # noqa: N811
 from .sht35 import SHT35 as sht35  # noqa: N811
 from .sm9561 import SM9561 as sm9561  # noqa: N811
+
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class SensorProtocol(Protocol):
+        NAME: str
+        TYPE: str
+        required: bool
+
+        def ping(self) -> bool: ...
+        def get_value_map(self) -> dict[str, Any]: ...
 
 iolink = importlib.import_module(".io_link", __package__)
 
@@ -43,14 +57,14 @@ __all__ = [
 ]
 
 
-def load(sensor_def_list):
+def load(sensor_def_list: list[dict[str, Any]]) -> list[Any]:
     logging.info("Load drivers...")
 
-    sensor_list = []
+    sensor_list: list[Any] = []
     for sensor_def in sensor_def_list:
         logging.info("Load %s driver", sensor_def["name"])
 
-        param = {}
+        param: dict[str, Any] = {}
         if "uart_dev" in sensor_def:
             dev_file = sensor_def["uart_dev"]
 
@@ -79,17 +93,17 @@ def load(sensor_def_list):
     return sensor_list
 
 
-def sensor_info(sensor):
+def sensor_info(sensor: Any) -> str:
     if sensor.TYPE == "I2C":
         return f"{sensor.NAME} (I2C: 0x{sensor.dev_addr:02X})"
     else:
         return f"{sensor.NAME} ({sensor.TYPE})"
 
 
-def ping(sensor_list):
+def ping(sensor_list: list[Any]) -> list[Any]:
     logging.info("Check sensor existences...")
 
-    active_sensor_list = []
+    active_sensor_list: list[Any] = []
     for sensor in sensor_list:
         if sensor.ping():
             logging.info("Sensor %s exists.", sensor.NAME)
@@ -105,8 +119,8 @@ def ping(sensor_list):
     return active_sensor_list
 
 
-def sense(sensor_list):
-    value_map = {}
+def sense(sensor_list: list[Any]) -> tuple[dict[str, Any], bool]:
+    value_map: dict[str, Any] = {}
     is_success = True
     for sensor in sensor_list:
         try:
