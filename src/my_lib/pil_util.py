@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
 import pathlib
+from typing import Any
 
 import PIL.Image
 import PIL.ImageDraw
@@ -8,35 +11,35 @@ import PIL.ImageEnhance
 import PIL.ImageFont
 
 
-def get_font(config, font_type, size):
+def get_font(config: dict[str, Any], font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
     font_path = pathlib.Path(config["path"]).resolve() / config["map"][font_type]
 
-    if font_path not in get_font.loaded:
+    if font_path not in get_font.loaded:  # type: ignore[attr-defined]
         logging.debug("Load font: %s", font_path)
-        get_font.loaded[font_path] = True
+        get_font.loaded[font_path] = True  # type: ignore[attr-defined]
 
     return PIL.ImageFont.truetype(font_path, size)
 
 
-get_font.loaded = {}
+get_font.loaded: dict[pathlib.Path, bool] = {}  # type: ignore[attr-defined]
 
 
-def text_size(img, font, text):
+def text_size(img: PIL.Image.Image, font: PIL.ImageFont.FreeTypeFont, text: str) -> tuple[int, int]:
     left, top, right, bottom = PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)
 
     return (right - left, bottom - top)
 
 
 def draw_text(  # noqa: PLR0913
-    img,
-    text,
-    pos,
-    font,
-    align="left",
-    color="#000",
-    stroke_width=0,
-    stroke_fill=None,
-):
+    img: PIL.Image.Image,
+    text: str,
+    pos: tuple[int, int],
+    font: PIL.ImageFont.FreeTypeFont,
+    align: str = "left",
+    color: str = "#000",
+    stroke_width: int = 0,
+    stroke_fill: str | None = None,
+) -> tuple[int, int]:
     text_line_list = text.split("\n")
 
     pos_x, next_pos_y = pos
@@ -60,31 +63,34 @@ def draw_text(  # noqa: PLR0913
 
 
 def draw_text_line(  # noqa: PLR0913
-    img,
-    text,
-    pos,
-    font,
-    align="left",
-    color="#000",
-    stroke_width=0,
-    stroke_fill=None,
-):
+    img: PIL.Image.Image,
+    text: str,
+    pos: tuple[int, int],
+    font: PIL.ImageFont.FreeTypeFont,
+    align: str = "left",
+    color: str = "#000",
+    stroke_width: int = 0,
+    stroke_fill: str | None = None,
+) -> tuple[int, int]:
     draw = PIL.ImageDraw.Draw(img)
 
+    draw_pos: tuple[int, int]
     if align == "center":
-        pos = (int(pos[0] - text_size(img, font, text)[0] / 2.0), int(pos[1]))
+        draw_pos = (int(pos[0] - text_size(img, font, text)[0] / 2.0), int(pos[1]))
     elif align == "right":
-        pos = (int(pos[0] - text_size(img, font, text)[0]), int(pos[1]))
+        draw_pos = (int(pos[0] - text_size(img, font, text)[0]), int(pos[1]))
+    else:
+        draw_pos = pos
 
     # draw.rectangle(
     #     (pos[0], pos[1], pos[0] + 4, pos[1] + 4),
     #     fill="black",
     # )
 
-    pos = (pos[0], pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1])
+    draw_pos = (draw_pos[0], draw_pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1])
 
     draw.text(
-        pos,
+        draw_pos,
         text,
         color,
         font,
@@ -98,8 +104,8 @@ def draw_text_line(  # noqa: PLR0913
     # draw.rectangle(bbox, outline="red")
 
     next_pos = (
-        pos[0] + text_size(img, font, text)[0],
-        pos[1] + PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[3],
+        draw_pos[0] + text_size(img, font, text)[0],
+        draw_pos[1] + PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[3],
     )
 
     # draw.rectangle(
@@ -110,7 +116,7 @@ def draw_text_line(  # noqa: PLR0913
     return next_pos  # noqa: RET504
 
 
-def load_image(img_config):
+def load_image(img_config: dict[str, Any]) -> PIL.Image.Image:
     img = PIL.Image.open(pathlib.Path(img_config["path"]))
 
     if "scale" in img_config:
@@ -127,7 +133,9 @@ def load_image(img_config):
     return img
 
 
-def alpha_paste(img, paint_img, pos):
+def alpha_paste(
+    img: PIL.Image.Image, paint_img: PIL.Image.Image, pos: tuple[int, int]
+) -> None:
     canvas = PIL.Image.new(
         "RGBA",
         img.size,
@@ -137,7 +145,7 @@ def alpha_paste(img, paint_img, pos):
     img.alpha_composite(canvas, (0, 0))
 
 
-def convert_to_gray(img):
+def convert_to_gray(img: PIL.Image.Image) -> PIL.Image.Image:
     img = img.convert("RGB")
     img = img.point([int(pow(x / 255.0, 2.2) * 255) for x in range(256)] * 3)
     img = img.convert("L")

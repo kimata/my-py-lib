@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import functools
 import gzip
 import hashlib
 import io
 import socket
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, TypeVar
 
 import flask
 
+F = TypeVar("F", bound=Callable[..., Any])
 
-def gzipped(f):
+
+def gzipped(f: F) -> F:
     @functools.wraps(f)
-    def view_func(*args, **kwargs):
+    def view_func(*args: Any, **kwargs: Any) -> Any:
         @flask.after_this_request
-        def zipper(response):
+        def zipper(response: flask.Response) -> flask.Response:
             accept_encoding = flask.request.headers.get("Accept-Encoding", "")
 
             if "gzip" not in accept_encoding.lower():
@@ -47,12 +53,12 @@ def gzipped(f):
 
         return f(*args, **kwargs)
 
-    return view_func
+    return view_func  # type: ignore[return-value]
 
 
-def support_jsonp(f):
+def support_jsonp(f: F) -> F:
     @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
         callback = flask.request.args.get("callback", False)
         if callback:
             content = callback + "(" + f().data.decode().strip() + ")"
@@ -60,21 +66,23 @@ def support_jsonp(f):
         else:
             return f(*args, **kwargs)
 
-    return decorated_function
+    return decorated_function  # type: ignore[return-value]
 
 
-def remote_host(request):
+def remote_host(request: flask.Request) -> str:
     try:
         return socket.gethostbyaddr(request.remote_addr)[0]
     except Exception:
         return request.remote_addr
 
 
-def auth_user(request):
+def auth_user(request: flask.Request) -> str:
     return request.headers.get("X-Auth-Request-Email", "Unknown")
 
 
-def calculate_etag(data=None, file_path=None, weak=False):
+def calculate_etag(
+    data: bytes | str | None = None, file_path: str | Path | None = None, weak: bool = False
+) -> str | None:
     if file_path and Path(file_path).exists():
         stat = Path(file_path).stat()
         etag_base = f"{stat.st_mtime}-{stat.st_size}"
@@ -89,7 +97,7 @@ def calculate_etag(data=None, file_path=None, weak=False):
     return f'W/"{etag}"' if weak else f'"{etag}"'
 
 
-def check_etag(etag, request_headers):
+def check_etag(etag: str | None, request_headers: flask.datastructures.Headers) -> bool:
     if not etag:
         return False
 
@@ -111,9 +119,9 @@ def check_etag(etag, request_headers):
     return False
 
 
-def etag_cache(f):
+def etag_cache(f: F) -> F:
     @functools.wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
         response = f(*args, **kwargs)
 
         if isinstance(response, flask.Response) and response.status_code == 200:
@@ -130,13 +138,13 @@ def etag_cache(f):
 
         return response
 
-    return decorated_function
+    return decorated_function  # type: ignore[return-value]
 
 
-def etag_file(file_path):
-    def decorator(f):
+def etag_file(file_path: str | Path) -> Callable[[F], F]:
+    def decorator(f: F) -> F:
         @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
             etag = calculate_etag(file_path=file_path, weak=True)
 
             if etag and check_etag(etag, flask.request.headers):
@@ -154,12 +162,12 @@ def etag_file(file_path):
 
             return response
 
-        return decorated_function
+        return decorated_function  # type: ignore[return-value]
 
     return decorator
 
 
-def _generate_etag_from_data(etag_data, weak=True):
+def _generate_etag_from_data(etag_data: str | bytes | dict[str, Any], weak: bool = True) -> str | None:
     """ETAGデータからETAGを生成する内部関数"""
     if isinstance(etag_data, str):
         return calculate_etag(file_path=etag_data, weak=weak)
@@ -172,7 +180,11 @@ def _generate_etag_from_data(etag_data, weak=True):
     return None
 
 
-def etag_conditional(etag_func=None, cache_control="max-age=86400, must-revalidate", weak=True):
+def etag_conditional(
+    etag_func: Callable[..., str | bytes | dict[str, Any]] | None = None,
+    cache_control: str = "max-age=86400, must-revalidate",
+    weak: bool = True,
+) -> Callable[[F], F]:
     """
     汎用ETAGキャッシュデコレーター
 
@@ -197,11 +209,11 @@ def etag_conditional(etag_func=None, cache_control="max-age=86400, must-revalida
 
     """
 
-    def decorator(f):
+    def decorator(f: F) -> F:
         @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
             # ETAGを生成
-            etag = None
+            etag: str | None = None
             if etag_func:
                 etag_data = etag_func(*args, **kwargs)
                 etag = _generate_etag_from_data(etag_data, weak)
@@ -230,12 +242,15 @@ def etag_conditional(etag_func=None, cache_control="max-age=86400, must-revalida
 
             return response
 
-        return decorated_function
+        return decorated_function  # type: ignore[return-value]
 
     return decorator
 
 
-def file_etag(filename_func=None, cache_control="max-age=86400, must-revalidate"):
+def file_etag(
+    filename_func: Callable[..., str | Path] | None = None,
+    cache_control: str = "max-age=86400, must-revalidate",
+) -> Callable[[F], F]:
     """
     ファイルベースETAGキャッシュデコレーター
 
@@ -259,10 +274,11 @@ def file_etag(filename_func=None, cache_control="max-age=86400, must-revalidate"
 
     """
 
-    def decorator(f):
+    def decorator(f: F) -> F:
         @functools.wraps(f)
-        def decorated_function(*args, **kwargs):
+        def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
             # ファイルパスを取得
+            file_path: str | Path | None
             if filename_func:
                 file_path = filename_func(*args, **kwargs)
             else:
@@ -297,6 +313,6 @@ def file_etag(filename_func=None, cache_control="max-age=86400, must-revalidate"
 
             return response
 
-        return decorated_function
+        return decorated_function  # type: ignore[return-value]
 
     return decorator

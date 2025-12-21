@@ -11,23 +11,29 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import collections
 import logging
 import os
+from typing import Any
 
 import linebot.v3.messaging
 
 # NOTE: テスト用
-notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
 
 
-def get_msg_config(line_config):
+def get_msg_config(line_config: dict[str, Any]) -> linebot.v3.messaging.Configuration:
     return linebot.v3.messaging.Configuration(
         host="https://api.line.me", access_token=line_config["channel"]["access_token"]
     )
 
 
-def send_impl(line_config, message):
+def send_impl(
+    line_config: dict[str, Any],
+    message: linebot.v3.messaging.FlexMessage | linebot.v3.messaging.TemplateMessage,
+) -> None:
     hist_add(message.alt_text)
 
     msg_config = get_msg_config(line_config)
@@ -40,11 +46,11 @@ def send_impl(line_config, message):
             logging.exception("Failed to send message")
 
 
-def send(line_config, message):
+def send(line_config: dict[str, Any], message: dict[str, Any]) -> None:
     send_impl(line_config, linebot.v3.messaging.TemplateMessage.from_dict(message))
 
 
-def error(line_config, text):
+def error(line_config: dict[str, Any], text: str) -> None:
     message = linebot.v3.messaging.FlexMessage.from_dict(
         {
             "type": "flex",
@@ -88,7 +94,7 @@ def error(line_config, text):
     send_impl(line_config, message)
 
 
-def info(line_config, text):
+def info(line_config: dict[str, Any], text: str) -> None:
     message = linebot.v3.messaging.FlexMessage.from_dict(
         {
             "type": "flex",
@@ -133,17 +139,17 @@ def info(line_config, text):
 
 
 # NOTE: テスト用
-def hist_clear():
+def hist_clear() -> None:
     hist_get().clear()
 
 
 # NOTE: テスト用
-def hist_add(message):
+def hist_add(message: str) -> None:
     hist_get().append(message)
 
 
 # NOTE: テスト用
-def hist_get():
+def hist_get() -> list[str]:
     global notify_hist
 
     worker = os.environ.get("PYTEST_XDIST_WORKER", "0")

@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
 import textwrap
 import time
 import traceback
+from collections.abc import Callable
+from typing import Any
 
 import PIL.Image
 import PIL.ImageDraw
@@ -11,7 +15,7 @@ import my_lib.notify.slack
 import my_lib.pil_util
 
 
-def notify_error(config, message):
+def notify_error(config: dict[str, Any], message: str) -> None:
     logging.error(message)
 
     if "slack" not in config:
@@ -26,7 +30,9 @@ def notify_error(config, message):
     )
 
 
-def create_error_image(panel_config, font_config, message):
+def create_error_image(
+    panel_config: dict[str, Any], font_config: dict[str, Any], message: str
+) -> PIL.Image.Image:
     img = PIL.Image.new(
         "RGBA",
         (panel_config["panel"]["width"], panel_config["panel"]["height"]),
@@ -59,12 +65,18 @@ def create_error_image(panel_config, font_config, message):
 
 
 def draw_panel_patiently(  # noqa: PLR0913
-    func, panel_config, font_config, slack_config, is_side_by_side, opt_config=None, error_image=True
-):
+    func: Callable[..., PIL.Image.Image],
+    panel_config: dict[str, Any],
+    font_config: dict[str, Any],
+    slack_config: dict[str, Any] | None,
+    is_side_by_side: bool,
+    opt_config: dict[str, Any] | None = None,
+    error_image: bool = True,
+) -> tuple[PIL.Image.Image, float] | tuple[PIL.Image.Image, float, str | None]:
     RETRY_COUNT = 5
     start = time.perf_counter()
 
-    error_message = None
+    error_message: str | None = None
     for i in range(RETRY_COUNT):
         try:
             return (

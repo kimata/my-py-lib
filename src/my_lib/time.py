@@ -9,28 +9,30 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import os
 import zoneinfo
 
 import pytz
 
-TIMEZONE_DEFAULT = "Asia/Tokyo"
+TIMEZONE_DEFAULT: str = "Asia/Tokyo"
 
 
-def get_tz():
+def get_tz() -> str:
     return os.environ.get("TZ", TIMEZONE_DEFAULT)
 
 
-def get_zoneinfo():
+def get_zoneinfo() -> zoneinfo.ZoneInfo:
     return zoneinfo.ZoneInfo(get_tz())
 
 
-def get_pytz():
+def get_pytz() -> pytz.BaseTzInfo:
     return pytz.timezone(get_tz())
 
 
-def now():
+def now() -> datetime.datetime:
     return datetime.datetime.now(get_zoneinfo())
 
 

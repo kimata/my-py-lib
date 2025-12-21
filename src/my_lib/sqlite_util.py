@@ -11,6 +11,8 @@ Kubernetes manual storage class（ローカルストレージ/NFS）環境に最
     SQLITE_CHECKPOINT_DIR: WALチェックポイント用ディレクトリ
 """
 
+from __future__ import annotations
+
 import contextlib
 import fcntl
 import logging
@@ -18,9 +20,10 @@ import os
 import pathlib
 import sqlite3
 import time
+from typing import Any
 
 
-def init(conn, *, timeout=60.0):
+def init(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
     """
     SQLiteデータベースのテーブル設定を初期化する
 
@@ -33,8 +36,6 @@ def init(conn, *, timeout=60.0):
 
     # ジャーナルモード: WALモードはNFSでも動作するが、DELETEモードの方が安全な場合もある
     # NFSでのファイルロック問題を回避するため、環境に応じて選択可能にする
-    import os
-
     journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
     conn.execute(f"PRAGMA journal_mode={journal_mode}")
 
@@ -82,7 +83,7 @@ def init(conn, *, timeout=60.0):
 class DatabaseConnection:
     """SQLite接続をContext Managerとしても通常の関数としても使用可能にするラッパー"""
 
-    def __init__(self, db_path, *, timeout=60.0):
+    def __init__(self, db_path: str | pathlib.Path, *, timeout: float = 60.0) -> None:
         """
         データベース接続の初期化
 
@@ -93,12 +94,10 @@ class DatabaseConnection:
         """
         self.db_path = pathlib.Path(db_path)
         self.timeout = timeout
-        self.conn = None
+        self.conn: sqlite3.Connection | None = None
 
-    def _acquire_lock(self, lock_file):
+    def _acquire_lock(self, lock_file: Any) -> bool:
         """ロックの取得を試みる"""
-        import os
-
         if os.environ.get("SQLITE_LOCK_MODE") == "NONBLOCK":
             try:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -110,11 +109,9 @@ class DatabaseConnection:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             return True
 
-    def _get_connection_params(self):
+    def _get_connection_params(self) -> dict[str, Any]:
         """SQLite接続パラメータを取得"""
-        import os
-
-        params = {
+        params: dict[str, Any] = {
             "timeout": self.timeout,
             "check_same_thread": False,
             "isolation_level": "DEFERRED",
@@ -127,7 +124,7 @@ class DatabaseConnection:
 
         return params
 
-    def _create_connection(self):
+    def _create_connection(self) -> sqlite3.Connection:
         """実際の接続処理"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -181,13 +178,19 @@ class DatabaseConnection:
             self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
             logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
+        assert self.conn is not None
         return self.conn
 
-    def __enter__(self):
+    def __enter__(self) -> sqlite3.Connection:
         """Context Manager として使用する場合のenter"""
         return self._create_connection()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
         """Context Manager として使用する場合のexit"""
         if self.conn is not None:
             if exc_type is None:
@@ -196,12 +199,12 @@ class DatabaseConnection:
                 self.conn.rollback()  # 例外発生時はロールバック
             self.conn.close()
 
-    def get(self):
+    def get(self) -> sqlite3.Connection:
         """通常の関数として使用する場合（使用後は必ずcloseすること）"""
         return self._create_connection()
 
 
-def connect(db_path, *, timeout=60.0):
+def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseConnection:
     """
     Kubernetes manual storage class環境に適したSQLiteデータベースに接続する
 
@@ -231,7 +234,7 @@ def connect(db_path, *, timeout=60.0):
     return DatabaseConnection(db_path, timeout=timeout)
 
 
-def recover(db_path):
+def recover(db_path: str | pathlib.Path) -> None:
     """データベースの復旧を試みる"""
     try:
         db_path = pathlib.Path(db_path)

@@ -9,15 +9,24 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import logging
+from typing import TypedDict
 
 import git
 
 import my_lib.time
 
 
-def get_revision_info():
+class RevisionInfo(TypedDict):
+    hash: str
+    date: datetime.datetime
+    is_dirty: bool
+
+
+def get_revision_info() -> RevisionInfo:
     repo = git.Repo(".")
 
     commit = repo.head.commit
@@ -32,7 +41,7 @@ def get_revision_info():
     }
 
 
-def get_revision_str():
+def get_revision_str() -> str:
     revision_info = get_revision_info()
 
     return (

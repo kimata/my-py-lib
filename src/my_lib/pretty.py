@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import io
 import warnings
+from typing import Any
 
 import rich.console
 
 
-def format(obj):  # noqa: A001
+def format(obj: Any) -> str:  # noqa: A001
     str_buf = io.StringIO()
     # Suppress DeprecationWarning from rich library's internal use of datetime.utcfromtimestamp()
     with warnings.catch_warnings():

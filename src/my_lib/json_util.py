@@ -9,26 +9,29 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import json
 import re
+from typing import Any
 
 
 class DateTimeJSONEncoder(json.JSONEncoder):
     """datetime オブジェクトを ISO format 文字列に変換する JSON エンコーダー"""
 
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, datetime.datetime):
             return obj.isoformat()
         return super().default(obj)
 
 
-def datetime_hook(dct):
+def datetime_hook(dct: dict[str, Any]) -> dict[str, Any]:
     """辞書内のISO形式文字列をdatetimeオブジェクトに変換するフック関数"""
     # ISO 8601形式の日時文字列パターン（タイムゾーン付き）
     iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)$")
 
-    def convert_value(value):
+    def convert_value(value: Any) -> Any:
         if isinstance(value, str) and iso_pattern.match(value):
             try:
                 # ISO形式文字列をdatetimeオブジェクトに変換
@@ -47,7 +50,7 @@ def datetime_hook(dct):
     return {key: convert_value(value) for key, value in dct.items()}
 
 
-def loads(json_str):
+def loads(json_str: str) -> Any:
     result = json.loads(json_str, object_hook=datetime_hook)
 
     # 結果が文字列で、ISO形式の日時文字列の場合はdatetimeオブジェクトに変換
@@ -62,7 +65,7 @@ def loads(json_str):
     return result
 
 
-def dumps(obj):
+def dumps(obj: Any) -> str:
     return json.dumps(obj, cls=DateTimeJSONEncoder)
 
 

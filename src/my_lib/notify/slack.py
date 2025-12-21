@@ -11,6 +11,8 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import collections
 import json
 import logging
@@ -20,13 +22,16 @@ import pathlib
 import tempfile
 import threading
 import time
+from typing import Any, Callable, TypedDict
 
 import slack_sdk
+import slack_sdk.web.slack_response
+from PIL import Image
 
 import my_lib.footprint
 
-NOTIFY_FOOTPRINT = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
-INTERVAL_MIN = 60
+NOTIFY_FOOTPRINT: pathlib.Path = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
+INTERVAL_MIN: int = 60
 
 SIMPLE_TMPL = """\
 [
@@ -48,24 +53,37 @@ SIMPLE_TMPL = """\
 ]
 """
 
+
+class FormattedMessage(TypedDict):
+    text: str
+    json: list[dict[str, Any]]
+
+
+class AttachImage(TypedDict):
+    data: Image.Image
+    text: str
+
+
 # NOTE: テスト用
 thread_local = threading.local()
-notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
 _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 
-def format_simple(title, message):
+def format_simple(title: str, message: str) -> FormattedMessage:
     return {
         "text": message,
         "json": json.loads(SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
     }
 
 
-def send(token, ch_name, message, thread_ts=None):
+def send(
+    token: str, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+) -> slack_sdk.web.slack_response.SlackResponse | None:
     try:
         client = slack_sdk.WebClient(token=token)
 
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "channel": ch_name,
             "text": message["text"],
             "blocks": message["json"],
@@ -76,9 +94,16 @@ def send(token, ch_name, message, thread_ts=None):
         return client.chat_postMessage(**kwargs)
     except slack_sdk.errors.SlackClientError:
         logging.exception("Failed to send Slack message")
+        return None
 
 
-def split_send(token, ch_name, title, message, formatter=format_simple):
+def split_send(
+    token: str,
+    ch_name: str,
+    title: str,
+    message: str,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+) -> str | None:
     LINE_SPLIT = 20
 
     logging.info("Post slack channel: %s", ch_name)
@@ -89,7 +114,7 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
 
     message_lines = message.splitlines()
     total = math.ceil(len(message_lines) / LINE_SPLIT)
-    thread_ts = None
+    thread_ts: str | None = None
 
     for i in range(0, len(message_lines), LINE_SPLIT):
         # メッセージ内容を事前に生成
@@ -137,12 +162,25 @@ def split_send(token, ch_name, title, message, formatter=format_simple):
     return thread_ts
 
 
-def info(token, ch_name, title, message, formatter=format_simple):
+def info(
+    token: str,
+    ch_name: str,
+    title: str,
+    message: str,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+) -> None:
     title = "Info: " + title
     split_send(token, ch_name, title, message, formatter)
 
 
-def upload_image(token, ch_id, title, img, text, thread_ts=None):  # noqa: PLR0913
+def upload_image(  # noqa: PLR0913
+    token: str,
+    ch_id: str,
+    title: str,
+    img: Image.Image,
+    text: str,
+    thread_ts: str | None = None,
+) -> str | None:
     client = slack_sdk.WebClient(token=token)
 
     with tempfile.TemporaryDirectory() as dname:
@@ -150,7 +188,7 @@ def upload_image(token, ch_id, title, img, text, thread_ts=None):  # noqa: PLR09
         img.save(img_path)
 
         try:
-            kwargs = {
+            kwargs: dict[str, Any] = {
                 "channel": ch_id,
                 "file": str(img_path),
                 "title": title,
@@ -163,19 +201,19 @@ def upload_image(token, ch_id, title, img, text, thread_ts=None):  # noqa: PLR09
 
             return resp["files"][0]["id"]
         except slack_sdk.errors.SlackApiError:
-            logging.exception("Failed to sendo Slack message")
+            logging.exception("Failed to send Slack message")
 
             return None
 
 
 def error(  # noqa: PLR0913
-    token,
-    ch_name,
-    title,
-    message,
-    interval_min=INTERVAL_MIN,
-    formatter=format_simple,
-):
+    token: str,
+    ch_name: str,
+    title: str,
+    message: str,
+    interval_min: int | float = INTERVAL_MIN,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+) -> None:
     title = "Error: " + title
 
     hist_add(message)
@@ -190,15 +228,15 @@ def error(  # noqa: PLR0913
 
 
 def error_with_image(  # noqa: PLR0913
-    token,
-    ch_name,
-    ch_id,
-    title,
-    message,
-    attatch_img,
-    interval_min=INTERVAL_MIN,
-    formatter=format_simple,
-):  # def error_with_image
+    token: str,
+    ch_name: str,
+    ch_id: str | None,
+    title: str,
+    message: str,
+    attatch_img: AttachImage | None,
+    interval_min: int | float = INTERVAL_MIN,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+) -> None:
     title = "Error: " + title
 
     hist_add(message)
@@ -219,24 +257,24 @@ def error_with_image(  # noqa: PLR0913
 
 
 # NOTE: テスト用
-def interval_clear():
+def interval_clear() -> None:
     my_lib.footprint.clear(NOTIFY_FOOTPRINT)
 
 
 # NOTE: テスト用
-def hist_clear():
+def hist_clear() -> None:
     hist_get(True).clear()
     hist_get(False).clear()
 
 
 # NOTE: テスト用
-def hist_add(message):
+def hist_add(message: str) -> None:
     hist_get(True).append(message)
     hist_get(False).append(message)
 
 
 # NOTE: テスト用
-def hist_get(is_thread_local=True):
+def hist_get(is_thread_local: bool = True) -> list[str]:
     global thread_local
     global notify_hist
     global _hist_lock

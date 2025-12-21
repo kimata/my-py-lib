@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
 import os
 import signal
@@ -6,14 +8,14 @@ import signal
 import psutil
 
 
-def signal_name(sig):
+def signal_name(sig: int) -> str:
     try:
         return signal.Signals(sig).name
     except ValueError:
         return "UNKNOWN"
 
 
-def status_text(status):
+def status_text(status: int) -> str:
     if os.WIFEXITED(status):
         return f"Exited normally with code {os.WEXITSTATUS(status)}"
     elif os.WIFSIGNALED(status):
@@ -26,7 +28,7 @@ def status_text(status):
         return f"Unknown status: {status}"
 
 
-def kill_child(timeout=5):  # noqa: C901, PLR0912
+def kill_child(timeout: float = 5) -> None:  # noqa: C901, PLR0912
     """現在のプロセスの子プロセスを終了させる
 
     Args:
@@ -82,8 +84,8 @@ def kill_child(timeout=5):  # noqa: C901, PLR0912
         logging.warning("Failed to kill child processes: %s", e)
 
 
-def get_child_pid_map():
-    pid_map = {}
+def get_child_pid_map() -> dict[int, str]:
+    pid_map: dict[int, str] = {}
     parent = psutil.Process()
 
     try:
@@ -98,7 +100,7 @@ def get_child_pid_map():
     return pid_map
 
 
-def reap_zombie():
+def reap_zombie() -> None:
     pid_map = get_child_pid_map()
     try:
         while True:

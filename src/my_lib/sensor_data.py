@@ -18,15 +18,37 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
 import os
 import time
+from typing import Any, TypedDict
 
 import influxdb_client
+from influxdb_client.client.flux_table import TableList
 
 import my_lib.time
+
+
+class SensorDataResult(TypedDict):
+    value: list[float]
+    time: list[datetime.datetime]
+    valid: bool
+
+
+class DataRequest(TypedDict, total=False):
+    measure: str
+    hostname: str
+    field: str
+    start: str
+    stop: str
+    every_min: int
+    window_min: int
+    create_empty: bool
+    last: bool
 
 # NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
 # timedMovingAverage を使う。timedMovingAverage の計算の結果、データが後ろに
@@ -80,7 +102,9 @@ from(bucket: "{bucket}")
 """
 
 
-def _process_query_results(table_list, create_empty, last, every_min, window_min):
+def _process_query_results(
+    table_list: list[Any], create_empty: bool, last: bool, every_min: int, window_min: int
+) -> SensorDataResult:
     """共通のクエリ結果処理ロジック"""
     data_list = []
     time_list = []
@@ -111,8 +135,18 @@ def _process_query_results(table_list, create_empty, last, every_min, window_min
 
 
 def fetch_data_impl(  # noqa: PLR0913
-    db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
-):
+    db_config: dict[str, Any],
+    template: str,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str,
+    stop: str,
+    every: int,
+    window: int,
+    create_empty: bool,
+    last: bool = False,
+) -> TableList:
     client = None
     try:
         token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
@@ -145,8 +179,18 @@ def fetch_data_impl(  # noqa: PLR0913
 
 
 async def fetch_data_impl_async(  # noqa: PLR0913
-    db_config, template, measure, hostname, field, start, stop, every, window, create_empty, last=False
-):
+    db_config: dict[str, Any],
+    template: str,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str,
+    stop: str,
+    every: int,
+    window: int,
+    create_empty: bool,
+    last: bool = False,
+) -> TableList:
     """非同期版のデータ取得実装"""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
@@ -167,17 +211,17 @@ async def fetch_data_impl_async(  # noqa: PLR0913
 
 
 def fetch_data(  # noqa: PLR0913
-    db_config,
-    measure,
-    hostname,
-    field,
-    start="-30h",
-    stop="now()",
-    every_min=1,
-    window_min=3,
-    create_empty=True,
-    last=False,
-):
+    db_config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = "-30h",
+    stop: str = "now()",
+    every_min: int = 1,
+    window_min: int = 3,
+    create_empty: bool = True,
+    last: bool = False,
+) -> SensorDataResult:
     time_start = time.time()
     logging.debug(
         (
@@ -232,17 +276,17 @@ def fetch_data(  # noqa: PLR0913
 
 
 async def fetch_data_async(  # noqa: PLR0913
-    db_config,
-    measure,
-    hostname,
-    field,
-    start="-30h",
-    stop="now()",
-    every_min=1,
-    window_min=3,
-    create_empty=True,
-    last=False,
-):
+    db_config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = "-30h",
+    stop: str = "now()",
+    every_min: int = 1,
+    window_min: int = 3,
+    create_empty: bool = True,
+    last: bool = False,
+) -> SensorDataResult:
     """非同期版のfetch_data"""
     time_start = time.time()
     logging.debug(
@@ -297,7 +341,9 @@ async def fetch_data_async(  # noqa: PLR0913
         return {"value": [], "time": [], "valid": False}
 
 
-async def fetch_data_parallel(db_config, requests):
+async def fetch_data_parallel(
+    db_config: dict[str, Any], requests: list[DataRequest]
+) -> list[SensorDataResult | BaseException]:
     """
     複数のデータ取得リクエストを並列実行
 
@@ -340,17 +386,17 @@ async def fetch_data_parallel(db_config, requests):
 
 
 def get_equip_on_minutes(  # noqa: PLR0913
-    config,
-    measure,
-    hostname,
-    field,
-    threshold,
-    start="-30h",
-    stop="now()",
-    every_min=1,
-    window_min=5,
-    create_empty=True,
-):  # def get_equip_on_minutes
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    threshold: float,
+    start: str = "-30h",
+    stop: str = "now()",
+    every_min: int = 1,
+    window_min: int = 5,
+    create_empty: bool = True,
+) -> int:
     logging.info(
         (
             "Get 'ON' minutes (type: %s, host: %d, field: %d{field}, "
@@ -409,17 +455,17 @@ def get_equip_on_minutes(  # noqa: PLR0913
 
 
 def get_equip_mode_period(  # noqa: C901, PLR0913
-    config,
-    measure,
-    hostname,
-    field,
-    threshold_list,
-    start="-30h",
-    stop="now()",
-    every_min=10,
-    window_min=10,
-    create_empty=True,
-):  # def get_equip_mode_period
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    threshold_list: list[float],
+    start: str = "-30h",
+    stop: str = "now()",
+    every_min: int = 10,
+    window_min: int = 10,
+    create_empty: bool = True,
+) -> list[list[Any]]:
     logging.info(
         (
             "Get equipment mode period (type: %s, host: %s, field: %s, "
@@ -465,7 +511,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
             # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
             # だとタイミングによって、先頭に None が入る
             if record.get_value() is None:
-                logging.debug("DELETE %s", datetime=record.get_time() + localtime_offset)
+                logging.debug("DELETE %s", record.get_time() + localtime_offset)
                 continue
 
             is_idle = True
@@ -473,6 +519,8 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
                 if record.get_value() > threshold_list[i]:
                     if state != i:
                         if state != -1:
+                            assert start_time is not None
+                            assert prev_time is not None
                             on_range.append(
                                 [
                                     start_time + localtime_offset,
@@ -485,6 +533,8 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
                     is_idle = False
                     break
             if is_idle and state != -1:
+                assert start_time is not None
+                assert prev_time is not None
                 on_range.append(
                     [
                         start_time + localtime_offset,
@@ -498,6 +548,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
             prev_time = record.get_time()
 
         if state != -1:
+            assert start_time is not None
             on_range.append(
                 [
                     start_time + localtime_offset,
@@ -511,7 +562,16 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
         return []
 
 
-def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_min=1, window_min=3):  # noqa:  PLR0913
+def get_sum(  # noqa: PLR0913
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = "-3m",
+    stop: str = "now()",
+    every_min: int = 1,
+    window_min: int = 3,
+) -> float:
     try:
         table_list = fetch_data_impl(
             config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
@@ -522,15 +582,28 @@ def get_sum(config, measure, hostname, field, start="-3m", stop="now()", every_m
         if len(value_list) == 0:
             return 0
         else:
-            return value_list[0][1]
+            sum_value = value_list[0][1]
+            if isinstance(sum_value, (int, float)):
+                return float(sum_value)
+            raise ValueError(f"Unexpected sum value type: {type(sum_value).__name__} (value={sum_value})")
+    except ValueError:
+        raise
     except Exception:
         logging.exception("Failed to fetch data")
         return 0
 
 
-def get_day_sum(  # noqa:  PLR0913
-    config, measure, hostname, field, days, day_before=0, day_offset=0, every_min=1, window_min=5
-):
+def get_day_sum(  # noqa: PLR0913
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    days: int,
+    day_before: int = 0,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 5,
+) -> float:
     now = my_lib.time.now()
 
     if day_before == 0:
@@ -543,21 +616,41 @@ def get_day_sum(  # noqa:  PLR0913
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_hour_sum(config, measure, hostname, field, hours, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+def get_hour_sum(  # noqa: PLR0913
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    hours: int,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 1,
+) -> float:
     start = f"-{day_offset * 24 + hours}h"
     stop = f"-{day_offset * 24}h"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_minute_sum(config, measure, hostname, field, minutes, day_offset=0, every_min=1, window_min=1):  # noqa:  PLR0913
+def get_minute_sum(  # noqa: PLR0913
+    config: dict[str, Any],
+    measure: str,
+    hostname: str,
+    field: str,
+    minutes: int,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 1,
+) -> float:
     start = f"-{day_offset * 24 * 60 + minutes}m"
     stop = f"-{day_offset * 24 * 60}m"
 
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_last_event(config, measure, hostname, field, start="-7d"):
+def get_last_event(
+    config: dict[str, Any], measure: str, hostname: str, field: str, start: str = "-7d"
+) -> datetime.datetime | None:
     try:
         table_list = fetch_data_impl(
             config, FLUX_EVENT_QUERY, measure, hostname, field, start, "now()", 0, 0, False
@@ -568,13 +661,18 @@ def get_last_event(config, measure, hostname, field, start="-7d"):
         if len(value_list) == 0:
             return None
         else:
-            return value_list[0][0]
+            time_value = value_list[0][0]
+            if isinstance(time_value, datetime.datetime):
+                return time_value
+            raise ValueError(f"Unexpected time value type: {type(time_value).__name__} (value={time_value})")
+    except ValueError:
+        raise
     except Exception:
         logging.exception("Failed to fetch data")
         return None
 
 
-def dump_data(data):
+def dump_data(data: SensorDataResult) -> None:
     for i in range(len(data["time"])):
         logging.info("%s: %s", data["time"][i], data["value"][i])
 
@@ -618,8 +716,9 @@ if __name__ == "__main__":
     logging.info("DB config: %s", my_lib.pretty.format(db_config))
     logging.info("Sensor config: %s", my_lib.pretty.format(sensor_config))
 
+    result: SensorDataResult | float
     if mode == "data":
-        data = fetch_data(
+        result = fetch_data(
             db_config,
             sensor_config["measure"],
             sensor_config["hostname"],
@@ -632,12 +731,13 @@ if __name__ == "__main__":
             last=False,
         )
     elif mode == "day_sum":
-        data = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
     elif mode == "hour_sum":
-        data = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
     elif mode == "minute_sum":
-        data = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
     else:
         logging.error("Unknown mode: %s", mode)
+        result = 0.0
 
-    logging.info(my_lib.pretty.format(data))
+    logging.info(my_lib.pretty.format(result))

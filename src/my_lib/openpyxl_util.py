@@ -1,16 +1,32 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
+import pathlib
+from collections.abc import Callable
+from typing import Any
 
 import openpyxl.drawing.image
+import openpyxl.drawing.spreadsheet_drawing
 import openpyxl.styles
 import openpyxl.utils
+import openpyxl.utils.units
+import openpyxl.workbook
+import openpyxl.worksheet.worksheet
 
 
-def gen_text_pos(row, col):
+def gen_text_pos(row: int, col: int) -> str:
     return f"{openpyxl.utils.get_column_letter(col)}{row}"
 
 
-def set_header_cell_style(sheet, row, col, value, width, style):  # noqa: PLR0913
+def set_header_cell_style(
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    row: int,
+    col: int,
+    value: str,
+    width: float | None,
+    style: dict[str, Any],
+) -> None:  # noqa: PLR0913
     sheet.cell(row, col).value = value
     sheet.cell(row, col).style = "Normal"
     sheet.cell(row, col).border = style["border"]
@@ -20,10 +36,15 @@ def set_header_cell_style(sheet, row, col, value, width, style):  # noqa: PLR091
         sheet.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
 
 
-def insert_table_header(sheet, row, sheet_def, base_style):
+def insert_table_header(
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    row: int,
+    sheet_def: dict[str, Any],
+    base_style: dict[str, Any],
+) -> None:
     for key in sheet_def["TABLE_HEADER"]["col"]:
-        col = sheet_def["TABLE_HEADER"]["col"][key]["pos"]
-        width = sheet_def["TABLE_HEADER"]["col"][key].get("width", None)
+        col: int = sheet_def["TABLE_HEADER"]["col"][key]["pos"]
+        width: float | None = sheet_def["TABLE_HEADER"]["col"][key].get("width", None)
 
         if key == "category":
             for i in range(sheet_def["TABLE_HEADER"]["col"][key]["length"]):
@@ -41,7 +62,7 @@ def insert_table_header(sheet, row, sheet_def, base_style):
             )
 
 
-def gen_item_cell_style(base_style, cell_def):
+def gen_item_cell_style(base_style: dict[str, Any], cell_def: dict[str, Any]) -> dict[str, Any]:
     style = base_style.copy()
 
     if "format" in cell_def:
@@ -52,7 +73,13 @@ def gen_item_cell_style(base_style, cell_def):
     return style
 
 
-def set_item_cell_style(sheet, row, col, value, style):
+def set_item_cell_style(
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    row: int,
+    col: int,
+    value: Any,
+    style: dict[str, Any],
+) -> None:
     sheet.cell(row, col).value = value
     sheet.cell(row, col).style = "Normal"
     sheet.cell(row, col).border = style["border"]
@@ -62,16 +89,24 @@ def set_item_cell_style(sheet, row, col, value, style):
         sheet.cell(row, col).number_format = style["text_format"]
 
 
-def insert_table_item(sheet, row, item, is_need_thumb, thumb_path, sheet_def, base_style):  # noqa: PLR0912, PLR0913, C901
+def insert_table_item(  # noqa: PLR0912, PLR0913, C901
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    row: int,
+    item: dict[str, Any],
+    is_need_thumb: bool,
+    thumb_path: pathlib.Path | None,
+    sheet_def: dict[str, Any],
+    base_style: dict[str, Any],
+) -> None:
     for key in sheet_def["TABLE_HEADER"]["col"]:
-        col = sheet_def["TABLE_HEADER"]["col"][key]["pos"]
+        col: int = sheet_def["TABLE_HEADER"]["col"][key]["pos"]
 
         cell_style = gen_item_cell_style(base_style, sheet_def["TABLE_HEADER"]["col"][key])
 
         if key == "category":
             if key in item:
                 for i in range(sheet_def["TABLE_HEADER"]["col"][key]["length"]):
-                    value = item[key][i] if i < len(item["category"]) else ""
+                    value: Any = item[key][i] if i < len(item["category"]) else ""
                     set_item_cell_style(sheet, row, col + i, value, cell_style)
             else:
                 logging.warning("キー '%s' がアイテムに存在しません", key)
@@ -123,7 +158,14 @@ def insert_table_item(sheet, row, item, is_need_thumb, thumb_path, sheet_def, ba
             sheet.cell(row, col).hyperlink = sheet_def["TABLE_HEADER"]["col"][key]["link_func"](item)
 
 
-def insert_table_cell_image(sheet, row, col, thumb_path, cell_width, cell_height):  # noqa: PLR0913
+def insert_table_cell_image(  # noqa: PLR0913
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    row: int,
+    col: int,
+    thumb_path: pathlib.Path | None,
+    cell_width: float,
+    cell_height: float,
+) -> None:
     if (thumb_path is None) or (not thumb_path.exists()):
         return
 
@@ -175,7 +217,12 @@ def insert_table_cell_image(sheet, row, col, thumb_path, cell_width, cell_height
     sheet.add_image(img)
 
 
-def setting_table_view(sheet, sheet_def, row_last, is_hidden):
+def setting_table_view(
+    sheet: openpyxl.worksheet.worksheet.Worksheet,
+    sheet_def: dict[str, Any],
+    row_last: int,
+    is_hidden: bool,
+) -> None:
     sheet.column_dimensions.group(
         openpyxl.utils.get_column_letter(sheet_def["TABLE_HEADER"]["col"]["image"]["pos"]),
         openpyxl.utils.get_column_letter(sheet_def["TABLE_HEADER"]["col"]["image"]["pos"]),
@@ -198,15 +245,15 @@ def setting_table_view(sheet, sheet_def, row_last, is_hidden):
 
 
 def generate_list_sheet(  # noqa: PLR0913
-    book,
-    item_list,
-    sheet_def,
-    is_need_thumb,
-    thumb_path_func,
-    set_status_func,
-    update_seq_func,
-    update_item_func,
-):
+    book: openpyxl.workbook.Workbook,
+    item_list: list[dict[str, Any]],
+    sheet_def: dict[str, Any],
+    is_need_thumb: bool,
+    thumb_path_func: Callable[[dict[str, Any]], pathlib.Path | None],
+    set_status_func: Callable[[str], None],
+    update_seq_func: Callable[[], None],
+    update_item_func: Callable[[], None],
+) -> openpyxl.worksheet.worksheet.Worksheet:
     sheet = book.create_sheet()
     sheet.title = "{label}アイテム一覧".format(label=sheet_def["SHEET_TITLE"])
 
@@ -214,7 +261,7 @@ def generate_list_sheet(  # noqa: PLR0913
     border = openpyxl.styles.Border(top=side, left=side, right=side, bottom=side)
     fill = openpyxl.styles.PatternFill(patternType="solid", fgColor="F2F2F2")
 
-    base_style = {"border": border, "fill": fill}
+    base_style: dict[str, Any] = {"border": border, "fill": fill}
 
     row = sheet_def["TABLE_HEADER"]["row"]["pos"]
 
@@ -225,6 +272,7 @@ def generate_list_sheet(  # noqa: PLR0913
 
     set_status_func("{label} - 商品の記載をしています...".format(label=sheet_def["SHEET_TITLE"]))
 
+    cell_height: float
     if is_need_thumb:
         cell_height = sheet_def["TABLE_HEADER"]["row"]["height"]["default"]
     else:

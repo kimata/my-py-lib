@@ -13,6 +13,8 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import io
 import json
 import logging
@@ -20,13 +22,14 @@ import time
 import urllib.parse
 import urllib.request
 import wave
+from typing import Any
 
 import numpy as np
 import pyaudio
 import scipy.signal
 
 
-def get_query_url(config, text, speaker_id):
+def get_query_url(config: dict[str, Any], text: str, speaker_id: int) -> str:
     return urllib.parse.urlunparse(
         urllib.parse.urlparse(
             urllib.parse.urljoin(config["voice"]["server"]["url"], "/audio_query")
@@ -34,7 +37,7 @@ def get_query_url(config, text, speaker_id):
     )
 
 
-def get_synthesis_url(config, speaker_id):
+def get_synthesis_url(config: dict[str, Any], speaker_id: int) -> str:
     return urllib.parse.urlunparse(
         urllib.parse.urlparse(urllib.parse.urljoin(config["voice"]["server"]["url"], "/synthesis"))._replace(
             query=urllib.parse.urlencode({"speaker": speaker_id})
@@ -43,7 +46,7 @@ def get_synthesis_url(config, speaker_id):
 
 
 # MEMO: 一般的なサンプリングレートに変更
-def convert_wav_data(wav_data_in):
+def convert_wav_data(wav_data_in: bytes) -> bytes:
     with wave.open(io.BytesIO(wav_data_in), "rb") as wav_in:
         n_channels = wav_in.getnchannels()
         sampwidth = wav_in.getsampwidth()
@@ -52,12 +55,12 @@ def convert_wav_data(wav_data_in):
         audio_data = wav_in.readframes(n_frames)
 
     # WAV の sample dtype を推定
-    dtype_map = {1: np.int8, 2: np.int16, 4: np.int32}
+    dtype_map: dict[int, type[np.signedinteger[Any]]] = {1: np.int8, 2: np.int16, 4: np.int32}
     if sampwidth not in dtype_map:
         logging.error("Unsupported sampwidth: %d, defaulting to int16", sampwidth)
         sampwidth = 2  # Default to 16-bit
     dtype = dtype_map[sampwidth]
-    audio = np.frombuffer(audio_data, dtype=dtype)
+    audio: np.ndarray[Any, np.dtype[Any]] = np.frombuffer(audio_data, dtype=dtype)
 
     # ステレオ → モノラル（加算ではなく平均にする）
     if n_channels == 2:
@@ -98,7 +101,9 @@ def convert_wav_data(wav_data_in):
     return out_buf.getvalue()
 
 
-def synthesize(config, text, speaker_id=3, volume=2):
+def synthesize(
+    config: dict[str, Any], text: str, speaker_id: int = 3, volume: int | float = 2
+) -> bytes:
     if not isinstance(text, str) or len(text.strip()) == 0:
         raise ValueError("Text must be a non-empty string")
     if not isinstance(speaker_id, int) or speaker_id < 0:
@@ -116,7 +121,7 @@ def synthesize(config, text, speaker_id=3, volume=2):
         req = urllib.request.Request(query_url, method="POST")  # noqa: S310
 
         with urllib.request.urlopen(req, timeout=30) as res:  # noqa: S310
-            query_json = json.loads(res.read().decode("utf-8"))
+            query_json: dict[str, Any] = json.loads(res.read().decode("utf-8"))
 
         query_json["volumeScale"] = volume
         query_json["speedScale"] = 0.9
@@ -136,7 +141,7 @@ def synthesize(config, text, speaker_id=3, volume=2):
         raise RuntimeError(f"Invalid response from voice server: {e}") from e
 
 
-def play(wav_data, duration_sec=None):
+def play(wav_data: bytes, duration_sec: float | None = None) -> None:
     # Check if data needs conversion (only convert if not already 44.1kHz mono)
     with wave.open(io.BytesIO(wav_data), "rb") as wav_check:
         needs_conversion = wav_check.getframerate() != 44100 or wav_check.getnchannels() != 1
@@ -146,7 +151,7 @@ def play(wav_data, duration_sec=None):
 
     # PyAudio instance
     p = pyaudio.PyAudio()
-    stream = None
+    stream: pyaudio.Stream | None = None
 
     try:
         with wave.open(io.BytesIO(wav_data), "rb") as wav_file:
@@ -156,7 +161,7 @@ def play(wav_data, duration_sec=None):
             sampwidth = wav_file.getsampwidth()
 
             # Get format from sample width
-            audio_format_map = {1: pyaudio.paInt8, 2: pyaudio.paInt16, 4: pyaudio.paInt32}
+            audio_format_map: dict[int, int] = {1: pyaudio.paInt8, 2: pyaudio.paInt16, 4: pyaudio.paInt32}
             audio_format = audio_format_map.get(sampwidth, pyaudio.paInt16)
 
             # Open stream
@@ -174,7 +179,7 @@ def play(wav_data, duration_sec=None):
                     break
 
                 # Check duration limit
-                if duration_sec and (time.time() - start_time) >= duration_sec:
+                if duration_sec and start_time and (time.time() - start_time) >= duration_sec:
                     break
 
                 stream.write(data)

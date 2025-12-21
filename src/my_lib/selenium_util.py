@@ -10,6 +10,8 @@ Options:
   -d                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import inspect
 import logging
@@ -20,6 +22,7 @@ import re
 import signal
 import subprocess
 import time
+from typing import TYPE_CHECKING, Any
 
 import psutil
 import selenium
@@ -32,10 +35,14 @@ import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
 import undetected_chromedriver
 
-WAIT_RETRY_COUNT = 1
+if TYPE_CHECKING:
+    import selenium.webdriver.remote.webdriver
+    import selenium.webdriver.support.wait
+
+WAIT_RETRY_COUNT: int = 1
 
 
-def get_chrome_version():
+def get_chrome_version() -> int | None:
     try:
         result = subprocess.run(
             ["google-chrome", "--version"],
@@ -51,7 +58,9 @@ def get_chrome_version():
     return None
 
 
-def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
+def create_driver_impl(
+    profile_name: str, data_path: pathlib.Path, is_headless: bool
+) -> undetected_chromedriver.Chrome:  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -117,7 +126,7 @@ def create_driver_impl(profile_name, data_path, is_headless):  # noqa: ARG001
     return driver
 
 
-def _cleanup_profile_lock(profile_path):
+def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
     """プロファイルのロックファイルを削除する"""
     lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
     found_locks = []
@@ -135,7 +144,12 @@ def _cleanup_profile_lock(profile_path):
                 logging.warning("Failed to remove lock file %s: %s", lock_path, e)
 
 
-def create_driver(profile_name, data_path, is_headless=True, clean_profile=False):
+def create_driver(
+    profile_name: str,
+    data_path: pathlib.Path,
+    is_headless: bool = True,
+    clean_profile: bool = False,
+) -> undetected_chromedriver.Chrome:
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
@@ -172,11 +186,16 @@ def create_driver(profile_name, data_path, is_headless=True, clean_profile=False
         return create_driver_impl(profile_name, data_path, is_headless)
 
 
-def xpath_exists(driver, xpath):
+def xpath_exists(driver: selenium.webdriver.remote.webdriver.WebDriver, xpath: str) -> bool:
     return len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0
 
 
-def get_text(driver, xpath, safe_text, wait=None):
+def get_text(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    xpath: str,
+    safe_text: str,
+    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+) -> str:
     if wait is not None:
         wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
@@ -190,7 +209,13 @@ def get_text(driver, xpath, safe_text, wait=None):
         return safe_text
 
 
-def input_xpath(driver, xpath, text, wait=None, is_warn=True):
+def input_xpath(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    xpath: str,
+    text: str,
+    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+    is_warn: bool = True,
+) -> bool:
     if wait is not None:
         wait.until(
             selenium.webdriver.support.expected_conditions.element_to_be_clickable(
@@ -208,7 +233,13 @@ def input_xpath(driver, xpath, text, wait=None, is_warn=True):
         return False
 
 
-def click_xpath(driver, xpath, wait=None, is_warn=True):
+def click_xpath(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    xpath: str,
+    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+    is_warn: bool = True,
+    move: bool = False,
+) -> bool:
     if wait is not None:
         wait.until(
             selenium.webdriver.support.expected_conditions.element_to_be_clickable(
@@ -219,9 +250,10 @@ def click_xpath(driver, xpath, wait=None, is_warn=True):
 
     if xpath_exists(driver, xpath):
         elem = driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath)
-        action = selenium.webdriver.common.action_chains.ActionChains(driver)
-        action.move_to_element(elem)
-        action.perform()
+        if move:
+            action = selenium.webdriver.common.action_chains.ActionChains(driver)
+            action.move_to_element(elem)
+            action.perform()
 
         elem.click()
         return True
@@ -231,20 +263,24 @@ def click_xpath(driver, xpath, wait=None, is_warn=True):
         return False
 
 
-def is_display(driver, xpath):
+def is_display(driver: selenium.webdriver.remote.webdriver.WebDriver, xpath: str) -> bool:
     return (len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0) and (
         driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).is_displayed()
     )
 
 
-def random_sleep(sec):
+def random_sleep(sec: float) -> None:
     RATIO = 0.8
 
     time.sleep((sec * RATIO) + (sec * (1 - RATIO) * 2) * random.random())  # noqa: S311
 
 
-def wait_patiently(driver, wait, target):
-    error = None
+def wait_patiently(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    target: Any,
+) -> None:
+    error: selenium.common.exceptions.TimeoutException | None = None
     for i in range(WAIT_RETRY_COUNT + 1):
         try:
             wait.until(target)
@@ -263,10 +299,19 @@ def wait_patiently(driver, wait, target):
                 logging.info("refresh")
                 driver.refresh()
 
-    raise error
+    if error is not None:
+        raise error
 
 
-def dump_page(driver, index, dump_path, stack=1):
+def dump_page(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    index: int,
+    dump_path: pathlib.Path | None = None,
+    stack: int = 1,
+) -> None:
+    if dump_path is None:
+        return
+
     name = inspect.stack()[stack].function.replace("<", "").replace(">", "")
 
     dump_path.mkdir(parents=True, exist_ok=True)
@@ -288,12 +333,12 @@ def dump_page(driver, index, dump_path, stack=1):
     )
 
 
-def clear_cache(driver):
+def clear_cache(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     driver.execute_cdp_cmd("Network.clearBrowserCache", {})
 
 
-def clean_dump(dump_path, keep_days=1):
-    if not dump_path.exists():
+def clean_dump(dump_path: pathlib.Path | None = None, keep_days: int = 1) -> None:
+    if dump_path is None or not dump_path.exists():
         return
 
     time_threshold = datetime.timedelta(keep_days)
@@ -314,7 +359,7 @@ def clean_dump(dump_path, keep_days=1):
             item.unlink(missing_ok=True)
 
 
-def get_memory_info(driver):
+def get_memory_info(driver: selenium.webdriver.remote.webdriver.WebDriver) -> dict[str, int]:
     total = subprocess.Popen(  # noqa: S602
         "smem -t -c pss -P chrome | tail -n 1",  # noqa: S607
         shell=True,
@@ -327,14 +372,19 @@ def get_memory_info(driver):
     return {"total": total, "js_heap": js_heap}
 
 
-def log_memory_usage(driver):
+def log_memory_usage(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     mem_info = get_memory_info(driver)
     logging.info(
         "Chrome memory: %s MB (JS: %s MB)", f"""{mem_info["total"]:,}""", f"""{mem_info["js_heap"]:,}:"""
     )
 
 
-def warmup(driver, keyword, url_pattern, sleep_sec=3):
+def warmup(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    keyword: str,
+    url_pattern: str,
+    sleep_sec: int = 3,
+) -> None:
     # NOTE: ダミーアクセスを行って BOT ではないと思わせる。(効果なさそう...)
     driver.get("https://www.yahoo.co.jp/")
     time.sleep(sleep_sec)
@@ -354,18 +404,25 @@ def warmup(driver, keyword, url_pattern, sleep_sec=3):
 
 
 class browser_tab:  # noqa: N801
-    def __init__(self, driver, url):  # noqa: D107
+    def __init__(
+        self, driver: selenium.webdriver.remote.webdriver.WebDriver, url: str
+    ) -> None:  # noqa: D107
         self.driver = driver
         self.url = url
-        self.original_window = None
+        self.original_window: str | None = None
 
-    def __enter__(self):  # noqa: D105
+    def __enter__(self) -> None:  # noqa: D105
         self.original_window = self.driver.current_window_handle
         self.driver.execute_script("window.open('');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
         self.driver.get(self.url)
 
-    def __exit__(self, exception_type, exception_value, traceback):  # noqa: D105
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception_value: BaseException | None,
+        traceback: Any,
+    ) -> None:  # noqa: D105
         try:
             self.driver.close()
             self.driver.switch_to.window(self.original_window)
@@ -375,7 +432,7 @@ class browser_tab:  # noqa: N801
             logging.exception("Failed to close browser tab (Chrome may have crashed)")
 
 
-def _is_chrome_related_process(process):
+def _is_chrome_related_process(process: psutil.Process) -> bool:
     """プロセスがChrome関連かどうかを判定"""
     try:
         process_name = process.name().lower()
@@ -389,7 +446,7 @@ def _is_chrome_related_process(process):
         return False
 
 
-def _get_chrome_processes_by_pgid(chromedriver_pid, existing_pids):
+def _get_chrome_processes_by_pgid(chromedriver_pid: int, existing_pids: set[int]) -> list[int]:
     """プロセスグループIDで追加のChrome関連プロセスを取得"""
     additional_pids = []
     try:
@@ -414,7 +471,7 @@ def _get_chrome_processes_by_pgid(chromedriver_pid, existing_pids):
     return additional_pids
 
 
-def get_chrome_related_processes(driver):
+def get_chrome_related_processes(driver: selenium.webdriver.remote.webdriver.WebDriver) -> list[int]:
     """Chrome関連の全子プロセスを取得
 
     undetected_chromedriver 使用時、Chrome プロセスは chromedriver の子ではなく
@@ -463,7 +520,7 @@ def get_chrome_related_processes(driver):
     return list(chrome_pids)
 
 
-def _send_signal_to_processes(pids, sig, signal_name):
+def _send_signal_to_processes(pids: list[int], sig: signal.Signals, signal_name: str) -> None:
     """プロセスリストに指定されたシグナルを送信"""
     errors = []
     for pid in pids:
@@ -489,7 +546,7 @@ def _send_signal_to_processes(pids, sig, signal_name):
         logging.debug("Failed to send %s to some processes: %s", signal_name, errors)
 
 
-def terminate_chrome_processes(chrome_pids, timeout=5.0):
+def terminate_chrome_processes(chrome_pids: list[int], timeout: float = 5.0) -> None:
     """Chrome関連プロセスを段階的に終了
 
     Args:
@@ -534,7 +591,7 @@ def terminate_chrome_processes(chrome_pids, timeout=5.0):
         _send_signal_to_processes(remaining_pids, signal.SIGKILL, "SIGKILL")
 
 
-def _reap_single_process(pid):
+def _reap_single_process(pid: int) -> None:
     """単一プロセスをwaitpidで回収"""
     try:
         # ノンブロッキングでwaitpid
@@ -552,13 +609,13 @@ def _reap_single_process(pid):
         pass
 
 
-def reap_chrome_processes(chrome_pids):
+def reap_chrome_processes(chrome_pids: list[int]) -> None:
     """Chrome関連プロセスを明示的に回収してゾンビ化を防ぐ"""
     for pid in chrome_pids:
         _reap_single_process(pid)
 
 
-def quit_driver_gracefully(driver):  # noqa: C901, PLR0912
+def quit_driver_gracefully(driver: selenium.webdriver.remote.webdriver.WebDriver | None) -> None:  # noqa: C901, PLR0912
     """Chrome WebDriverを確実に終了する"""
     if driver is None:
         return

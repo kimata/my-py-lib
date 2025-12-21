@@ -1,36 +1,45 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import bz2
 import io
 import logging
 import logging.handlers
 import os
 import pathlib
+from typing import Any
 
 import coloredlogs
 
-MAX_SIZE = 10 * 1024 * 1024
-ROTATE_COUNT = 10
+MAX_SIZE: int = 10 * 1024 * 1024
+ROTATE_COUNT: int = 10
 
-LOG_FORMAT = "{name} %(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
+LOG_FORMAT: str = "{name} %(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
 
 
-def log_formatter(name):
+def log_formatter(name: str) -> logging.Formatter:
     return logging.Formatter(fmt=LOG_FORMAT.format(name=name), datefmt="%Y-%m-%d %H:%M:%S")
 
 
 class GZipRotator:
     @staticmethod
-    def namer(name):
+    def namer(name: str) -> str:
         return name + ".bz2"
 
     @staticmethod
-    def rotator(source, dest):
+    def rotator(source: str, dest: str) -> None:
         with pathlib.Path(source).open(mode="rb") as fs, bz2.open(dest, "wb") as fd:
             fd.writelines(fs)
-        pathlib.Path.unlink(source)
+        pathlib.Path.unlink(pathlib.Path(source))
 
 
-def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_log=False):
+def init(
+    name: str,
+    level: int = logging.WARNING,
+    log_dir_path: str | pathlib.Path | None = None,
+    log_queue: Any = None,
+    is_str_log: bool = False,
+) -> io.StringIO | None:
     # ルートロガーを取得
     root_logger = logging.getLogger()
 
@@ -66,19 +75,19 @@ def init(name, level=logging.WARNING, log_dir_path=None, log_queue=None, is_str_
         )
         log_handler.formatter = log_formatter(name)
         log_handler.namer = GZipRotator.namer
-        log_handler.rotator = GZipRotator.rotator
+        log_handler.rotator = GZipRotator.rotator  # type: ignore[assignment]
 
         logger.addHandler(log_handler)
 
     if log_queue is not None:
-        handler = logging.handlers.QueueHandler(log_queue)
-        logging.getLogger().addHandler(handler)
+        queue_handler = logging.handlers.QueueHandler(log_queue)
+        logging.getLogger().addHandler(queue_handler)
 
     if is_str_log:
         str_io = io.StringIO()
-        handler = logging.StreamHandler(str_io)
-        handler.formatter = log_formatter(name)
-        logging.getLogger().addHandler(handler)
+        stream_handler = logging.StreamHandler(str_io)
+        stream_handler.formatter = log_formatter(name)
+        logging.getLogger().addHandler(stream_handler)
 
         return str_io
 

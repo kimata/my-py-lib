@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
 import socket
 
@@ -7,7 +9,7 @@ import requests
 import my_lib.footprint
 
 
-def check_liveness(name, liveness_file, interval):
+def check_liveness(name: str, liveness_file: str, interval: float) -> bool:
     if not my_lib.footprint.exists(liveness_file):
         logging.warning("%s is not executed.", name)
         return False
@@ -22,7 +24,7 @@ def check_liveness(name, liveness_file, interval):
         return True
 
 
-def check_tcp_port(port, address="127.0.0.1"):
+def check_tcp_port(port: int, address: str = "127.0.0.1") -> bool:
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
@@ -34,7 +36,7 @@ def check_tcp_port(port, address="127.0.0.1"):
         return False
 
 
-def check_http_port(port, address="127.0.0.1"):
+def check_http_port(port: int, address: str = "127.0.0.1") -> bool:
     try:
         if requests.get(f"http://{address}:{port}/", timeout=5).status_code == 200:
             return True

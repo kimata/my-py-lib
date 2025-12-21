@@ -10,20 +10,93 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import logging
 import re
 import ssl
 import urllib.request
+from typing import Any, TypedDict
 
 import lxml.html
 
 import my_lib.time
 
-TIMEOUT_SEC = 5
+TIMEOUT_SEC: int = 5
 
 
-def fetch_page(url, encoding="UTF-8"):
+class WeatherInfo(TypedDict):
+    text: str
+    icon_url: str
+
+
+class WindInfo(TypedDict):
+    dir: str
+    speed: int
+
+
+class HourlyData(TypedDict):
+    hour: int
+    weather: WeatherInfo
+    temp: float
+    humi: float
+    precip: float
+    wind: WindInfo
+
+
+class DayData(TypedDict):
+    date: datetime.datetime
+    data: list[HourlyData]
+
+
+class WeatherResult(TypedDict):
+    today: DayData
+    tomorrow: DayData
+
+
+class ClothingData(TypedDict):
+    date: datetime.datetime
+    data: int
+
+
+class ClothingResult(TypedDict):
+    today: ClothingData
+    tomorrow: ClothingData
+
+
+class WbgtDailyData(TypedDict):
+    today: list[int | None] | None
+    tomorrow: list[int | None] | None
+
+
+class WbgtResult(TypedDict):
+    current: float | None
+    daily: WbgtDailyData
+
+
+class SunsetResult(TypedDict):
+    today: str
+    tomorrow: str
+
+
+class TenkiHourlyData(TypedDict):
+    temp: float
+    precip: int
+    humi: int
+
+
+class TenkiDayData(TypedDict):
+    date: datetime.datetime
+    data: list[TenkiHourlyData]
+
+
+class TenkiResult(TypedDict):
+    today: TenkiDayData
+    tommorow: TenkiDayData
+
+
+def fetch_page(url: str, encoding: str | None = "UTF-8") -> lxml.html.HtmlElement:
     logging.debug("fetch %s", url)
 
     # NOTE: 環境省のページはこれをしないとエラーになる
@@ -38,30 +111,33 @@ def fetch_page(url, encoding="UTF-8"):
         return lxml.html.fromstring(data.read())
 
 
-def parse_weather_yahoo(content):
+def parse_weather_yahoo(content: lxml.html.HtmlElement) -> WeatherInfo:
     return {
         "text": content.text_content().strip(),
         "icon_url": content.xpath("img/@src")[0].replace("_g.", "."),
     }
 
 
-def parse_wind_yahoo(content):
+def parse_wind_yahoo(content: lxml.html.HtmlElement) -> WindInfo:
     direction, speed = content.text_content().split()
 
     return {"dir": direction, "speed": int(speed)}
 
 
-def parse_date_yahoo(content, index):
+def parse_date_yahoo(content: lxml.html.HtmlElement, index: int) -> datetime.datetime:
     date_text = content.xpath(f'(//h3/span[@class="yjSt"])[{index}]')[0].text_content().strip()
-    date_text = re.search(r"\d{1,2}月\d{1,2}日", date_text).group(0)
+    match = re.search(r"\d{1,2}月\d{1,2}日", date_text)
+    if match is None:
+        raise ValueError(f"Failed to parse date from: {date_text}")
+    date_text = match.group(0)
 
     return datetime.datetime.strptime(date_text, "%m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
 
 
-def parse_table_yahoo(content, index):
+def parse_table_yahoo(content: lxml.html.HtmlElement, index: int) -> list[HourlyData]:
     ROW_LIST = ["hour", "weather", "temp", "humi", "precip", "wind"]
 
-    day_info_by_type = {}
+    day_info_by_type: dict[str, list[Any]] = {}
     table_xpath = f'(//table[@class="yjw_table2"])[{index}]'
     for row, label in enumerate(ROW_LIST):
         td_content_list = content.xpath(table_xpath + f"//tr[{row + 1}]/td")
@@ -80,17 +156,17 @@ def parse_table_yahoo(content, index):
             case _:  # pragma: no cover
                 pass
 
-    day_data_list = []
+    day_data_list: list[HourlyData] = []
     for i in range(len(day_info_by_type[ROW_LIST[0]])):
-        day_info = {}
+        day_info: dict[str, Any] = {}
         for label in ROW_LIST:
             day_info[label] = day_info_by_type[label][i]
-        day_data_list.append(day_info)
+        day_data_list.append(day_info)  # type: ignore[arg-type]
 
     return day_data_list
 
 
-def parse_clothing_yahoo(content, index):
+def parse_clothing_yahoo(content: lxml.html.HtmlElement, index: int) -> int:
     table_xpath = (
         '(//dl[contains(@class, "indexList_item-clothing")])[{index}]' + "//dd/p[1]/@class"
     ).format(index=index)
@@ -98,7 +174,7 @@ def parse_clothing_yahoo(content, index):
     return int(content.xpath(table_xpath)[0].split("-", 1)[1])
 
 
-def get_weather_yahoo(yahoo_config):
+def get_weather_yahoo(yahoo_config: dict[str, Any]) -> WeatherResult:
     content = fetch_page(yahoo_config["url"])
 
     return {
@@ -107,7 +183,7 @@ def get_weather_yahoo(yahoo_config):
     }
 
 
-def get_clothing_yahoo(yahoo_config):
+def get_clothing_yahoo(yahoo_config: dict[str, Any]) -> ClothingResult:
     content = fetch_page(yahoo_config["url"])
 
     return {
@@ -116,7 +192,7 @@ def get_clothing_yahoo(yahoo_config):
     }
 
 
-def parse_wbgt_current(content):
+def parse_wbgt_current(content: lxml.html.HtmlElement) -> float | None:
     wbgt = content.xpath('//span[contains(@class, "present_num")]')
 
     if len(wbgt) == 0:
@@ -125,7 +201,9 @@ def parse_wbgt_current(content):
         return float(wbgt[0].text_content().strip())
 
 
-def parse_wbgt_daily(content, wbgt_measured_today):
+def parse_wbgt_daily(
+    content: lxml.html.HtmlElement, wbgt_measured_today: list[float | None]
+) -> WbgtDailyData:
     wbgt_col_list = content.xpath('//table[contains(@class, "forecast3day")]//td[contains(@class, "day")]')
 
     if len(wbgt_col_list) != 35:
@@ -133,12 +211,14 @@ def parse_wbgt_daily(content, wbgt_measured_today):
         return {"today": None, "tomorrow": None}
 
     wbgt_col_list = wbgt_col_list[8:]
-    wbgt_list = []
+    wbgt_list: list[int | None] = []
     # NOTE: 0, 3, ..., 21 時のデータが入るようにする。0 時はダミーで可。
     for i in range(27):
         if i % 9 == 0:
             # NOTE: 日付を取得しておく
             m = re.search(r"(\d+)日", wbgt_col_list[i].text_content())
+            if m is None:
+                raise ValueError(f"Failed to parse day from: {wbgt_col_list[i].text_content()}")
             wbgt_list.append(int(m.group(1)))
         else:
             val = wbgt_col_list[i].text_content().strip()
@@ -155,7 +235,8 @@ def parse_wbgt_daily(content, wbgt_measured_today):
         # NOTE: 当日の過去データは実測値で差し替える
         for i in range(9):
             if wbgt_list[i] is None:
-                wbgt_list[i] = wbgt_measured_today[i]
+                measured = wbgt_measured_today[i]
+                wbgt_list[i] = int(measured) if measured is not None else None
 
         return {
             "today": wbgt_list[0:9],
@@ -173,13 +254,13 @@ def parse_wbgt_daily(content, wbgt_measured_today):
         }
 
 
-def get_wbgt_measured_today(wbgt_config):
+def get_wbgt_measured_today(wbgt_config: dict[str, Any]) -> list[float | None]:
     content = fetch_page(wbgt_config["data"]["env_go"]["url"].replace("graph_ref_td.php", "day_list.php"))
     wbgt_col_list = content.xpath(
         '//table[contains(@class, "asc_tbl_daylist")]//td[contains(@class, "asc_body")]'
     )
 
-    wbgt_list = [None]
+    wbgt_list: list[float | None] = [None]
     for i, col in enumerate(wbgt_col_list):
         if i % 12 != 9:
             continue
@@ -193,7 +274,7 @@ def get_wbgt_measured_today(wbgt_config):
     return wbgt_list
 
 
-def get_wbgt(wbgt_config):
+def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
     # NOTE: 夏季にしか提供されないので冬は取りに行かない
     now = my_lib.time.now()
 
@@ -212,19 +293,19 @@ def get_wbgt(wbgt_config):
     }
 
 
-def get_sunset_url_nao(sunset_config, date):
+def get_sunset_url_nao(sunset_config: dict[str, Any], date: datetime.datetime) -> str:
     return "https://eco.mtk.nao.ac.jp/koyomi/dni/{year}/s{pref:02d}{month:02d}.html".format(
         year=date.year, month=date.month, pref=sunset_config["data"]["nao"]["pref"]
     )
 
 
-def get_sunset_date_nao(sunset_config, date):
+def get_sunset_date_nao(sunset_config: dict[str, Any], date: datetime.datetime) -> str:
     # NOTE: XHTML で encoding が指定されているので、decode しないようにする
     content = fetch_page(get_sunset_url_nao(sunset_config, date), None)
 
     sun_data = content.xpath('//table[contains(@class, "result")]//td')
 
-    sun_info = [
+    sun_info: list[dict[str, str]] = [
         {
             "day": sun_data[i + 0].text_content().strip(),
             "rise": sun_data[i + 1].text_content().strip(),
@@ -236,7 +317,7 @@ def get_sunset_date_nao(sunset_config, date):
     return sun_info[date.day - 1]["set"]
 
 
-def get_sunset_nao(sunset_config):
+def get_sunset_nao(sunset_config: dict[str, Any]) -> SunsetResult:
     now = my_lib.time.now()
 
     try:
@@ -250,48 +331,51 @@ def get_sunset_nao(sunset_config):
         return {"today": "?", "tomorrow": "?"}
 
 
-def parse_table_tenki(content, index):
-    ROW_LIST = [
+def parse_table_tenki(content: lxml.html.HtmlElement, index: int) -> list[TenkiHourlyData]:
+    ROW_LIST: list[dict[str, str | int]] = [
         {"label": "temp", "index": 6, "type": "float"},
         {"label": "precip", "index": 9, "type": "int"},
         {"label": "humi", "index": 10, "type": "int"},
     ]
 
-    day_info_by_type = {}
+    day_info_by_type: dict[str, list[int | float]] = {}
     table_xpath = f'(//table[@class="forecast-point-1h"])[{index}]'
     for row_info in ROW_LIST:
         td_content_list = content.xpath(table_xpath + f"//tr[{row_info['index']}]/td")
 
         match row_info["type"]:
             case "int":
-                day_info_by_type[row_info["label"]] = [int(c.text_content()) for c in td_content_list]
+                day_info_by_type[str(row_info["label"])] = [int(c.text_content()) for c in td_content_list]
             case "float":
-                day_info_by_type[row_info["label"]] = [float(c.text_content()) for c in td_content_list]
+                day_info_by_type[str(row_info["label"])] = [float(c.text_content()) for c in td_content_list]
             case _:  # pragma: no cover
                 pass
 
-    day_data_list = []
+    day_data_list: list[TenkiHourlyData] = []
     for i in range(24):
-        day_info = {}
+        day_info: dict[str, int | float] = {}
         for row_info in ROW_LIST:
-            day_info[row_info["label"]] = day_info_by_type[row_info["label"]][i]
-        day_data_list.append(day_info)
+            day_info[str(row_info["label"])] = day_info_by_type[str(row_info["label"])][i]
+        day_data_list.append(day_info)  # type: ignore[arg-type]
 
     return day_data_list
 
 
-def parse_date_tenki(content, index):
+def parse_date_tenki(content: lxml.html.HtmlElement, index: int) -> datetime.datetime:
     date_text = (
         content.xpath(f'(((//table[@class="forecast-point-1h"])[{index}]/tr)[1]/td)[1]')[0]
         .text_content()
         .strip()
     )
-    date_text = re.search(r"\d{4}年\d{1,2}月\d{1,2}日", date_text).group(0)
+    match = re.search(r"\d{4}年\d{1,2}月\d{1,2}日", date_text)
+    if match is None:
+        raise ValueError(f"Failed to parse date from: {date_text}")
+    date_text = match.group(0)
 
     return datetime.datetime.strptime(date_text, "%Y年%m月%d日")  # noqa: DTZ007
 
 
-def get_precip_by_hour_tenki(tenki_config):
+def get_precip_by_hour_tenki(tenki_config: dict[str, Any]) -> TenkiResult:
     content = fetch_page(tenki_config["url"])
 
     return {

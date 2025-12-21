@@ -9,17 +9,22 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import pathlib
 import pickle
 import shutil
 import tempfile
+from typing import Any, TypeVar
 
 import my_lib.pytest_util
 
+T = TypeVar("T")
 
-def store(path_str, data):
+
+def store(path_str: str | pathlib.Path, data: Any) -> None:
     logging.debug("Store %s", path_str)
 
     path = my_lib.pytest_util.get_path(path_str)
@@ -39,7 +44,7 @@ def store(path_str, data):
     pathlib.Path(temp_name).replace(path)
 
 
-def load(path_str, init_value=None):
+def load(path_str: str | pathlib.Path, init_value: T | None = None) -> T | dict[str, Any]:
     logging.debug("Load %s", path_str)
 
     path = my_lib.pytest_util.get_path(path_str)
@@ -49,16 +54,16 @@ def load(path_str, init_value=None):
     with path.open("rb") as f:
         if isinstance(init_value, dict):
             # NOTE: dict の場合は、プログラムの更新でキーが追加された場合にも自動的に追従させる
-            data = init_value.copy()
+            data: dict[str, Any] = init_value.copy()
             data.update(pickle.load(f))  # noqa: S301
             return data
         else:
             return pickle.load(f)  # noqa: S301
 
 
-def get_size_str(path_str):
+def get_size_str(path_str: str | pathlib.Path) -> str:
     path = my_lib.pytest_util.get_path(path_str)
-    size = path.stat().st_size
+    size: float = path.stat().st_size
 
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024:

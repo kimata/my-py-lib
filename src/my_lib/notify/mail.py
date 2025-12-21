@@ -11,15 +11,24 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import email.mime.image
 import email.mime.multipart
 import email.mime.text
 import logging
 import pathlib
 import smtplib
+from typing import Any, TypedDict
 
 
-def build_message(subject, message, image=None):
+class ImageAttachment(TypedDict, total=False):
+    path: str
+    data: bytes
+    id: str
+
+
+def build_message(subject: str, message: str, image: ImageAttachment | None = None) -> str:
     msg = email.mime.multipart.MIMEMultipart("alternative")
     msg["Subject"] = subject
 
@@ -38,7 +47,7 @@ def build_message(subject, message, image=None):
     return msg.as_string()
 
 
-def send_impl(mail_config, message):
+def send_impl(mail_config: dict[str, Any], message: str) -> None:
     smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
     smtp.starttls()
     smtp.login(mail_config["user"], mail_config["pass"])
@@ -46,7 +55,7 @@ def send_impl(mail_config, message):
     smtp.quit()
 
 
-def send(mail_config, message):
+def send(mail_config: dict[str, Any], message: str) -> None:
     try:
         send_impl(mail_config, message)
     except Exception:
