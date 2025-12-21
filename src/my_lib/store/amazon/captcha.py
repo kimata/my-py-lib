@@ -12,18 +12,18 @@ import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
+from my_lib.notify.slack import SlackConfig
 import my_lib.store.captcha
 
 
 def resolve(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: dict[str, Any],
+    wait: selenium.webdriver.support.wait.WebDriverWait,  # noqa: ARG001
+    slack_config: SlackConfig,
     xpath: dict[str, str],
-) -> None:  # noqa: ARG001
+) -> None:
     file_id = my_lib.store.captcha.send_challenge_image_slack(
-        config["slack"]["bot_token"],
-        config["slack"]["captcha"]["channel"]["id"],
+        slack_config,
         "Amazon Login",
         PIL.Image.open(
             io.BytesIO(
@@ -35,9 +35,7 @@ def resolve(
 
     if file_id is None:
         raise RuntimeError("Failed to send challenge image to Slack")
-    captcha = my_lib.store.captcha.recv_response_image_slack(
-        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
-    )
+    captcha = my_lib.store.captcha.recv_response_image_slack(slack_config, file_id)
 
     if captcha is None:
         raise RuntimeError("CAPTCHA を解決できませんでした。")

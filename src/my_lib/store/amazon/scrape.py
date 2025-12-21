@@ -30,6 +30,7 @@ import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
+from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 
@@ -37,7 +38,7 @@ import my_lib.store.amazon.captcha
 def fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: dict[str, Any],
+    slack_config: SlackConfig | None,
     item: dict[str, Any],
 ) -> dict[str, Any]:  # noqa: C901, PLR0912
     PRICE_ELEM_LIST: list[dict[str, str]] = [
@@ -134,18 +135,16 @@ def fetch_price_impl(
         else:
             logging.warning("Unable to fetch price: %s", item["url"])
 
-            my_lib.notify.slack.error_with_image(
-                config["slack"]["bot_token"],
-                config["slack"]["error"]["channel"]["name"],
-                config["slack"]["error"]["channel"]["id"],
-                "価格取得に失敗",
-                "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
-                {
-                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                    "text": "スクリーンショット",
-                },
-                interval_min=0.5,
-            )
+            if slack_config is not None:
+                my_lib.notify.slack.error_with_image(
+                    slack_config,
+                    "価格取得に失敗",
+                    "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
+                    {
+                        "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                        "text": "スクリーンショット",
+                    },
+                )
             return {"price": 0, "category": category}
 
     try:
@@ -156,18 +155,16 @@ def fetch_price_impl(
     except Exception:
         logging.warning('Unable to parse "%s": %s.', price_text, item["url"])
 
-        my_lib.notify.slack.error_with_image(
-            config["slack"]["bot_token"],
-            config["slack"]["error"]["channel"]["name"],
-            config["slack"]["error"]["channel"]["id"],
-            "価格取得に失敗",
-            "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
-            {
-                "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                "text": "スクリーンショット",
-            },
-            interval_min=0.5,
-        )
+        if slack_config is not None:
+            my_lib.notify.slack.error_with_image(
+                slack_config,
+                "価格取得に失敗",
+                "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
+                {
+                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                    "text": "スクリーンショット",
+                },
+            )
         return {"price": 0, "category": category}
 
     return {"price": price, "category": category}
@@ -190,7 +187,10 @@ def fetch_price(
                 )
             )
 
-            item |= fetch_price_impl(driver, wait, config, item)
+            slack_config = (
+                my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
+            )
+            item |= fetch_price_impl(driver, wait, slack_config, item)
 
             if (item["price"] is None) or (item["price"] == 0):
                 my_lib.selenium_util.dump_page(

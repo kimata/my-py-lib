@@ -17,6 +17,7 @@ import selenium.webdriver.support.ui
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
+from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 import my_lib.store.captcha
 from my_lib.store.mercari.config import LineLoginConfig, MercariLoginConfig
@@ -31,7 +32,7 @@ def execute(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: MercariLoginConfig,
     line_login: LineLoginConfig,
-    slack_config: dict[str, Any] | None,
+    slack_config: SlackConfig | None,
     dump_path: pathlib.Path | None,
 ) -> None:  # noqa: PLR0913
     try:
@@ -58,7 +59,7 @@ def _execute_impl(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: MercariLoginConfig,  # noqa: ARG001
     line_login: LineLoginConfig,
-    slack_config: dict[str, Any] | None,
+    slack_config: SlackConfig | None,
     dump_path: pathlib.Path | None,  # noqa: ARG001
 ) -> None:
     logging.info("ログインを行います。")
@@ -111,21 +112,17 @@ def _execute_impl(
     logging.info("認証番号の対応を行います。")
 
     code: str | None = None
+    ts: str | None = None
     if slack_config is not None:
         logging.info("Slack に SMS で送られてきた認証番号を入力してください")
         ts = my_lib.store.captcha.send_request_text_slack(
-            slack_config["bot_token"],
-            slack_config["captcha"]["channel"]["name"],
+            slack_config,
             "CAPTCHA",
             "SMS で送られてきた認証番号を入力してください",
         )
         if ts is None:
             raise RuntimeError("Failed to send request text to Slack")
-        code = my_lib.store.captcha.recv_response_text_slack(
-            slack_config["bot_token"],
-            slack_config["captcha"]["channel"]["id"],
-            ts,
-        )
+        code = my_lib.store.captcha.recv_response_text_slack(slack_config, ts)
     else:
         code = input("SMS で送られてきた認証番号を入力してください: ")
 
@@ -154,8 +151,8 @@ def _execute_impl(
 
     if slack_config is not None and ts is not None:
         my_lib.notify.slack.send(
-            slack_config["bot_token"],
-            slack_config["captcha"]["channel"]["name"],
+            slack_config,
+            slack_config.captcha.channel.name,
             my_lib.notify.slack.format_simple("CAPTCHA", "成功しました"),
             thread_ts=ts,
         )
@@ -167,7 +164,7 @@ def _login_via_line(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     line_login: LineLoginConfig,
-    slack_config: dict[str, Any] | None,
+    slack_config: SlackConfig | None,
 ) -> None:
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 
@@ -191,8 +188,7 @@ def _login_via_line(
 
         if slack_config is not None:
             my_lib.notify.slack.info(
-                slack_config["bot_token"],
-                slack_config["captcha"]["channel"]["name"],
+                slack_config,
                 "LINE ログイン",
                 f"LINE アプリで認証番号「{code}」を入力してください。",
             )

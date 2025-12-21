@@ -21,13 +21,8 @@ def notify_error(config: dict[str, Any], message: str) -> None:
     if "slack" not in config:
         return
 
-    my_lib.notify.slack.error(
-        config["slack"]["bot_token"],
-        config["slack"]["error"]["channel"]["name"],
-        config["slack"]["from"],
-        message,
-        config["slack"]["error"]["interval_min"],
-    )
+    slack_config = my_lib.notify.slack.parse_config(config["slack"])
+    my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
 
 
 def create_error_image(

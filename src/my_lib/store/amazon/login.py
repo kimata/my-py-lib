@@ -25,6 +25,8 @@ import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
+import my_lib.notify.slack
+from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 import my_lib.store.captcha
@@ -38,14 +40,14 @@ WAIT_COUNT: int = 40
 def resolve_puzzle(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: dict[str, Any],
+    slack_config: SlackConfig,
 ) -> None:
     logging.info("Try to resolve PUZZLE")
 
     my_lib.store.amazon.captcha.resolve(
         driver,
         wait,
-        config,
+        slack_config,
         {"image": '//img[@alt="captcha"]', "text": '//input[@name="cvf_captcha_input"]'},
     )
 
@@ -112,10 +114,11 @@ def handle_password_input(
             remember_checkbox.click()
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@id="auth-captcha-guess"]'):
+        slack_config = my_lib.notify.slack.parse_config(config["slack"])
         my_lib.store.amazon.captcha.resolve(
             driver,
             wait,
-            config,
+            slack_config,
             {
                 "image": '//img[@id="auth-captcha-image"]',
                 "text": '//input[@id="auth-captcha-guess"]',
@@ -140,18 +143,14 @@ def handle_password_input(
 
 def handle_quiz(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
-    config: dict[str, Any],
+    slack_config: SlackConfig,
+    dump_path: pathlib.Path | None,
 ) -> None:
-    quiz_xpath = (
-        '//span[contains(@class, "a-size-base-plus") and '
-        '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
-    )
     if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):
         return
 
     file_id = my_lib.store.captcha.send_challenge_image_slack(
-        config["slack"]["bot_token"],
-        config["slack"]["captcha"]["channel"]["id"],
+        slack_config,
         "Amazon Login",
         PIL.Image.open(
             io.BytesIO(
@@ -165,9 +164,7 @@ def handle_quiz(
 
     if file_id is None:
         raise RuntimeError("Failed to send challenge image to Slack")
-    captcha = my_lib.store.captcha.recv_response_image_slack(
-        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
-    )
+    captcha = my_lib.store.captcha.recv_response_image_slack(slack_config, file_id)
 
     if captcha is None:
         raise RuntimeError("クイズを解決できませんでした。")
@@ -182,7 +179,7 @@ def handle_quiz(
     my_lib.selenium_util.dump_page(
         driver,
         int(random.random() * 100),  # noqa: S311
-        pathlib.Path(config["data"]["dump"]),
+        dump_path,
     )
 
     driver.find_element(
@@ -252,11 +249,15 @@ def execute_impl(
         return
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
-        resolve_puzzle(driver, wait, config)
+        slack_config = my_lib.notify.slack.parse_config(config["slack"])
+        resolve_puzzle(driver, wait, slack_config)
 
     handle_email_input(driver, config)
     handle_password_input(driver, wait, config)
-    handle_quiz(driver, config)
+
+    slack_config = my_lib.notify.slack.parse_config(config["slack"])
+    dump_path = pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
+    handle_quiz(driver, slack_config, dump_path)
     handle_security_check(driver, config)
 
     wait.until(

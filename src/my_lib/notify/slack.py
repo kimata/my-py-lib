@@ -113,7 +113,7 @@ _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 
 # NOTE: 公開関数のデフォルト引数で参照されるため、公開関数より前に定義
-def _format_simple(title: str, message: str) -> FormattedMessage:
+def format_simple(title: str, message: str) -> FormattedMessage:
     return {
         "text": message,
         "json": json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
@@ -124,7 +124,7 @@ def info(
     config: SlackConfig,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Info: " + title
     _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
@@ -134,7 +134,7 @@ def error(
     config: SlackConfig,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Error: " + title
 
@@ -155,7 +155,7 @@ def error_with_image(
     title: str,
     message: str,
     attach_img: AttachImage | None,
-    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Error: " + title
 
@@ -187,6 +187,23 @@ def parse_config(data: dict[str, Any]) -> SlackConfig:
         captcha=_parse_slack_captcha(data["captcha"]),
         error=_parse_slack_error(data["error"]),
     )
+
+
+def send(
+    config: SlackConfig, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+) -> slack_sdk.web.slack_response.SlackResponse | None:
+    return _send(config.bot_token, ch_name, message, thread_ts)
+
+
+def upload_image(  # noqa: PLR0913
+    config: SlackConfig,
+    ch_id: str,
+    title: str,
+    img: Image.Image,
+    text: str,
+    thread_ts: str | None = None,
+) -> str | None:
+    return _upload_image(config.bot_token, ch_id, title, img, text, thread_ts)
 
 
 def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
@@ -236,7 +253,7 @@ def _split_send(
     ch_name: str,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> str | None:
     LINE_SPLIT = 20
 

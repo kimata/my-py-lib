@@ -29,6 +29,7 @@ import slack_sdk
 
 import my_lib.notify.mail
 import my_lib.notify.slack
+from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 
 RESPONSE_WAIT_SEC: int = 5
@@ -201,11 +202,13 @@ def resolve_recaptcha_mail(
     driver.switch_to.default_content()
 
 
-def send_request_text_slack(token: str, ch_name: str, title: str, message: str) -> str | None:
+def send_request_text_slack(config: SlackConfig, title: str, message: str) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
     try:
-        resp = my_lib.notify.slack.send(token, ch_name, my_lib.notify.slack.format_simple(title, message))
+        resp = my_lib.notify.slack.send(
+            config, config.captcha.channel.name, my_lib.notify.slack.format_simple(title, message)
+        )
 
         if resp is None:
             return None
@@ -216,13 +219,17 @@ def send_request_text_slack(token: str, ch_name: str, title: str, message: str) 
 
 
 def recv_response_text_slack(
-    token: str, ch_id: str, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: SlackConfig, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [text]")
 
+    ch_id = config.captcha.channel.id
+    if ch_id is None:
+        raise ValueError("captcha channel id is not configured")
+
     time.sleep(RESPONSE_WAIT_SEC)
     try:
-        client = slack_sdk.WebClient(token=token)
+        client = slack_sdk.WebClient(token=config.bot_token)
         count = 0
         thread_ts: str | None = None
         while True:
@@ -251,22 +258,28 @@ def recv_response_text_slack(
         return None
 
 
-def send_challenge_image_slack(
-    token: str, ch_id: str, title: str, img: Any, text: str
-) -> str | None:
+def send_challenge_image_slack(config: SlackConfig, title: str, img: Any, text: str) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 
-    return my_lib.notify.slack.upload_image(token, ch_id, title, img, text)
+    ch_id = config.captcha.channel.id
+    if ch_id is None:
+        raise ValueError("captcha channel id is not configured")
+
+    return my_lib.notify.slack.upload_image(config, ch_id, title, img, text)
 
 
 def recv_response_image_slack(
-    token: str, ch_id: str, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: SlackConfig, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [image]")
 
+    ch_id = config.captcha.channel.id
+    if ch_id is None:
+        raise ValueError("captcha channel id is not configured")
+
     time.sleep(RESPONSE_WAIT_SEC)
     try:
-        client = slack_sdk.WebClient(token=token)
+        client = slack_sdk.WebClient(token=config.bot_token)
 
         count = 0
         thread_ts: str | None = None
@@ -321,37 +334,23 @@ if __name__ == "__main__":
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config = my_lib.config.load(config_file)
+    slack_config = my_lib.notify.slack.parse_config(config["slack"])
     img = PIL.Image.open(captcha_file)
 
-    file_id = send_challenge_image_slack(
-        config["slack"]["bot_token"],
-        config["slack"]["captcha"]["channel"]["id"],
-        "Amazon Login",
-        img,
-        "画像 CAPTCHA",
-    )
+    file_id = send_challenge_image_slack(slack_config, "Amazon Login", img, "画像 CAPTCHA")
 
     if file_id is None:
         raise RuntimeError("Failed to send challenge image")
 
-    captcha = recv_response_image_slack(
-        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
-    )
+    captcha = recv_response_image_slack(slack_config, file_id)
 
     logging.info('CAPTCHA is "%s"', captcha)
 
-    ts = send_request_text_slack(
-        config["slack"]["bot_token"],
-        config["slack"]["captcha"]["channel"]["id"],
-        "CAPTCHA",
-        "SMS で送られてきた数字を入力してください",
-    )
+    ts = send_request_text_slack(slack_config, "CAPTCHA", "SMS で送られてきた数字を入力してください")
 
     if ts is None:
         raise RuntimeError("Failed to send request text")
 
-    captcha = recv_response_text_slack(
-        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], ts
-    )
+    captcha = recv_response_text_slack(slack_config, ts)
 
     logging.info('CAPTCHA is "%s"', captcha)
