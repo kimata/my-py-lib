@@ -12,3 +12,7 @@ requirements.lock
 config.yaml
 # venv
 .venv
+
+# test data (Chrome profile, etc.)
+data/
+.coverage
