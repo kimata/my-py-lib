@@ -379,8 +379,12 @@ def _is_chrome_related_process(process):
     """プロセスがChrome関連かどうかを判定"""
     try:
         process_name = process.name().lower()
+        # Chrome関連のプロセス名パターン
+        chrome_patterns = ["chrome", "chromium", "google-chrome", "undetected_chro"]
         # chromedriverは除外
-        return "chromedriver" not in process_name
+        if "chromedriver" in process_name:
+            return False
+        return any(pattern in process_name for pattern in chrome_patterns)
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return False
 
