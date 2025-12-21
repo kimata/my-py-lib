@@ -22,6 +22,7 @@ import pathlib
 import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any, Callable, TypedDict
 
 import slack_sdk
@@ -62,6 +63,80 @@ class FormattedMessage(TypedDict):
 class AttachImage(TypedDict):
     data: Image.Image
     text: str
+
+
+@dataclass(frozen=True)
+class SlackChannelConfig:
+    """Slack チャンネル設定"""
+
+    name: str
+    id: str | None = None  # info チャンネルでは id は不要
+
+
+@dataclass(frozen=True)
+class SlackInfoConfig:
+    """Slack 情報通知設定"""
+
+    channel: SlackChannelConfig
+
+
+@dataclass(frozen=True)
+class SlackCaptchaConfig:
+    """Slack CAPTCHA 通知設定"""
+
+    channel: SlackChannelConfig
+
+
+@dataclass(frozen=True)
+class SlackErrorConfig:
+    """Slack エラー通知設定"""
+
+    channel: SlackChannelConfig
+    interval_min: int
+
+
+@dataclass(frozen=True)
+class SlackConfig:
+    """Slack 設定"""
+
+    bot_token: str
+    from_name: str
+    info: SlackInfoConfig
+    captcha: SlackCaptchaConfig
+    error: SlackErrorConfig
+
+
+def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
+    return SlackChannelConfig(
+        name=data["name"],
+        id=data.get("id"),
+    )
+
+
+def _parse_slack_info(data: dict[str, Any]) -> SlackInfoConfig:
+    return SlackInfoConfig(channel=_parse_slack_channel(data["channel"]))
+
+
+def _parse_slack_captcha(data: dict[str, Any]) -> SlackCaptchaConfig:
+    return SlackCaptchaConfig(channel=_parse_slack_channel(data["channel"]))
+
+
+def _parse_slack_error(data: dict[str, Any]) -> SlackErrorConfig:
+    return SlackErrorConfig(
+        channel=_parse_slack_channel(data["channel"]),
+        interval_min=data["interval_min"],
+    )
+
+
+def parse_slack_config(data: dict[str, Any]) -> SlackConfig:
+    """Slack 設定をパースする"""
+    return SlackConfig(
+        bot_token=data["bot_token"],
+        from_name=data["from"],
+        info=_parse_slack_info(data["info"]),
+        captcha=_parse_slack_captcha(data["captcha"]),
+        error=_parse_slack_error(data["error"]),
+    )
 
 
 # NOTE: テスト用
