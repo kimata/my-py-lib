@@ -112,14 +112,20 @@ _notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(
 _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 
+# NOTE: 公開関数のデフォルト引数で参照されるため、公開関数より前に定義
+def _format_simple(title: str, message: str) -> FormattedMessage:
+    return {
+        "text": message,
+        "json": json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
+    }
+
+
 def info(
     config: SlackConfig,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
 ) -> None:
-    if formatter is None:
-        formatter = _format_simple
     title = "Info: " + title
     _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
 
@@ -128,10 +134,8 @@ def error(
     config: SlackConfig,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
 ) -> None:
-    if formatter is None:
-        formatter = _format_simple
     title = "Error: " + title
 
     _hist_add(message)
@@ -151,10 +155,8 @@ def error_with_image(
     title: str,
     message: str,
     attach_img: AttachImage | None,
-    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
 ) -> None:
-    if formatter is None:
-        formatter = _format_simple
     title = "Error: " + title
 
     _hist_add(message)
@@ -164,9 +166,7 @@ def error_with_image(
         logging.warning("Interval is too short. Skipping.")
         return
 
-    thread_ts = _split_send(
-        config.bot_token, config.error.channel.name, title, message, formatter
-    )
+    thread_ts = _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
     if attach_img is not None:
         ch_id = config.error.channel.id
@@ -176,6 +176,17 @@ def error_with_image(
         _upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
 
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+
+
+def parse_config(data: dict[str, Any]) -> SlackConfig:
+    """Slack 設定をパースする"""
+    return SlackConfig(
+        bot_token=data["bot_token"],
+        from_name=data["from"],
+        info=_parse_slack_info(data["info"]),
+        captcha=_parse_slack_captcha(data["captcha"]),
+        error=_parse_slack_error(data["error"]),
+    )
 
 
 def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
@@ -198,24 +209,6 @@ def _parse_slack_error(data: dict[str, Any]) -> SlackErrorConfig:
         channel=_parse_slack_channel(data["channel"]),
         interval_min=data["interval_min"],
     )
-
-
-def parse_slack_config(data: dict[str, Any]) -> SlackConfig:
-    """Slack 設定をパースする"""
-    return SlackConfig(
-        bot_token=data["bot_token"],
-        from_name=data["from"],
-        info=_parse_slack_info(data["info"]),
-        captcha=_parse_slack_captcha(data["captcha"]),
-        error=_parse_slack_error(data["error"]),
-    )
-
-
-def _format_simple(title: str, message: str) -> FormattedMessage:
-    return {
-        "text": message,
-        "json": json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
-    }
 
 
 def _send(
@@ -396,7 +389,7 @@ if __name__ == "__main__":
         logging.warning("Slack の設定が記載されていません。")
         sys.exit(-1)
 
-    slack_config = parse_slack_config(raw_config["slack"])
+    slack_config = parse_config(raw_config["slack"])
 
     info(slack_config, "Test", "This is test")
     error(slack_config, "Test", "This is test")
