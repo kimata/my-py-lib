@@ -55,6 +55,9 @@ dev = [
     "pytest-forked>=1.6.0",
     "pytest-rerunfailures>=15.1",
     "undetected-chromedriver>=3.5.5",
+    "types-requests>=2.32.4.20250913",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-pytz>=2025.2.0.20251108",
 ]
 
 [tool.uv]
@@ -100,3 +103,34 @@ exclude_lines = [
 
 [tool.coverage.html]
 directory = "tests/evidence/coverage"
+
+[tool.rye]
+dev-dependencies = [
+    "mypy>=1.19.1",
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_return_any = false
+warn_unused_ignores = false
+check_untyped_defs = true
+no_implicit_optional = true
+
+# 複雑な型エラーがあるモジュールは一時的に無視
+[[tool.mypy.overrides]]
+module = [
+    "my_lib.sensor.*",
+    "my_lib.store.*",
+    "my_lib.webapp.event",
+    "my_lib.webapp.base",
+    "my_lib.webapp.proxy",
+    "my_lib.rpi",
+    "my_lib.pil_util",
+    "my_lib.chrome_util",
+    "my_lib.panel_util",
+    "my_lib.flask_util",
+    "my_lib.selenium_util",
+]
+ignore_errors = true
+
