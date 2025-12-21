@@ -55,22 +55,7 @@ def send(mail_config: MailConfig | dict[str, Any], message: str) -> None:
         logging.exception("Failed to sendo Mail message")
 
 
-def _send_impl(mail_config: MailConfig | dict[str, Any], message: str) -> None:
-    if isinstance(mail_config, MailConfig):
-        smtp = smtplib.SMTP(mail_config.smtp.host, mail_config.smtp.port)
-        smtp.starttls()
-        smtp.login(mail_config.smtp.user, mail_config.smtp.password)
-        smtp.sendmail(mail_config.from_address, mail_config.to, message)
-    else:
-        # 後方互換性のため辞書形式もサポート
-        smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
-        smtp.starttls()
-        smtp.login(mail_config["user"], mail_config["pass"])
-        smtp.sendmail(mail_config["from"], mail_config["to"], message)
-    smtp.quit()
-
-
-def _build_message(subject: str, message: str, image: ImageAttachment | None = None) -> str:
+def build_message(subject: str, message: str, image: ImageAttachment | None = None) -> str:
     msg = email.mime.multipart.MIMEMultipart("alternative")
     msg["Subject"] = subject
 
@@ -87,6 +72,34 @@ def _build_message(subject: str, message: str, image: ImageAttachment | None = N
         msg.attach(mime_img)
 
     return msg.as_string()
+
+
+def parse_config(data: dict[str, Any]) -> MailConfig:
+    return MailConfig(
+        smtp=MailSmtpConfig(
+            host=data["smtp"]["host"],
+            port=data["smtp"]["port"],
+            user=data["user"],
+            password=data["pass"],
+        ),
+        from_address=data["from"],
+        to=data["to"],
+    )
+
+
+def _send_impl(mail_config: MailConfig | dict[str, Any], message: str) -> None:
+    if isinstance(mail_config, MailConfig):
+        smtp = smtplib.SMTP(mail_config.smtp.host, mail_config.smtp.port)
+        smtp.starttls()
+        smtp.login(mail_config.smtp.user, mail_config.smtp.password)
+        smtp.sendmail(mail_config.from_address, mail_config.to, message)
+    else:
+        # 後方互換性のため辞書形式もサポート
+        smtp = smtplib.SMTP(mail_config["smtp"]["host"], mail_config["smtp"]["port"])
+        smtp.starttls()
+        smtp.login(mail_config["user"], mail_config["pass"])
+        smtp.sendmail(mail_config["from"], mail_config["to"], message)
+    smtp.quit()
 
 
 if __name__ == "__main__":
