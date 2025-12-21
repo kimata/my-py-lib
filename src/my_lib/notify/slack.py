@@ -238,14 +238,13 @@ def split_send(
 
 
 def info(
-    token: str,
-    ch_name: str,
+    config: SlackConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Info: " + title
-    split_send(token, ch_name, title, message, formatter)
+    split_send(config.bot_token, config.info.channel.name, title, message, formatter)
 
 
 def upload_image(  # noqa: PLR0913
@@ -281,52 +280,52 @@ def upload_image(  # noqa: PLR0913
             return None
 
 
-def error(  # noqa: PLR0913
-    token: str,
-    ch_name: str,
+def error(
+    config: SlackConfig,
     title: str,
     message: str,
-    interval_min: int | float = INTERVAL_MIN,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Error: " + title
 
     hist_add(message)
 
+    interval_min = config.error.interval_min
     if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return
 
-    split_send(token, ch_name, title, message, formatter)
+    split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
     my_lib.footprint.update(NOTIFY_FOOTPRINT)
 
 
-def error_with_image(  # noqa: PLR0913
-    token: str,
-    ch_name: str,
-    ch_id: str | None,
+def error_with_image(
+    config: SlackConfig,
     title: str,
     message: str,
-    attatch_img: AttachImage | None,
-    interval_min: int | float = INTERVAL_MIN,
+    attach_img: AttachImage | None,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
     title = "Error: " + title
 
     hist_add(message)
 
+    interval_min = config.error.interval_min
     if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return
 
-    thread_ts = split_send(token, ch_name, title, message, formatter)
+    thread_ts = split_send(
+        config.bot_token, config.error.channel.name, title, message, formatter
+    )
 
-    if attatch_img is not None:
+    if attach_img is not None:
+        ch_id = config.error.channel.id
         if ch_id is None:
-            raise ValueError("ch_id is None")
+            raise ValueError("error channel id is not configured")
 
-        upload_image(token, ch_id, title, attatch_img["data"], attatch_img["text"], thread_ts)
+        upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
 
     my_lib.footprint.update(NOTIFY_FOOTPRINT)
 
@@ -385,26 +384,13 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    config = my_lib.config.load(config_file)
+    raw_config = my_lib.config.load(config_file)
 
-    if "slack" not in config:
+    if "slack" not in raw_config:
         logging.warning("Slack の設定が記載されていません。")
         sys.exit(-1)
 
-    client = slack_sdk.WebClient(token=config["slack"]["bot_token"])
+    slack_config = parse_slack_config(raw_config["slack"])
 
-    if "info" in config["slack"]:
-        info(
-            config["slack"]["bot_token"],
-            config["slack"]["info"]["channel"]["name"],
-            "Test",
-            "This is test",
-        )
-
-    if "error" in config["slack"]:
-        error(
-            config["slack"]["bot_token"],
-            config["slack"]["error"]["channel"]["name"],
-            "Test",
-            "This is test",
-        )
+    info(slack_config, "Test", "This is test")
+    error(slack_config, "Test", "This is test")
