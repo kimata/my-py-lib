@@ -29,7 +29,6 @@ import slack_sdk
 
 import my_lib.notify.mail
 import my_lib.notify.slack
-from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 
 RESPONSE_WAIT_SEC: int = 5
@@ -202,7 +201,7 @@ def resolve_recaptcha_mail(
     driver.switch_to.default_content()
 
 
-def send_request_text_slack(config: SlackConfig, title: str, message: str) -> str | None:
+def send_request_text_slack(config: my_lib.notify.slack.SlackConfig, title: str, message: str) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
     try:
@@ -219,7 +218,7 @@ def send_request_text_slack(config: SlackConfig, title: str, message: str) -> st
 
 
 def recv_response_text_slack(
-    config: SlackConfig, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.SlackConfig, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [text]")
 
@@ -258,7 +257,7 @@ def recv_response_text_slack(
         return None
 
 
-def send_challenge_image_slack(config: SlackConfig, title: str, img: Any, text: str) -> str | None:
+def send_challenge_image_slack(config: my_lib.notify.slack.SlackConfig, title: str, img: Any, text: str) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 
     ch_id = config.captcha.channel.id
@@ -269,7 +268,7 @@ def send_challenge_image_slack(config: SlackConfig, title: str, img: Any, text: 
 
 
 def recv_response_image_slack(
-    config: SlackConfig, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.SlackConfig, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [image]")
 

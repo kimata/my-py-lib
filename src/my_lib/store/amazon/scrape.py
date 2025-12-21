@@ -30,7 +30,6 @@ import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
-from my_lib.notify.slack import SlackConfig
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 
@@ -38,7 +37,7 @@ import my_lib.store.amazon.captcha
 def fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    slack_config: SlackConfig | None,
+    slack_config: my_lib.notify.slack.SlackConfig | None,
     item: dict[str, Any],
 ) -> dict[str, Any]:  # noqa: C901, PLR0912
     PRICE_ELEM_LIST: list[dict[str, str]] = [

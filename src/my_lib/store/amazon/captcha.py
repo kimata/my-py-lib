@@ -12,14 +12,13 @@ import selenium.webdriver.support
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
-from my_lib.notify.slack import SlackConfig
 import my_lib.store.captcha
 
 
 def resolve(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,  # noqa: ARG001
-    slack_config: SlackConfig,
+    slack_config: my_lib.notify.slack.SlackConfig,
     xpath: dict[str, str],
 ) -> None:
     file_id = my_lib.store.captcha.send_challenge_image_slack(
