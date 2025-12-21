@@ -94,11 +94,11 @@ def fetch_price_impl(
         logging.debug('xpath: "%s', price_elem["xpath"])
 
         if price_elem["type"] == "html":
-            price_text = (
-                driver.find_element(selenium.webdriver.common.by.By.XPATH, price_elem["xpath"])
-                .get_attribute("innerHTML")
-                .strip()
-            )
+            inner_html = driver.find_element(
+                selenium.webdriver.common.by.By.XPATH, price_elem["xpath"]
+            ).get_attribute("innerHTML")
+            if inner_html is not None:
+                price_text = inner_html.strip()
         else:
             price_text = driver.find_element(selenium.webdriver.common.by.By.XPATH, price_elem["xpath"]).text
         break
@@ -150,6 +150,8 @@ def fetch_price_impl(
 
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", re.sub(r"[^0-9][0-9]+個", "", price_text))
+        if m is None:
+            raise ValueError(f"Failed to parse price: {price_text}")
         price = int(m.group(1).replace(",", ""))
     except Exception:
         logging.warning('Unable to parse "%s": %s.', price_text, item["url"])

@@ -64,7 +64,7 @@ def process_action(
                 selenium.webdriver.common.by.By.XPATH, resolve_template(action["xpath"], item)
             ).click()
         elif action["type"] == "recaptcha":
-            my_lib.store.captcha.resolve_mp3(driver, wait)
+            my_lib.store.captcha.resolve_recaptcha_auto(driver, wait)
         elif action["type"] == "captcha":
             input_xpath = '//input[@id="captchacharacters"]'
             if not my_lib.selenium_util.xpath_exists(driver, input_xpath):
@@ -126,7 +126,11 @@ def fetch_price_impl(
     logging.info("Fetch: %s", item["url"])
 
     driver.get(item["url"])
-    wait.until(selenium.webdriver.support.expected_conditions.presence_of_all_elements_located)
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (selenium.webdriver.common.by.By.XPATH, "//body")
+        )
+    )
     time.sleep(2)
 
     if "action" in item:
@@ -152,6 +156,8 @@ def fetch_price_impl(
     price_text = driver.find_element(selenium.webdriver.common.by.By.XPATH, item["price_xpath"]).text
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", price_text)
+        if m is None:
+            raise ValueError(f"Failed to parse price: {price_text}")
         item["price"] = int(m.group(1).replace(",", ""))
         logging.info("%s%s", f"""{item["price"]:,}""", item["price_unit"])
     except Exception:
@@ -176,15 +182,17 @@ def fetch_price_impl(
         style_text = driver.find_element(
             selenium.webdriver.common.by.By.XPATH, item["thumb_block_xpath"]
         ).get_attribute("style")
-        m = re.match(
-            r"background-image: url\([\"'](.*)[\"']\)",
-            style_text,
-        )
-        thumb_url = m.group(1)
-        if not re.compile(r"^\.\.").search(thumb_url):
-            thumb_url = "/" + thumb_url
+        if style_text is not None:
+            m = re.match(
+                r"background-image: url\([\"'](.*)[\"']\)",
+                style_text,
+            )
+            if m is not None:
+                thumb_url = m.group(1)
+                if not re.compile(r"^\.\.").search(thumb_url):
+                    thumb_url = "/" + thumb_url
 
-        item["thumb_url"] = urllib.parse.urljoin(driver.current_url, thumb_url)
+                item["thumb_url"] = urllib.parse.urljoin(driver.current_url, thumb_url)
 
     return item
 
@@ -233,4 +241,4 @@ if __name__ == "__main__":
         "unavailable_xpath": '//button[contains(@id, "BIS_trigger") and contains(text(), "入荷通知登録")]',
     }
 
-    logging.info(fetch_price(driver, item, 0))
+    logging.info(fetch_price(driver, item, None))

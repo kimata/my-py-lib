@@ -148,7 +148,6 @@ def execute_impl(
 
     logging.info("認証番号の対応を行います。")
 
-    ts: str | None = None
     code: str | None = None
     if slack_config is not None:
         logging.info("Slack に SMS で送られてきた認証番号を入力してください")
@@ -158,6 +157,8 @@ def execute_impl(
             "CAPTCHA",
             "SMS で送られてきた認証番号を入力してください",
         )
+        if ts is None:
+            raise RuntimeError("Failed to send request text to Slack")
         code = my_lib.store.captcha.recv_response_text_slack(
             slack_config["bot_token"],
             slack_config["captcha"]["channel"]["id"],
@@ -166,6 +167,8 @@ def execute_impl(
     else:
         code = input("SMS で送られてきた認証番号を入力してください: ")
 
+    if code is None:
+        raise RuntimeError("Failed to receive authentication code")
     driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="code"]').send_keys(code)
     my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "認証して完了する")]', wait)
 

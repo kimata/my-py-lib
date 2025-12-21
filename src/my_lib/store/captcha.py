@@ -94,6 +94,9 @@ def resolve_recaptcha_auto(
         selenium.webdriver.common.by.By.XPATH, '//audio[@id="audio-source"]'
     ).get_attribute("src")
 
+    if audio_url is None:
+        raise RuntimeError("Failed to get audio URL for CAPTCHA")
+
     text = recognize_audio(audio_url)
 
     input_elem = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="audio-response"]')
@@ -204,6 +207,8 @@ def send_request_text_slack(token: str, ch_name: str, title: str, message: str) 
     try:
         resp = my_lib.notify.slack.send(token, ch_name, my_lib.notify.slack.format_simple(title, message))
 
+        if resp is None:
+            return None
         return resp["ts"]
     except slack_sdk.errors.SlackApiError:
         logging.exception("Failed to send text request")
@@ -326,6 +331,9 @@ if __name__ == "__main__":
         "画像 CAPTCHA",
     )
 
+    if file_id is None:
+        raise RuntimeError("Failed to send challenge image")
+
     captcha = recv_response_image_slack(
         config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
     )
@@ -338,6 +346,9 @@ if __name__ == "__main__":
         "CAPTCHA",
         "SMS で送られてきた数字を入力してください",
     )
+
+    if ts is None:
+        raise RuntimeError("Failed to send request text")
 
     captcha = recv_response_text_slack(
         config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], ts

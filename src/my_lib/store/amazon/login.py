@@ -163,8 +163,10 @@ def handle_quiz(
         "画像クイズ",
     )
 
+    if file_id is None:
+        raise RuntimeError("Failed to send challenge image to Slack")
     captcha = my_lib.store.captcha.recv_response_image_slack(
-        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], "image", file_id
+        config["slack"]["bot_token"], config["slack"]["captcha"]["channel"]["id"], file_id
     )
 
     if captcha is None:
