@@ -21,13 +21,13 @@ def get_font(config: dict[str, Any], font_type: str, size: int) -> PIL.ImageFont
     return PIL.ImageFont.truetype(font_path, size)
 
 
-get_font.loaded: dict[pathlib.Path, bool] = {}  # type: ignore[attr-defined]
+get_font.loaded: dict[pathlib.Path, bool] = {}  # type: ignore[attr-defined,misc]
 
 
 def text_size(img: PIL.Image.Image, font: PIL.ImageFont.FreeTypeFont, text: str) -> tuple[int, int]:
     left, top, right, bottom = PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)
 
-    return (right - left, bottom - top)
+    return (int(right - left), int(bottom - top))
 
 
 def draw_text(  # noqa: PLR0913
@@ -87,7 +87,7 @@ def draw_text_line(  # noqa: PLR0913
     #     fill="black",
     # )
 
-    draw_pos = (draw_pos[0], draw_pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1])
+    draw_pos = (draw_pos[0], int(draw_pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1]))
 
     draw.text(
         draw_pos,
@@ -105,7 +105,7 @@ def draw_text_line(  # noqa: PLR0913
 
     next_pos = (
         draw_pos[0] + text_size(img, font, text)[0],
-        draw_pos[1] + PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[3],
+        int(draw_pos[1] + PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[3]),
     )
 
     # draw.rectangle(
@@ -113,11 +113,11 @@ def draw_text_line(  # noqa: PLR0913
     #     fill="black",
     # )
 
-    return next_pos  # noqa: RET504
+    return next_pos
 
 
 def load_image(img_config: dict[str, Any]) -> PIL.Image.Image:
-    img = PIL.Image.open(pathlib.Path(img_config["path"]))
+    img: PIL.Image.Image = PIL.Image.open(pathlib.Path(img_config["path"]))
 
     if "scale" in img_config:
         img = img.resize(
@@ -125,7 +125,7 @@ def load_image(img_config: dict[str, Any]) -> PIL.Image.Image:
                 int(img.size[0] * img_config["scale"]),
                 int(img.size[1] * img_config["scale"]),
             ),
-            PIL.Image.LANCZOS,
+            PIL.Image.Resampling.LANCZOS,
         )
     if "brightness" in img_config:
         img = PIL.ImageEnhance.Brightness(img).enhance(img_config["brightness"])

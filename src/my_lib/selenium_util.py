@@ -360,12 +360,12 @@ def clean_dump(dump_path: pathlib.Path | None = None, keep_days: int = 1) -> Non
 
 
 def get_memory_info(driver: selenium.webdriver.remote.webdriver.WebDriver) -> dict[str, int]:
-    total = subprocess.Popen(  # noqa: S602
+    total_bytes = subprocess.Popen(  # noqa: S602
         "smem -t -c pss -P chrome | tail -n 1",  # noqa: S607
         shell=True,
         stdout=subprocess.PIPE,
     ).communicate()[0]
-    total = int(str(total, "utf-8").strip()) // 1024
+    total = int(str(total_bytes, "utf-8").strip()) // 1024
 
     js_heap = driver.execute_script("return window.performance.memory.usedJSHeapSize") // (1024 * 1024)
 
@@ -425,7 +425,8 @@ class browser_tab:  # noqa: N801
     ) -> None:  # noqa: D105
         try:
             self.driver.close()
-            self.driver.switch_to.window(self.original_window)
+            if self.original_window is not None:
+                self.driver.switch_to.window(self.original_window)
             time.sleep(0.1)
         except Exception:
             # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）

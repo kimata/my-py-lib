@@ -76,7 +76,7 @@ def draw_panel_patiently(  # noqa: PLR0913
     RETRY_COUNT = 5
     start = time.perf_counter()
 
-    error_message: str | None = None
+    error_message: str = "Unknown error"
     for i in range(RETRY_COUNT):
         try:
             return (

@@ -137,6 +137,8 @@ def _cleanup_chrome_process_groups():
 
         # pkillでChromeプロセス全体を終了
         pkill_path = shutil.which("pkill")
+        if pkill_path is None:
+            return
         result = subprocess.run(  # noqa: S603
             [pkill_path, "-f", "chrome"], capture_output=True, text=True, timeout=5, check=False
         )
