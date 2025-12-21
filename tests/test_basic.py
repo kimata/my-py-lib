@@ -759,7 +759,7 @@ def test_mercari_iter_items_on_display(slack_mock):
 
     try:
         my_lib.store.mercari.scrape.iter_items_on_display(
-            driver, wait, {}, True, [lambda driver, wait, scrape_config, item, debug_mode: True]
+            driver, wait, True, [lambda driver, wait, item, debug_mode: True]
         )
     except Exception:
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311

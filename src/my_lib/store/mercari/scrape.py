@@ -33,7 +33,6 @@ _POPUP_CLOSE_XPATHS: list[str] = [
 def iter_items_on_display(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    scrape_config: dict[str, Any],
     debug_mode: bool,
     item_func_list: list[Callable[..., Any]],
 ) -> None:
@@ -72,7 +71,7 @@ def iter_items_on_display(
     for i in range(1, item_count + 1):
         for retry in range(_TRY_COUNT):
             try:
-                _execute_item(driver, wait, scrape_config, debug_mode, item_count, i, item_func_list)
+                _execute_item(driver, wait, debug_mode, item_count, i, item_func_list)
                 break
             except Exception:
                 logging.exception("エラーが発生しました。")
@@ -136,12 +135,11 @@ def _expand_all(
 def _execute_item(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    scrape_config: dict[str, Any],
     debug_mode: bool,
     item_count: int,
     index: int,
     item_func_list: list[Callable[..., Any]],
-) -> None:  # noqa: PLR0913
+) -> None:
     item, item_element, item_link = _parse_item(driver, index)
 
     logging.info(
@@ -180,7 +178,7 @@ def _execute_item(
     for item_func in item_func_list:
         while True:
             try:
-                item_func(driver, wait, scrape_config, item, debug_mode)
+                item_func(driver, wait, item, debug_mode)
                 fail_count = 0
                 break
             except (
