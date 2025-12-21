@@ -11,11 +11,14 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
 import time
 import wsgiref.handlers
+from typing import Any, Generator
 
 import flask
 import requests
@@ -26,10 +29,10 @@ import my_lib.webapp.config
 
 blueprint = flask.Blueprint("webapp-proxy", __name__)
 
-api_base_url = None
+api_base_url: str | None = None
 
 
-def init(api_base_url_):
+def init(api_base_url_: str) -> None:
     global api_base_url  # noqa: PLW0603
     global error_response
 
@@ -39,7 +42,7 @@ def init(api_base_url_):
 # NOTE: リバースプロキシの場合は、webapp_event ではなく、
 # ここで /api/proxy/event/* をハンドリングする
 @blueprint.route("/api/proxy/event/<path:subpath>", methods=["GET", "POST"])
-def api_proxy_event(subpath):
+def api_proxy_event(subpath: str) -> flask.Response:
     global api_base_url
 
     # NOTE: EventStream を中継する
@@ -88,7 +91,7 @@ def api_proxy_event(subpath):
     return res
 
 
-def _make_proxy_request(subpath):
+def _make_proxy_request(subpath: str) -> requests.Response:
     """プロキシリクエストの共通処理"""
     global api_base_url
 
@@ -101,7 +104,7 @@ def _make_proxy_request(subpath):
     else:
         # POSTの場合はフォームデータとクエリパラメータの両方を転送
         params = dict(flask.request.args)
-        data = dict(flask.request.form)
+        data: dict[str, Any] = dict(flask.request.form)
         # JSONデータの場合も対応
         if flask.request.is_json:
             data = flask.request.get_json()
@@ -116,7 +119,7 @@ def _make_proxy_request(subpath):
 @blueprint.route("/api/proxy/json/<path:subpath>", methods=["GET", "POST"])
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
-def api_proxy_json(subpath):
+def api_proxy_json(subpath: str) -> flask.Response | tuple[flask.Response, int]:
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
     # 無効化する。
     flask.g.disable_cache = True
@@ -141,7 +144,7 @@ def api_proxy_json(subpath):
 
 @blueprint.route("/api/proxy/html/<path:subpath>", methods=["GET", "POST"])
 @my_lib.flask_util.gzipped
-def api_proxy_html(subpath):
+def api_proxy_html(subpath: str) -> flask.Response:
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
     # 無効化する。
     flask.g.disable_cache = True
@@ -164,7 +167,7 @@ def api_proxy_html(subpath):
         return flask.Response(error_html, status=500, content_type="text/html; charset=utf-8")
 
 
-def test_run(api_base_url, port, debug_mode):
+def test_run(api_base_url_: str, port: int, debug_mode: bool) -> None:
     import flask_cors
 
     app = flask.Flask("test")

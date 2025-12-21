@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import contextlib
 import os
 import tracemalloc
 from pathlib import Path
+from typing import Any
 
 import flask
 import psutil
@@ -14,19 +17,19 @@ import my_lib.webapp.config
 
 blueprint = flask.Blueprint("webapp-util", __name__)
 
-snapshot_prev = None
+snapshot_prev: tracemalloc.Snapshot | None = None
 
 
 @blueprint.route("/api/memory", methods=["GET"])
 @my_lib.flask_util.support_jsonp
-def print_memory():
+def print_memory() -> dict[str, int]:
     return {"memory": psutil.Process(os.getpid()).memory_info().rss}
 
 
 # NOTE: メモリリーク調査用
 @blueprint.route("/api/snapshot", methods=["GET"])
 @my_lib.flask_util.support_jsonp
-def snap():
+def snap() -> dict[str, str] | flask.Response:
     global snapshot_prev  # noqa: PLW0603
 
     if not snapshot_prev:
@@ -44,15 +47,15 @@ def snap():
 
 @blueprint.route("/api/sysinfo", methods=["GET"])
 @my_lib.flask_util.support_jsonp
-def api_sysinfo():
+def api_sysinfo() -> flask.Response:
     memory_info = psutil.virtual_memory()
     disk_info = psutil.disk_usage("/")
 
-    cpu_temp = None
+    cpu_temp: float | None = None
     with contextlib.suppress(FileNotFoundError, ValueError, PermissionError):
         cpu_temp = float(Path("/sys/class/thermal/thermal_zone0/temp").read_text().strip()) / 1000.0
 
-    result = {
+    result: dict[str, Any] = {
         "date": my_lib.time.now().isoformat(),
         "timezone": my_lib.time.get_tz(),
         "image_build_date": os.environ.get("IMAGE_BUILD_DATE", ""),

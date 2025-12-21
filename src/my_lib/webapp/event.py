@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import enum
 import logging
 import multiprocessing
+import multiprocessing.queues
 import threading
 import time
 import traceback
+from typing import Any
 
 import flask
 
@@ -21,13 +25,13 @@ blueprint = flask.Blueprint("webapp-event", __name__)
 
 
 # NOTE: サイズは上の Enum の個数+1 にしておく
-event_count = multiprocessing.Array("i", 4)
+event_count: multiprocessing.Array = multiprocessing.Array("i", 4)
 
-should_terminate = False
-watch_thread = None
+should_terminate: bool = False
+watch_thread: threading.Thread | None = None
 
 
-def start(event_queue):
+def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
     global should_terminate  # noqa: PLW0603
     global watch_thread  # noqa: PLW0603
 
@@ -37,7 +41,7 @@ def start(event_queue):
     watch_thread.start()
 
 
-def worker(event_queue):
+def worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
     global should_terminate
 
     logging.info("Start notify watch thread")
@@ -60,7 +64,7 @@ def worker(event_queue):
     logging.info("Stop notify watch thread")
 
 
-def term():
+def term() -> None:
     global should_terminate  # noqa: PLW0603
     global watch_thread  # noqa: PLW0603
 
@@ -73,7 +77,7 @@ def term():
         watch_thread = None
 
 
-def event_index(event_type):
+def event_index(event_type: EVENT_TYPE) -> int:
     if event_type == EVENT_TYPE.CONTROL:
         return 0
     elif event_type == EVENT_TYPE.SCHEDULE:
@@ -84,16 +88,16 @@ def event_index(event_type):
         return 3
 
 
-def notify_event(event_type):
+def notify_event(event_type: EVENT_TYPE) -> None:
     global event_count
     event_count[event_index(event_type)] += 1
 
 
 @blueprint.route("/api/event", methods=["GET"])
-def api_event():
+def api_event() -> flask.Response:
     count = flask.request.args.get("count", 0, type=int)
 
-    def event_stream():
+    def event_stream() -> Any:
         global event_count
 
         last_count = event_count[:]

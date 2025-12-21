@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import pathlib
 
 import flask
@@ -9,7 +11,7 @@ import my_lib.webapp.config
 blueprint = flask.Blueprint("webapp-base", __name__)
 
 
-def _get_file_path(filename):
+def _get_file_path(filename: str) -> str | None:
     static_dir = pathlib.Path(my_lib.webapp.config.STATIC_DIR_PATH).resolve()
     requested_path = (static_dir / filename).resolve()
 
@@ -23,7 +25,7 @@ def _get_file_path(filename):
 @blueprint.route("/<path:filename>")
 @my_lib.flask_util.file_etag(filename_func=_get_file_path)
 @my_lib.flask_util.gzipped
-def webapp(filename):
+def webapp(filename: str) -> flask.Response:
     try:
         static_dir = pathlib.Path(my_lib.webapp.config.STATIC_DIR_PATH).resolve()
         requested_path = (static_dir / filename).resolve()
@@ -58,5 +60,5 @@ blueprint_default = flask.Blueprint("webapp-default", __name__)
 
 @blueprint_default.route("/")
 @my_lib.flask_util.gzipped
-def root():
+def root() -> flask.Response:
     return flask.redirect(f"{my_lib.webapp.config.URL_PREFIX}/")

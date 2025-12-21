@@ -11,17 +11,22 @@ Options:
   -D                : デバッグモードで動作します。
 """
 
+from __future__ import annotations
+
 import datetime
 import enum
 import json
 import logging
 import multiprocessing
+import multiprocessing.managers
 import os
+import pathlib
 import sqlite3
 import threading
 import time
 import traceback
 import wsgiref.handlers
+from typing import Any, Callable, TypeVar
 
 import flask
 
@@ -31,6 +36,8 @@ import my_lib.sqlite_util
 import my_lib.time
 import my_lib.webapp.config
 import my_lib.webapp.event
+
+T = TypeVar("T")
 
 
 class LOG_LEVEL(enum.Enum):  # noqa: N801
@@ -47,17 +54,17 @@ MAX_RETRY_DELAY_SEC = 5.0
 
 blueprint = flask.Blueprint("webapp-log", __name__)
 
-config = None
+config: dict[str, Any] | None = None
 
-_log_thread = {}
-_queue_lock = {}
-_log_queue = {}
-_log_manager = {}
-_log_event = {}
-_should_terminate = {}
+_log_thread: dict[str | None, threading.Thread] = {}
+_queue_lock: dict[str | None, threading.RLock] = {}
+_log_queue: dict[str | None, Any] = {}
+_log_manager: dict[str | None, multiprocessing.managers.SyncManager] = {}
+_log_event: dict[str | None, threading.Event] = {}
+_should_terminate: dict[str | None, threading.Event] = {}
 
 
-def init(config_, is_read_only=False):
+def init(config_: dict[str, Any], is_read_only: bool = False) -> None:
     global config  # noqa: PLW0603
 
     config = config_
@@ -75,35 +82,42 @@ def init(config_, is_read_only=False):
         init_impl()
 
 
-def term(is_read_only=False):
+def term(is_read_only: bool = False) -> None:
     if is_read_only:
         return
 
-    if get_log_thread() is None:
+    log_thread = get_log_thread()
+    if log_thread is None:
         return
 
-    get_should_terminate().set()
-    get_log_event().set()
+    should_terminate = get_should_terminate()
+    log_event = get_log_event()
+    if should_terminate is not None:
+        should_terminate.set()
+    if log_event is not None:
+        log_event.set()
 
     time.sleep(1)
 
-    get_log_thread().join()
+    log_thread.join()
     del _log_thread[get_worker_id()]
 
 
-def get_worker_id():
+def get_worker_id() -> str | None:
     return os.environ.get("PYTEST_XDIST_WORKER", None)
 
 
-def init_impl():
+def init_impl() -> None:
     # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-    if get_log_manager() is not None:
-        get_log_manager().shutdown()
+    log_manager = get_log_manager()
+    if log_manager is not None:
+        log_manager.shutdown()
 
     worker_id = get_worker_id()
 
-    if get_should_terminate() is not None:
-        get_should_terminate().clear()
+    should_terminate = get_should_terminate()
+    if should_terminate is not None:
+        should_terminate.clear()
     else:
         _queue_lock[worker_id] = threading.RLock()
         _should_terminate[worker_id] = threading.Event()
@@ -118,34 +132,37 @@ def init_impl():
     _log_thread[worker_id].start()
 
 
-def get_log_thread():
+def get_log_thread() -> threading.Thread | None:
     return _log_thread.get(get_worker_id(), None)
 
 
-def get_queue_lock():
+def get_queue_lock() -> threading.RLock | None:
     return _queue_lock.get(get_worker_id(), None)
 
 
-def get_log_manager():
+def get_log_manager() -> multiprocessing.managers.SyncManager | None:
     return _log_manager.get(get_worker_id(), None)
 
 
-def get_log_queue():
+def get_log_queue() -> Any:
     return _log_queue.get(get_worker_id(), None)
 
 
-def get_log_event():
+def get_log_event() -> threading.Event | None:
     return _log_event.get(get_worker_id(), None)
 
 
-def get_should_terminate():
+def get_should_terminate() -> threading.Event | None:
     return _should_terminate.get(get_worker_id(), None)
 
 
-def get_db_path():
+def get_db_path() -> pathlib.Path:
     # NOTE: Pytest を並列実行できるようにする
     worker_id = get_worker_id()
     base_path = my_lib.webapp.config.LOG_DIR_PATH
+
+    if base_path is None:
+        raise RuntimeError("LOG_DIR_PATH is not initialized. Call init() first.")
 
     if worker_id is None:
         return base_path
@@ -156,7 +173,7 @@ def get_db_path():
         return worker_dir / base_path.name
 
 
-def execute_with_retry(func, *args, **kwargs):
+def execute_with_retry(func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
     """リトライ機能付きで関数を実行する"""
     retry_count = 0
     delay = INITIAL_RETRY_DELAY_SEC
@@ -190,12 +207,12 @@ def execute_with_retry(func, *args, **kwargs):
     return None
 
 
-def log_impl(sqlite, message, level):
+def log_impl(sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None:
     global config
 
     logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
 
-    def _execute_log():
+    def _execute_log() -> None:
         sqlite.execute(
             f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
             [message],
@@ -209,7 +226,7 @@ def log_impl(sqlite, message, level):
     my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
     if level == LOG_LEVEL.ERROR:
-        if "slack" in config:
+        if config is not None and "slack" in config:
             my_lib.notify.slack.error(
                 config["slack"]["bot_token"],
                 config["slack"]["error"]["channel"]["name"],
@@ -225,19 +242,24 @@ def log_impl(sqlite, message, level):
             os._exit(-1)
 
 
-def worker(log_queue):
+def worker(log_queue: Any) -> None:
     with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
         while True:
-            if get_should_terminate().is_set():
+            should_terminate = get_should_terminate()
+            if should_terminate is not None and should_terminate.is_set():
                 break
 
             # NOTE: とりあえず、イベントを待つ
-            if not get_log_event().wait(CHECK_INTERVAL_SEC):
+            log_event = get_log_event()
+            if log_event is None or not log_event.wait(CHECK_INTERVAL_SEC):
                 continue
 
             try:
-                with get_queue_lock():  # NOTE: クリア処理と排他したい
-                    get_log_event().clear()
+                queue_lock = get_queue_lock()
+                if queue_lock is None:
+                    continue
+                with queue_lock:  # NOTE: クリア処理と排他したい
+                    log_event.clear()
 
                     while not log_queue.empty():
                         logging.debug("Found %d log message(s)", log_queue.qsize())
@@ -254,32 +276,40 @@ def worker(log_queue):
         logging.info("Terminate worker")
 
 
-def add(message, level):
-    with get_queue_lock():  # NOTE: クリア処理と排他したい
+def add(message: str, level: LOG_LEVEL) -> None:
+    queue_lock = get_queue_lock()
+    log_queue = get_log_queue()
+    log_event = get_log_event()
+
+    if queue_lock is None or log_queue is None or log_event is None:
+        logging.warning("Log system not initialized, skipping log: %s", message)
+        return
+
+    with queue_lock:  # NOTE: クリア処理と排他したい
         # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-        get_log_queue().put({"message": message, "level": level})
-        get_log_event().set()
+        log_queue.put({"message": message, "level": level})
+        log_event.set()
 
 
-def error(message):
+def error(message: str) -> None:
     logging.error(message)
 
     add(message, LOG_LEVEL.ERROR)
 
 
-def warning(message):
+def warning(message: str) -> None:
     logging.warning(message)
 
     add(message, LOG_LEVEL.WARN)
 
 
-def info(message):
+def info(message: str) -> None:
     logging.info(message)
 
     add(message, LOG_LEVEL.INFO)
 
 
-def get(stop_day=0):
+def get(stop_day: int = 0) -> list[dict[str, Any]]:
     with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
         sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
         cur = sqlite.cursor()
@@ -299,7 +329,7 @@ def get(stop_day=0):
         return log_list
 
 
-def clear():
+def clear() -> None:
     with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
         cur = sqlite.cursor()
 
@@ -314,7 +344,7 @@ def clear():
 
 @blueprint.route("/api/log_add", methods=["POST"])
 @my_lib.flask_util.support_jsonp
-def api_log_add():
+def api_log_add() -> flask.Response:
     if not flask.current_app.config["TEST"]:
         flask.abort(403)
 
@@ -328,10 +358,14 @@ def api_log_add():
 
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
-def api_log_clear():
+def api_log_clear() -> flask.Response:
     log = flask.request.args.get("log", True, type=json.loads)
 
-    with get_queue_lock():
+    queue_lock = get_queue_lock()
+    if queue_lock is None:
+        return flask.jsonify({"result": "error", "message": "Log system not initialized"})
+
+    with queue_lock:
         # NOTE: ログの先頭にクリアメッセージが来るようにする
         clear()
         if log:
@@ -343,7 +377,7 @@ def api_log_clear():
 @blueprint.route("/api/log_view", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
-def api_log_view():
+def api_log_view() -> flask.Response:
     stop_day = flask.request.args.get("stop_day", 0, type=int)
 
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
@@ -369,7 +403,7 @@ def api_log_view():
     return response
 
 
-def test_run(config, port, debug_mode):
+def test_run(config: dict[str, Any], port: int, debug_mode: bool) -> None:
     import flask_cors
 
     app = flask.Flask("test")
@@ -382,7 +416,8 @@ def test_run(config, port, debug_mode):
     flask_cors.CORS(app)
 
     app.config["TEST"] = True
-    app.json.compat = True
+    if hasattr(app.json, "compat"):
+        app.json.compat = True  # type: ignore[attr-defined]
 
     app.register_blueprint(my_lib.webapp.log.blueprint)
     app.register_blueprint(my_lib.webapp.event.blueprint)
@@ -427,7 +462,9 @@ if __name__ == "__main__":
 
     base_url = f"http://127.0.0.1:{port}/test"
 
-    proc = multiprocessing.Process(target=lambda: test_run(config, port, debug_mode))
+    assert config is not None, "Config must be loaded before running test"
+    config_: dict[str, Any] = config  # Capture narrowed type for lambda
+    proc = multiprocessing.Process(target=lambda: test_run(config_, port, debug_mode))
     proc.start()
 
     time.sleep(0.5)
@@ -442,6 +479,7 @@ if __name__ == "__main__":
 
     logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url}/api/log_view").text)))  # noqa: S113
 
-    os.kill(proc.pid, signal.SIGUSR1)
+    if proc.pid is not None:
+        os.kill(proc.pid, signal.SIGUSR1)
     proc.terminate()
     proc.join()

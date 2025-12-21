@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import logging
 import os
 import pathlib
+from typing import Any
+
+import flask
 
 import my_lib.time
 
-URL_PREFIX = None
+URL_PREFIX: str | None = None
 
 ZONEINFO = my_lib.time.get_zoneinfo()
 PYTZ = my_lib.time.get_pytz()
 
-STATIC_DIR_PATH = None
+STATIC_DIR_PATH: pathlib.Path | None = None
 
-SCHEDULE_FILE_PATH = None
-LOG_DIR_PATH = None
-STAT_DIR_PATH = None
+SCHEDULE_FILE_PATH: pathlib.Path | None = None
+LOG_DIR_PATH: pathlib.Path | None = None
+STAT_DIR_PATH: pathlib.Path | None = None
 
 
-def init(config):
+def init(config: dict[str, Any]) -> None:
     global STATIC_DIR_PATH  # noqa: PLW0603
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
@@ -40,7 +45,7 @@ def init(config):
     logging.info("STAT_DIR_PATH = %s", STAT_DIR_PATH)
 
 
-def show_handler_list(app, is_force=False):
+def show_handler_list(app: flask.Flask, is_force: bool = False) -> None:
     if (os.environ.get("WERKZEUG_RUN_MAIN") != "true") and not is_force:
         return
 
