@@ -464,17 +464,49 @@ def _send_signal_to_processes(pids, sig, signal_name):
         logging.debug("Failed to send %s to some processes: %s", signal_name, errors)
 
 
-def terminate_chrome_processes(chrome_pids):
-    """Chrome関連プロセスを段階的に終了"""
+def terminate_chrome_processes(chrome_pids, timeout=5.0):
+    """Chrome関連プロセスを段階的に終了
+
+    Args:
+        chrome_pids: 終了対象のプロセスIDリスト
+        timeout: SIGTERM後にプロセス終了を待機する最大時間（秒）
+    """
     if not chrome_pids:
         return
 
     # 優雅な終了（SIGTERM）
     _send_signal_to_processes(chrome_pids, signal.SIGTERM, "SIGTERM")
 
-    # 少し待機してから強制終了（SIGKILL）
-    time.sleep(0.5)
-    _send_signal_to_processes(chrome_pids, signal.SIGKILL, "SIGKILL")
+    # プロセスの終了を待機（ポーリング）
+    remaining_pids = list(chrome_pids)
+    poll_interval = 0.2
+    elapsed = 0.0
+
+    while remaining_pids and elapsed < timeout:
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+
+        # まだ生存しているプロセスをチェック
+        still_alive = []
+        for pid in remaining_pids:
+            try:
+                if psutil.pid_exists(pid):
+                    process = psutil.Process(pid)
+                    if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
+                        still_alive.append(pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+        remaining_pids = still_alive
+
+    # タイムアウト後もまだ残っているプロセスにのみ SIGKILL を送信
+    if remaining_pids:
+        logging.warning(
+            "Chrome processes still alive after %.1fs, sending SIGKILL to %d processes",
+            elapsed,
+            len(remaining_pids),
+        )
+        _send_signal_to_processes(remaining_pids, signal.SIGKILL, "SIGKILL")
 
 
 def _reap_single_process(pid):
@@ -517,7 +549,7 @@ def quit_driver_gracefully(driver):  # noqa: C901, PLR0912
         logging.exception("Failed to quit driver normally")
 
     # quit後に残存プロセスをチェック
-    time.sleep(2)
+    time.sleep(1)
     remaining_pids = []
     for pid in chrome_pids_before:
         try:
