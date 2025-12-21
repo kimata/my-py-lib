@@ -31,10 +31,10 @@ from PIL import Image
 
 import my_lib.footprint
 
-NOTIFY_FOOTPRINT: pathlib.Path = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
-INTERVAL_MIN: int = 60
+_NOTIFY_FOOTPRINT: pathlib.Path = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
+_INTERVAL_MIN: int = 60
 
-SIMPLE_TMPL = """\
+_SIMPLE_TMPL = """\
 [
     {{
         "type": "header",
@@ -106,6 +106,78 @@ class SlackConfig:
     error: SlackErrorConfig
 
 
+# NOTE: テスト用
+_thread_local = threading.local()
+_notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
+_hist_lock = threading.Lock()  # スレッドセーフティ用ロック
+
+
+def info(
+    config: SlackConfig,
+    title: str,
+    message: str,
+    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+) -> None:
+    if formatter is None:
+        formatter = _format_simple
+    title = "Info: " + title
+    _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
+
+
+def error(
+    config: SlackConfig,
+    title: str,
+    message: str,
+    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+) -> None:
+    if formatter is None:
+        formatter = _format_simple
+    title = "Error: " + title
+
+    _hist_add(message)
+
+    interval_min = config.error.interval_min
+    if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
+        logging.warning("Interval is too short. Skipping.")
+        return
+
+    _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
+
+    my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+
+
+def error_with_image(
+    config: SlackConfig,
+    title: str,
+    message: str,
+    attach_img: AttachImage | None,
+    formatter: Callable[[str, str], FormattedMessage] = None,  # type: ignore[assignment]
+) -> None:
+    if formatter is None:
+        formatter = _format_simple
+    title = "Error: " + title
+
+    _hist_add(message)
+
+    interval_min = config.error.interval_min
+    if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
+        logging.warning("Interval is too short. Skipping.")
+        return
+
+    thread_ts = _split_send(
+        config.bot_token, config.error.channel.name, title, message, formatter
+    )
+
+    if attach_img is not None:
+        ch_id = config.error.channel.id
+        if ch_id is None:
+            raise ValueError("error channel id is not configured")
+
+        _upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
+
+    my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+
+
 def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
     return SlackChannelConfig(
         name=data["name"],
@@ -139,20 +211,14 @@ def parse_slack_config(data: dict[str, Any]) -> SlackConfig:
     )
 
 
-# NOTE: テスト用
-thread_local = threading.local()
-notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
-_hist_lock = threading.Lock()  # スレッドセーフティ用ロック
-
-
-def format_simple(title: str, message: str) -> FormattedMessage:
+def _format_simple(title: str, message: str) -> FormattedMessage:
     return {
         "text": message,
-        "json": json.loads(SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
+        "json": json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
     }
 
 
-def send(
+def _send(
     token: str, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
     try:
@@ -172,12 +238,12 @@ def send(
         return None
 
 
-def split_send(
+def _split_send(
     token: str,
     ch_name: str,
     title: str,
     message: str,
-    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+    formatter: Callable[[str, str], FormattedMessage] = _format_simple,
 ) -> str | None:
     LINE_SPLIT = 20
 
@@ -203,7 +269,7 @@ def split_send(
 
         # 最初のメッセージを送信
         if i == 0:
-            response = send(
+            response = _send(
                 token,
                 ch_name,
                 formatter(split_title, message_content),
@@ -226,7 +292,7 @@ def split_send(
                 logging.exception("Failed to send Slack message in thread")
         else:
             # フォールバック: thread_tsが取得できなかった場合は通常通り送信
-            send(
+            _send(
                 token,
                 ch_name,
                 formatter(split_title, message_content),
@@ -237,17 +303,7 @@ def split_send(
     return thread_ts
 
 
-def info(
-    config: SlackConfig,
-    title: str,
-    message: str,
-    formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
-    title = "Info: " + title
-    split_send(config.bot_token, config.info.channel.name, title, message, formatter)
-
-
-def upload_image(  # noqa: PLR0913
+def _upload_image(  # noqa: PLR0913
     token: str,
     ch_id: str,
     title: str,
@@ -280,91 +336,41 @@ def upload_image(  # noqa: PLR0913
             return None
 
 
-def error(
-    config: SlackConfig,
-    title: str,
-    message: str,
-    formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
-    title = "Error: " + title
-
-    hist_add(message)
-
-    interval_min = config.error.interval_min
-    if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
-        logging.warning("Interval is too short. Skipping.")
-        return
-
-    split_send(config.bot_token, config.error.channel.name, title, message, formatter)
-
-    my_lib.footprint.update(NOTIFY_FOOTPRINT)
-
-
-def error_with_image(
-    config: SlackConfig,
-    title: str,
-    message: str,
-    attach_img: AttachImage | None,
-    formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
-    title = "Error: " + title
-
-    hist_add(message)
-
-    interval_min = config.error.interval_min
-    if my_lib.footprint.elapsed(NOTIFY_FOOTPRINT) <= interval_min * 60:
-        logging.warning("Interval is too short. Skipping.")
-        return
-
-    thread_ts = split_send(
-        config.bot_token, config.error.channel.name, title, message, formatter
-    )
-
-    if attach_img is not None:
-        ch_id = config.error.channel.id
-        if ch_id is None:
-            raise ValueError("error channel id is not configured")
-
-        upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
-
-    my_lib.footprint.update(NOTIFY_FOOTPRINT)
+# NOTE: テスト用
+def _interval_clear() -> None:
+    my_lib.footprint.clear(_NOTIFY_FOOTPRINT)
 
 
 # NOTE: テスト用
-def interval_clear() -> None:
-    my_lib.footprint.clear(NOTIFY_FOOTPRINT)
+def _hist_clear() -> None:
+    _hist_get(True).clear()
+    _hist_get(False).clear()
 
 
 # NOTE: テスト用
-def hist_clear() -> None:
-    hist_get(True).clear()
-    hist_get(False).clear()
+def _hist_add(message: str) -> None:
+    _hist_get(True).append(message)
+    _hist_get(False).append(message)
 
 
 # NOTE: テスト用
-def hist_add(message: str) -> None:
-    hist_get(True).append(message)
-    hist_get(False).append(message)
-
-
-# NOTE: テスト用
-def hist_get(is_thread_local: bool = True) -> list[str]:
-    global thread_local
-    global notify_hist
+def _hist_get(is_thread_local: bool = True) -> list[str]:
+    global _thread_local
+    global _notify_hist
     global _hist_lock
 
     worker = os.environ.get("PYTEST_XDIST_WORKER", "0")
 
     if is_thread_local:
         # スレッドセーフな初期化（Double-checked locking パターン）
-        if not hasattr(thread_local, "notify_hist"):
+        if not hasattr(_thread_local, "notify_hist"):
             with _hist_lock:
-                if not hasattr(thread_local, "notify_hist"):
-                    thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+                if not hasattr(_thread_local, "notify_hist"):
+                    _thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
 
-        return thread_local.notify_hist[worker]
+        return _thread_local.notify_hist[worker]
     else:
-        return notify_hist[worker]
+        return _notify_hist[worker]
 
 
 if __name__ == "__main__":
