@@ -70,7 +70,7 @@ class SCD4X:
     def __decode_response(self, data: bytes) -> list[int]:
         resp: list[int] = []
         for word in zip(*[iter(data)] * 3, strict=False):
-            if self.__crc(word[0:2]) != word[2]:
+            if self.__crc(list(word[0:2])) != word[2]:
                 raise OSError("CRC unmatch")
             resp.extend(word[0:2])
         return resp
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    sensor = my_lib.sensor.scd4x(bus_id=bus_id, dev_addr=dev_addr)
+    sensor = SCD4X(bus_id=bus_id, dev_addr=dev_addr)
 
     ping = sensor.ping()
     logging.info("PING: %s", ping)

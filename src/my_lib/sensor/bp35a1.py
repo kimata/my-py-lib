@@ -30,9 +30,9 @@ class BP35A1:
 
             ret = self.__send_command_raw("SKINFO")
             self.__expect("OK")
-            ret = ret.split(" ", 1)
+            parts = ret.split(" ", 1)
 
-            return ret[0] == "EINFO"
+            return parts[0] == "EINFO"
         except Exception:
             return False
 
@@ -60,6 +60,8 @@ class BP35A1:
 
     def get_option(self) -> None:
         ret = self.__send_command("ROPT")
+        if ret is None:
+            raise RuntimeError("Failed to get option")
         val = int(ret, 16)
 
         self.opt = val
@@ -137,12 +139,12 @@ class BP35A1:
             if line == "":
                 continue
 
-            line = line.split(" ", 9)
-            if line[0] != "ERXUDP":
+            parts = line.split(" ", 9)
+            if parts[0] != "ERXUDP":
                 continue
-            if line[1] == ipv6_addr:
+            if parts[1] == ipv6_addr:
                 # NOTE: 16進文字列をバイナリに変換 (デフォルト設定の WOPT 01 の前提)
-                return bytes.fromhex(line[8])
+                return bytes.fromhex(parts[8])
         return None
 
     def send_udp(
@@ -162,10 +164,10 @@ class BP35A1:
             if not line.startswith("  "):
                 raise Exception(f"Line does not start with space.\nrst: {line}")
 
-            line = line.strip().split(":")
-            pan_desc[line[0]] = line[1]
+            parts = line.strip().split(":")
+            pan_desc[parts[0]] = parts[1]
 
-            if line[0] == "PairID":
+            if parts[0] == "PairID":
                 break
 
         return pan_desc
@@ -188,12 +190,12 @@ class BP35A1:
 
     def __send_command(self, command: str) -> str | None:
         ret = self.__send_command_raw(command)
-        ret = ret.split(" ", 1)
+        parts = ret.split(" ", 1)
 
-        if ret[0] != "OK":
-            raise Exception(f"Status is not OK.\nrst: {ret[0]}")
+        if parts[0] != "OK":
+            raise RuntimeError(f"Status is not OK.\nrst: {parts[0]}")
 
-        return None if len(ret) == 1 else ret[1]
+        return None if len(parts) == 1 else parts[1]
 
     def __expect(self, text: str) -> None:
         line = ""

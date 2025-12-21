@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    sensor = my_lib.sensor.rg_15(dev=dev)
+    sensor = RG_15(dev=dev)
 
     ping = sensor.ping()
     logging.info("PING: %s", ping)

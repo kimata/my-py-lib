@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    sensor = my_lib.sensor.lp_pyra03(bus_id=bus_id, dev_addr=dev_addr)
+    sensor = LP_PYRA03(bus_id=bus_id, dev_addr=dev_addr)
 
     ping = sensor.ping()
     logging.info("PING: %s", ping)

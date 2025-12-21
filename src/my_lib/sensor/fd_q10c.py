@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    sensor = my_lib.sensor.fd_q10c(lock_file)
+    sensor = FD_Q10C()
 
     ping = sensor.ping()
     logging.info("PING: %s", ping)

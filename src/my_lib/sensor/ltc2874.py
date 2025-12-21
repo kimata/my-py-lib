@@ -12,6 +12,7 @@ import serial
 import spidev
 
 import my_lib.sensor
+import my_lib.sensor.io_link
 
 DEBUG: bool = True
 
@@ -274,10 +275,10 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
             raise OSError(f"INVALID response: {pprint.pformat(header)}")
 
     for _ in range(remain - 1):
-        data = isdu_res_read(spi, ser, flow & 0xF)
-        data_list.append(data)
+        res = isdu_res_read(spi, ser, flow & 0xF)
+        data_list.append(res)
         flow += 1
-        chk ^= data
+        chk ^= res
 
     chk ^= isdu_res_read(spi, ser, flow)
 

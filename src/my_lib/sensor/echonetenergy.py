@@ -112,7 +112,10 @@ class EchonetEnergy:
 
     def get_value(self) -> list[int]:
         if not self.is_connected:
-            self.connect(self.get_pan_info())
+            pan_info = self.get_pan_info()
+            if pan_info is None:
+                raise RuntimeError("Failed to get PAN info")
+            self.connect(pan_info)
             self.is_connected = True
 
         meter_eoj = my_lib.sensor.echonetlite.build_eoj(

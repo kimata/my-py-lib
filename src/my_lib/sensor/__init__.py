@@ -111,7 +111,7 @@ def ping(sensor_list: list[Any]) -> list[Any]:
         else:
             if sensor.required:
                 logging.error("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
-                raise "The required sensor could not be found."
+                raise RuntimeError("The required sensor could not be found.")
             else:
                 logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
 
