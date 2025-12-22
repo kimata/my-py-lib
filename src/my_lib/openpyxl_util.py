@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 import openpyxl.drawing.image
 import openpyxl.drawing.spreadsheet_drawing
@@ -13,6 +12,41 @@ import openpyxl.utils
 import openpyxl.utils.units
 import openpyxl.workbook
 import openpyxl.worksheet.worksheet
+
+
+class ThumbPathFunc(Protocol):
+    """サムネイル画像のパスを取得するコールバック関数の型"""
+
+    def __call__(self, item: dict[str, Any]) -> pathlib.Path | None:
+        """アイテムからサムネイル画像のパスを取得する。
+
+        Args:
+            item: 商品情報を含む辞書
+
+        Returns:
+            サムネイル画像のパス。存在しない場合は None
+        """
+        ...
+
+
+class SetStatusFunc(Protocol):
+    """ステータス表示を更新するコールバック関数の型"""
+
+    def __call__(self, status: str) -> None:
+        """ステータスメッセージを設定する。
+
+        Args:
+            status: 表示するステータスメッセージ
+        """
+        ...
+
+
+class UpdateFunc(Protocol):
+    """進捗を更新するコールバック関数の型"""
+
+    def __call__(self) -> None:
+        """進捗を1つ進める。"""
+        ...
 
 
 def gen_text_pos(row: int, col: int) -> str:
@@ -249,10 +283,10 @@ def generate_list_sheet(  # noqa: PLR0913
     item_list: list[dict[str, Any]],
     sheet_def: dict[str, Any],
     is_need_thumb: bool,
-    thumb_path_func: Callable[[dict[str, Any]], pathlib.Path | None],
-    set_status_func: Callable[[str], None],
-    update_seq_func: Callable[[], None],
-    update_item_func: Callable[[], None],
+    thumb_path_func: ThumbPathFunc,
+    set_status_func: SetStatusFunc,
+    update_seq_func: UpdateFunc,
+    update_item_func: UpdateFunc,
 ) -> openpyxl.worksheet.worksheet.Worksheet:
     sheet = book.create_sheet()
     sheet.title = "{label}アイテム一覧".format(label=sheet_def["SHEET_TITLE"])

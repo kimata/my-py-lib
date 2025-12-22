@@ -60,7 +60,7 @@ def get_chrome_version() -> int | None:
 
 def create_driver_impl(
     profile_name: str, data_path: pathlib.Path, is_headless: bool
-) -> undetected_chromedriver.Chrome:  # noqa: ARG001
+) -> selenium.webdriver.remote.webdriver.WebDriver:  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -149,7 +149,7 @@ def create_driver(
     data_path: pathlib.Path,
     is_headless: bool = True,
     clean_profile: bool = False,
-) -> undetected_chromedriver.Chrome:
+) -> selenium.webdriver.remote.webdriver.WebDriver:
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)

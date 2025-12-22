@@ -17,7 +17,7 @@ import pathlib
 import pickle
 import shutil
 import tempfile
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 
 import my_lib.pytest_util
 
@@ -44,7 +44,27 @@ def store(path_str: str | pathlib.Path, data: Any) -> None:
     pathlib.Path(temp_name).replace(path)
 
 
+@overload
+def load(path_str: str | pathlib.Path, init_value: None = None) -> dict[str, Any]: ...
+
+
+@overload
+def load(path_str: str | pathlib.Path, init_value: T) -> T: ...
+
+
 def load(path_str: str | pathlib.Path, init_value: T | None = None) -> T | dict[str, Any]:
+    """シリアライズされたデータを読み込む。
+
+    Args:
+        path_str: 読み込むファイルのパス
+        init_value: ファイルが存在しない場合に返すデフォルト値。
+                    None の場合は空の dict を返す。
+                    dict の場合は、保存されたデータをマージして返す。
+
+    Returns:
+        init_value が None の場合: dict[str, Any]
+        init_value が指定された場合: init_value と同じ型
+    """
     logging.debug("Load %s", path_str)
 
     path = my_lib.pytest_util.get_path(path_str)
