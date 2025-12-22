@@ -20,6 +20,7 @@ import time
 import urllib
 from typing import Any
 
+import PIL.Image
 import pydub
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
@@ -259,7 +260,7 @@ def recv_response_text_slack(
 
 
 def send_challenge_image_slack(
-    config: my_lib.notify.slack.SlackConfig, title: str, img: Any, text: str
+    config: my_lib.notify.slack.SlackConfig, title: str, img: PIL.Image.Image, text: str
 ) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 

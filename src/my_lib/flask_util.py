@@ -8,9 +8,12 @@ import io
 import socket
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import flask
+
+if TYPE_CHECKING:
+    import werkzeug.datastructures
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -100,7 +103,7 @@ def calculate_etag(
     return f'W/"{etag}"' if weak else f'"{etag}"'
 
 
-def check_etag(etag: str, request_headers: Any) -> bool:
+def check_etag(etag: str, request_headers: werkzeug.datastructures.Headers) -> bool:
     if_none_match = request_headers.get("If-None-Match")
     if not if_none_match:
         return False

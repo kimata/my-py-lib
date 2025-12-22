@@ -7,9 +7,12 @@ import logging
 import logging.handlers
 import os
 import pathlib
-from typing import Any
+from typing import TYPE_CHECKING
 
 import coloredlogs
+
+if TYPE_CHECKING:
+    import queue
 
 MAX_SIZE: int = 10 * 1024 * 1024
 ROTATE_COUNT: int = 10
@@ -37,7 +40,7 @@ def init(
     name: str,
     level: int = logging.WARNING,
     log_dir_path: str | pathlib.Path | None = None,
-    log_queue: Any = None,
+    log_queue: queue.Queue[logging.LogRecord] | None = None,
     is_str_log: bool = False,
 ) -> io.StringIO | None:
     # ルートロガーを取得
