@@ -133,6 +133,7 @@ def etag_cache(f: F) -> F:
                 etag = calculate_etag(data=response.get_data())
                 response.headers["ETag"] = etag
 
+            assert etag
             if check_etag(etag, flask.request.headers):
                 return flask.make_response("", 304)
 

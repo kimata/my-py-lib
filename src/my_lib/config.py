@@ -387,7 +387,7 @@ def _format_yaml_error(error: yaml.YAMLError, yaml_content: str) -> str:
     ]
 
     if isinstance(error, yaml.scanner.ScannerError):
-        problem = error.problem
+        problem = error.problem or "Unknown error"
         problem_jp = _translate_yaml_problem(problem)
 
         lines.append(f"  問題: {problem_jp}")
