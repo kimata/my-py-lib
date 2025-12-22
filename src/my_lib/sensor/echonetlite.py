@@ -63,11 +63,11 @@ class ECHONETLite:
             CUMULATIVE_ENERGY_FIXED_TIME_REVERSE_DIRECTION: int = 0xEB
 
     @classmethod
-    def parse_frame(cls, packet: bytes | None) -> dict[str, Any]:
+    def parse_frame(cls, packet: bytes) -> dict[str, Any]:
         frame: dict[str, Any] = {}
 
-        if (packet is None) or (len(packet) < 10):
-            hex_data = " ".join(f"0x{b:02x}" for b in packet) if packet else "None"
+        if len(packet) < 10:
+            hex_data = " ".join(f"0x{b:02x}" for b in packet)
             raise Exception(f"Invalid Packet: too short (data = {hex_data})")
 
         # ヘッダ
