@@ -615,8 +615,16 @@ def reap_chrome_processes(chrome_pids: list[int]) -> None:
         _reap_single_process(pid)
 
 
-def quit_driver_gracefully(driver: selenium.webdriver.remote.webdriver.WebDriver | None) -> None:  # noqa: C901, PLR0912
-    """Chrome WebDriverを確実に終了する"""
+def quit_driver_gracefully(
+    driver: selenium.webdriver.remote.webdriver.WebDriver | None,
+    wait_sec: float = 5,
+) -> None:  # noqa: C901, PLR0912
+    """Chrome WebDriverを確実に終了する
+
+    Args:
+        driver: 終了する WebDriver インスタンス
+        wait_sec: quit 後にプロセス終了を待機する秒数（デフォルト: 5秒）
+    """
     if driver is None:
         return
 
@@ -631,7 +639,7 @@ def quit_driver_gracefully(driver: selenium.webdriver.remote.webdriver.WebDriver
         logging.exception("Failed to quit driver normally")
 
     # quit後に残存プロセスをチェック（Chromeがファイル削除を完了する時間を確保）
-    time.sleep(5)
+    time.sleep(wait_sec)
     remaining_pids = []
     for pid in chrome_pids_before:
         try:

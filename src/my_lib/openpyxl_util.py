@@ -14,14 +14,40 @@ import openpyxl.workbook
 import openpyxl.worksheet.worksheet
 
 
+class RowData(Protocol):
+    """行データを表す型（dict や dataclass など __getitem__ をサポートする型）"""
+
+    def __getitem__(self, key: str) -> Any:
+        """キーに対応する値を取得する。
+
+        Args:
+            key: 取得するフィールド名
+
+        Returns:
+            フィールドの値
+        """
+        ...
+
+    def __contains__(self, key: str) -> bool:
+        """キーが存在するかを確認する。
+
+        Args:
+            key: 確認するフィールド名
+
+        Returns:
+            フィールドが存在する場合は True
+        """
+        ...
+
+
 class ThumbPathFunc(Protocol):
     """サムネイル画像のパスを取得するコールバック関数の型"""
 
-    def __call__(self, item: dict[str, Any]) -> pathlib.Path | None:
+    def __call__(self, item: RowData) -> pathlib.Path | None:
         """アイテムからサムネイル画像のパスを取得する。
 
         Args:
-            item: 商品情報を含む辞書
+            item: 商品情報を含むオブジェクト
 
         Returns:
             サムネイル画像のパス。存在しない場合は None
@@ -126,7 +152,7 @@ def set_item_cell_style(
 def insert_table_item(  # noqa: PLR0912, PLR0913, C901
     sheet: openpyxl.worksheet.worksheet.Worksheet,
     row: int,
-    item: dict[str, Any],
+    item: RowData,
     is_need_thumb: bool,
     thumb_path: pathlib.Path | None,
     sheet_def: dict[str, Any],
@@ -280,7 +306,7 @@ def setting_table_view(
 
 def generate_list_sheet(  # noqa: PLR0913
     book: openpyxl.workbook.Workbook,
-    item_list: list[dict[str, Any]],
+    item_list: list[RowData],
     sheet_def: dict[str, Any],
     is_need_thumb: bool,
     thumb_path_func: ThumbPathFunc,
