@@ -100,10 +100,7 @@ def calculate_etag(
     return f'W/"{etag}"' if weak else f'"{etag}"'
 
 
-def check_etag(etag: str | None, request_headers: Any) -> bool:
-    if not etag:
-        return False
-
+def check_etag(etag: str, request_headers: Any) -> bool:
     if_none_match = request_headers.get("If-None-Match")
     if not if_none_match:
         return False
