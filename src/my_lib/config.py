@@ -200,12 +200,15 @@ def _format_required_error(
     error: jsonschema.exceptions.ValidationError, lines: list[str]
 ) -> None:
     """Format required error."""
-    missing = error.validator_value
-    missing_str = (
-        ", ".join(f'"{p}"' for p in missing)
-        if isinstance(missing, list)
-        else f'"{missing}"'
-    )
+    required_props = error.validator_value
+    if isinstance(required_props, str):
+        required_props = [required_props]
+
+    # 実際に不足しているプロパティを計算
+    existing_keys = set(error.instance.keys()) if isinstance(error.instance, dict) else set()
+    missing = [p for p in required_props if p not in existing_keys]
+
+    missing_str = ", ".join(f'"{p}"' for p in missing) if missing else "(なし)"
     lines.append("  問題: 必須プロパティが不足しています")
     lines.append(f"  不足: {missing_str}")
     if isinstance(error.instance, dict):
@@ -223,6 +226,8 @@ def _format_additional_properties_error(
         extra_str = ", ".join(f'"{k}"' for k in extra)
         lines.append("  問題: 定義されていないプロパティがあります")
         lines.append(f"  過剰: {extra_str}")
+        existing = ", ".join(f'"{k}"' for k in error.instance) if error.instance else "(なし)"
+        lines.append(f"  現在の定義: {existing}")
         if allowed:
             allowed_str = ", ".join(f'"{k}"' for k in sorted(allowed))
             lines.append(f"  許可されているプロパティ: {allowed_str}")
