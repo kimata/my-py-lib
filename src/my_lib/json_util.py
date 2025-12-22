@@ -69,6 +69,47 @@ def dumps(obj: Any) -> str:
     return json.dumps(obj, cls=DateTimeJSONEncoder)
 
 
+def serialize_datetime(dt: datetime.datetime | None) -> str | None:
+    """datetime を ISO 8601 文字列に変換する。
+
+    Args:
+        dt: 変換する datetime オブジェクト（None も可）
+
+    Returns:
+        ISO 8601 形式の文字列、または None
+
+    Examples:
+        >>> serialize_datetime(datetime.datetime(2024, 1, 1, 12, 0, 0))
+        '2024-01-01T12:00:00'
+
+    """
+    if dt is None:
+        return None
+    return dt.isoformat()
+
+
+def deserialize_datetime(dt_str: str | None) -> datetime.datetime | None:
+    """ISO 8601 文字列を datetime に変換する。
+
+    Args:
+        dt_str: ISO 8601 形式の日時文字列（None も可）
+
+    Returns:
+        datetime オブジェクト、または None（変換失敗時も None）
+
+    Examples:
+        >>> deserialize_datetime('2024-01-01T12:00:00')
+        datetime.datetime(2024, 1, 1, 12, 0, 0)
+
+    """
+    if not dt_str:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(dt_str)
+    except ValueError:
+        return None
+
+
 if __name__ == "__main__":
     # TEST Code
     import logging
