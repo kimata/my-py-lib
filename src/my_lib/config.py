@@ -208,12 +208,18 @@ def _format_required_error(
     existing_keys = set(error.instance.keys()) if isinstance(error.instance, dict) else set()
     missing = [p for p in required_props if p not in existing_keys]
 
-    missing_str = ", ".join(f'"{p}"' for p in missing) if missing else "(なし)"
+    # 不足がない場合は早期リターン（論理的にはあり得ないが防御的に）
+    if not missing:
+        return
+
+    missing_str = ", ".join(f'"{p}"' for p in missing)
     lines.append("  問題: 必須プロパティが不足しています")
     lines.append(f"  不足: {missing_str}")
     if isinstance(error.instance, dict):
-        existing = ", ".join(f'"{k}"' for k in error.instance) if error.instance else "(なし)"
+        existing = ", ".join(f'"{k}"' for k in sorted(error.instance)) if error.instance else "(なし)"
         lines.append(f"  現在の定義: {existing}")
+    required_str = ", ".join(f'"{p}"' for p in sorted(required_props))
+    lines.append(f"  必須プロパティ: {required_str}")
 
 
 def _format_additional_properties_error(
@@ -226,7 +232,7 @@ def _format_additional_properties_error(
         extra_str = ", ".join(f'"{k}"' for k in extra)
         lines.append("  問題: 定義されていないプロパティがあります")
         lines.append(f"  過剰: {extra_str}")
-        existing = ", ".join(f'"{k}"' for k in error.instance) if error.instance else "(なし)"
+        existing = ", ".join(f'"{k}"' for k in sorted(error.instance)) if error.instance else "(なし)"
         lines.append(f"  現在の定義: {existing}")
         if allowed:
             allowed_str = ", ".join(f'"{k}"' for k in sorted(allowed))
