@@ -204,6 +204,7 @@ def resolve_recaptcha_mail(
 def send_request_text_slack(config: my_lib.notify.slack.SlackConfig, title: str, message: str) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
+    title = "CAPTCHA: " + title
     try:
         resp = my_lib.notify.slack.send(
             config, config.captcha.channel.name, my_lib.notify.slack.format_simple(title, message)
@@ -257,7 +258,9 @@ def recv_response_text_slack(
         return None
 
 
-def send_challenge_image_slack(config: my_lib.notify.slack.SlackConfig, title: str, img: Any, text: str) -> str | None:
+def send_challenge_image_slack(
+    config: my_lib.notify.slack.SlackConfig, title: str, img: Any, text: str
+) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 
     ch_id = config.captcha.channel.id

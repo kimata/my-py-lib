@@ -116,7 +116,7 @@ def _execute_impl(
         logging.info("Slack に SMS で送られてきた認証番号を入力してください")
         ts = my_lib.store.captcha.send_request_text_slack(
             slack_config,
-            "CAPTCHA",
+            "Mercari",
             "SMS で送られてきた認証番号を入力してください",
         )
         if ts is None:
@@ -186,9 +186,9 @@ def _login_via_line(
         code = my_lib.selenium_util.get_text(driver, '//p[contains(@class, "Number")]', "?", wait)
 
         if slack_config is not None:
-            my_lib.notify.slack.info(
+            my_lib.store.captcha.send_request_text_slack(
                 slack_config,
-                "LINE ログイン",
+                "LINE",
                 f"LINE アプリで認証番号「{code}」を入力してください。",
             )
         logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
