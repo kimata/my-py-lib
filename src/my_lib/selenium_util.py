@@ -364,15 +364,31 @@ def get_memory_info(driver: selenium.webdriver.remote.webdriver.WebDriver) -> di
     ).communicate()[0]
     total = int(str(total_bytes, "utf-8").strip()) // 1024
 
-    js_heap = driver.execute_script("return window.performance.memory.usedJSHeapSize") // (1024 * 1024)
+    try:
+        memory_info = driver.execute_cdp_cmd("Memory.getAllTimeSamplingProfile", {})
+        heap_usage = driver.execute_cdp_cmd("Runtime.getHeapUsage", {})
 
-    return {"total": total, "js_heap": js_heap}
+        heap_used = heap_usage.get("usedSize", 0)
+        heap_total = heap_usage.get("totalSize", 0)
+    except Exception as e:
+        logging.debug("Failed to get memory usage: %s", e)
+
+        memory_info = None
+        heap_used = 0
+        heap_total = 0
+
+    return {
+        "total": total,
+        "heap_used": heap_used,
+        "heap_total": heap_total,
+        "memory_info": memory_info,
+    }
 
 
 def log_memory_usage(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     mem_info = get_memory_info(driver)
     logging.info(
-        "Chrome memory: %s MB (JS: %s MB)", f"""{mem_info["total"]:,}""", f"""{mem_info["js_heap"]:,}:"""
+        "Chrome memory: %s MB (JS: %s MB)", f"""{mem_info["total"]:,}""", f"""{mem_info["heap_used"]:,}:"""
     )
 
 
