@@ -306,13 +306,9 @@ def wait_patiently(
 def dump_page(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     index: int,
-    dump_path: pathlib.Path | None = None,
+    dump_path: pathlib.Path,
     stack_index: int = 1,
 ) -> None:
-    if dump_path is None:
-        logging.warning("dump_path is None, skipping page dump")
-        return
-
     name = inspect.stack()[stack_index].function.replace("<", "").replace(">", "")
 
     dump_path.mkdir(parents=True, exist_ok=True)
@@ -338,8 +334,8 @@ def clear_cache(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     driver.execute_cdp_cmd("Network.clearBrowserCache", {})
 
 
-def clean_dump(dump_path: pathlib.Path | None = None, keep_days: int = 1) -> None:
-    if dump_path is None or not dump_path.exists():
+def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
+    if not dump_path.exists():
         return
 
     time_threshold = datetime.timedelta(keep_days)

@@ -143,7 +143,7 @@ def handle_password_input(
 def handle_quiz(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     slack_config: my_lib.notify.slack.SlackConfig,
-    dump_path: pathlib.Path | None,
+    dump_path: pathlib.Path,
 ) -> None:
     if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):
         return
@@ -255,7 +255,7 @@ def execute_impl(
     handle_password_input(driver, wait, config)
 
     slack_config = my_lib.notify.slack.parse_config(config["slack"])
-    dump_path = pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
+    dump_path = pathlib.Path(config["data"]["dump"])
     handle_quiz(driver, slack_config, dump_path)
     handle_security_check(driver, config)
 

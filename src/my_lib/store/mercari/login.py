@@ -32,7 +32,7 @@ def execute(
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.SlackConfig | None,
-    dump_path: pathlib.Path | None,
+    dump_path: pathlib.Path,
 ) -> None:  # noqa: PLR0913
     try:
         # NOTE: エラーが起きた後とかだと、一発でページが表示されないことがあるので、事前に一回アクセスさせる。
@@ -59,7 +59,7 @@ def _execute_impl(
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,  # noqa: ARG001
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.SlackConfig | None,
-    dump_path: pathlib.Path | None,  # noqa: ARG001
+    dump_path: pathlib.Path,  # noqa: ARG001
 ) -> None:
     logging.info("ログインを行います。")
     driver.get(_LOGIN_URL)

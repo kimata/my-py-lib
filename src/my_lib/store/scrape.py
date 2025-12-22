@@ -44,6 +44,8 @@ def process_action(
     item: dict[str, Any],
     action_list: list[dict[str, Any]],
     name: str = "action",
+    *,
+    dump_path: pathlib.Path,
 ) -> None:  # noqa:C901
     logging.info("Process action: %s", name)
 
@@ -74,7 +76,7 @@ def process_action(
 
             logging.warning("Resolve captche is needed at %s.", domain)
 
-            my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
+            my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
             code = input(f"{domain} captcha: ")
 
             driver.find_element(selenium.webdriver.common.by.By.XPATH, input_xpath).send_keys(code)
@@ -97,6 +99,8 @@ def process_preload(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     item: dict[str, Any],
     loop: int,
+    *,
+    dump_path: pathlib.Path,
 ) -> None:
     logging.info("Process preload: %s", item["name"])
 
@@ -110,18 +114,19 @@ def process_preload(
     driver.get(item["preload"]["url"])
     time.sleep(2)
 
-    process_action(driver, wait, item, item["preload"]["action"], "preload action")
+    process_action(driver, wait, item, item["preload"]["action"], "preload action", dump_path=dump_path)
 
 
 def fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     item: dict[str, Any],
-    dump_path: pathlib.Path | None,
     loop: int,
+    *,
+    dump_path: pathlib.Path,
 ) -> dict[str, Any] | bool:  # noqa: PLR0912, C901
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, TIMEOUT_SEC)
 
-    process_preload(driver, wait, item, loop)
+    process_preload(driver, wait, item, loop, dump_path=dump_path)
 
     logging.info("Fetch: %s", item["url"])
 
@@ -134,7 +139,7 @@ def fetch_price_impl(
     time.sleep(2)
 
     if "action" in item:
-        process_action(driver, wait, item, item["action"])
+        process_action(driver, wait, item, item["action"], dump_path=dump_path)
 
     logging.info("Parse: %s", item["name"])
 
@@ -200,17 +205,18 @@ def fetch_price_impl(
 def fetch_price(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     item: dict[str, Any],
-    dump_path: pathlib.Path | None,
     loop: int = 0,
+    *,
+    dump_path: pathlib.Path,
 ) -> dict[str, Any] | bool:
     try:
         logging.info("Check %s", item["name"])
 
-        return fetch_price_impl(driver, item, dump_path, loop)
+        return fetch_price_impl(driver, item, loop, dump_path=dump_path)
     except Exception:
         logging.exception("Failed to check %s", driver.current_url)
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100))  # noqa: S311
-        my_lib.selenium_util.clean_dump()
+        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+        my_lib.selenium_util.clean_dump(dump_path)
         raise
 
 
@@ -241,4 +247,4 @@ if __name__ == "__main__":
         "unavailable_xpath": '//button[contains(@id, "BIS_trigger") and contains(text(), "入荷通知登録")]',
     }
 
-    logging.info(fetch_price(driver, item, None))
+    logging.info(fetch_price(driver, item, dump_path=pathlib.Path(data_path)))
