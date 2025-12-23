@@ -217,8 +217,16 @@ def parse_clothing_yahoo(content: lxml.html.HtmlElement, index: int) -> int:
     return int(content.xpath(table_xpath)[0].split("-", 1)[1])
 
 
-def get_weather_yahoo(yahoo_config: dict[str, Any]) -> WeatherResult:
-    content = fetch_page(yahoo_config["url"])
+def get_weather_yahoo(url: str) -> WeatherResult:
+    """Yahoo天気から天気情報を取得する
+
+    Args:
+        url: Yahoo天気のURL
+
+    Returns:
+        天気情報
+    """
+    content = fetch_page(url)
 
     return WeatherResult(
         today=DayData(date=parse_date_yahoo(content, 1), data=parse_table_yahoo(content, 1)),
@@ -226,8 +234,16 @@ def get_weather_yahoo(yahoo_config: dict[str, Any]) -> WeatherResult:
     )
 
 
-def get_clothing_yahoo(yahoo_config: dict[str, Any]) -> ClothingResult:
-    content = fetch_page(yahoo_config["url"])
+def get_clothing_yahoo(url: str) -> ClothingResult:
+    """Yahoo天気から服装指数を取得する
+
+    Args:
+        url: Yahoo天気のURL
+
+    Returns:
+        服装指数情報
+    """
+    content = fetch_page(url)
 
     return ClothingResult(
         today=ClothingData(date=parse_date_yahoo(content, 1), data=parse_clothing_yahoo(content, 1)),
@@ -297,8 +313,16 @@ def parse_wbgt_daily(
         )
 
 
-def get_wbgt_measured_today(wbgt_config: dict[str, Any]) -> list[float | None]:
-    content = fetch_page(wbgt_config["data"]["env_go"]["url"].replace("graph_ref_td.php", "day_list.php"))
+def get_wbgt_measured_today(url: str) -> list[float | None]:
+    """環境省WBGTから当日の実測WBGT値を取得する
+
+    Args:
+        url: 環境省WBGTのURL
+
+    Returns:
+        実測WBGT値のリスト
+    """
+    content = fetch_page(url.replace("graph_ref_td.php", "day_list.php"))
     wbgt_col_list = content.xpath(
         '//table[contains(@class, "asc_tbl_daylist")]//td[contains(@class, "asc_body")]'
     )
@@ -317,7 +341,15 @@ def get_wbgt_measured_today(wbgt_config: dict[str, Any]) -> list[float | None]:
     return wbgt_list
 
 
-def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
+def get_wbgt(url: str) -> WbgtResult:
+    """環境省WBGTからWBGT情報を取得する
+
+    Args:
+        url: 環境省WBGTのURL
+
+    Returns:
+        WBGT情報
+    """
     # NOTE: 夏季にしか提供されないので冬は取りに行かない
     now = my_lib.time.now()
 
@@ -326,9 +358,9 @@ def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
 
     # NOTE: 当日の過去時間のデータは表示されず、
     # 別ページに実測値があるので、それを取ってくる。
-    wbgt_measured_today = get_wbgt_measured_today(wbgt_config)
+    wbgt_measured_today = get_wbgt_measured_today(url)
 
-    content = fetch_page(wbgt_config["data"]["env_go"]["url"])
+    content = fetch_page(url)
 
     return WbgtResult(
         current=parse_wbgt_current(content),
@@ -336,15 +368,33 @@ def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
     )
 
 
-def get_sunset_url_nao(sunset_config: dict[str, Any], date: datetime.datetime) -> str:
+def get_sunset_url_nao(pref: int, date: datetime.datetime) -> str:
+    """国立天文台の日の入り時刻URLを生成する
+
+    Args:
+        pref: 都道府県コード
+        date: 日付
+
+    Returns:
+        URL文字列
+    """
     return "https://eco.mtk.nao.ac.jp/koyomi/dni/{year}/s{pref:02d}{month:02d}.html".format(
-        year=date.year, month=date.month, pref=sunset_config["data"]["nao"]["pref"]
+        year=date.year, month=date.month, pref=pref
     )
 
 
-def get_sunset_date_nao(sunset_config: dict[str, Any], date: datetime.datetime) -> str:
+def get_sunset_date_nao(pref: int, date: datetime.datetime) -> str:
+    """国立天文台から指定日の日の入り時刻を取得する
+
+    Args:
+        pref: 都道府県コード
+        date: 日付
+
+    Returns:
+        日の入り時刻文字列
+    """
     # NOTE: XHTML で encoding が指定されているので、decode しないようにする
-    content = fetch_page(get_sunset_url_nao(sunset_config, date), None)
+    content = fetch_page(get_sunset_url_nao(pref, date), None)
 
     sun_data = content.xpath('//table[contains(@class, "result")]//td')
 
@@ -360,13 +410,21 @@ def get_sunset_date_nao(sunset_config: dict[str, Any], date: datetime.datetime) 
     return sun_info[date.day - 1]["set"]
 
 
-def get_sunset_nao(sunset_config: dict[str, Any]) -> SunsetResult:
+def get_sunset_nao(pref: int) -> SunsetResult:
+    """国立天文台から日の入り情報を取得する
+
+    Args:
+        pref: 都道府県コード
+
+    Returns:
+        日の入り情報
+    """
     now = my_lib.time.now()
 
     try:
         return SunsetResult(
-            today=get_sunset_date_nao(sunset_config, now),
-            tomorrow=get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
+            today=get_sunset_date_nao(pref, now),
+            tomorrow=get_sunset_date_nao(pref, now + datetime.timedelta(days=1)),
         )
     except Exception:
         logging.exception("Faile to fetch sunset info.")

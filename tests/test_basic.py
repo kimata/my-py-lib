@@ -268,12 +268,15 @@ def test_healthz():
     TEST_HEALTHZ_PATH = pathlib.Path("tests/data/healthz")
 
     import my_lib.healthz
+    from my_lib.healthz import HealthzTarget
+
+    target = HealthzTarget(name="TEST", liveness_file=TEST_HEALTHZ_PATH, interval=5)
 
     my_lib.footprint.clear(TEST_HEALTHZ_PATH)
-    assert not my_lib.healthz.check_liveness("TEST", TEST_HEALTHZ_PATH, 5)
+    assert not my_lib.healthz.check_liveness(target)
 
     my_lib.footprint.update(TEST_HEALTHZ_PATH)
-    assert my_lib.healthz.check_liveness("TEST", TEST_HEALTHZ_PATH, 5)
+    assert my_lib.healthz.check_liveness(target)
 
     assert my_lib.healthz.check_http_port(80, "google.com")
     assert not my_lib.healthz.check_http_port(9999, "google.com")
@@ -556,18 +559,10 @@ def test_selenium_util(mocker):
 def test_weather():
     import my_lib.weather
 
-    my_lib.weather.get_weather_yahoo({"url": "https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html"})
-    my_lib.weather.get_clothing_yahoo({"url": "https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html"})
-    my_lib.weather.get_wbgt(
-        {
-            "data": {
-                "env_go": {
-                    "url": "https://www.wbgt.env.go.jp/graph_ref_td.php?region=03&prefecture=44&point=44132"
-                }
-            }
-        }
-    )
-    my_lib.weather.get_sunset_nao({"data": {"nao": {"pref": 13}}})
+    my_lib.weather.get_weather_yahoo("https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html")
+    my_lib.weather.get_clothing_yahoo("https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html")
+    my_lib.weather.get_wbgt("https://www.wbgt.env.go.jp/graph_ref_td.php?region=03&prefecture=44&point=44132")
+    my_lib.weather.get_sunset_nao(13)
 
 
 def test_time():
