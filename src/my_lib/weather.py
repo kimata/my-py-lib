@@ -17,7 +17,8 @@ import logging
 import re
 import ssl
 import urllib.request
-from typing import Any, TypedDict
+from dataclasses import dataclass, field
+from typing import Any
 
 import lxml.html
 
@@ -26,17 +27,26 @@ import my_lib.time
 TIMEOUT_SEC: int = 5
 
 
-class WeatherInfo(TypedDict):
+@dataclass(frozen=True)
+class WeatherInfo:
+    """天気情報"""
+
     text: str
     icon_url: str
 
 
-class WindInfo(TypedDict):
+@dataclass(frozen=True)
+class WindInfo:
+    """風情報"""
+
     dir: str
     speed: int
 
 
-class HourlyData(TypedDict):
+@dataclass(frozen=True)
+class HourlyData:
+    """時間ごとのデータ"""
+
     hour: int
     weather: WeatherInfo
     temp: float
@@ -45,55 +55,85 @@ class HourlyData(TypedDict):
     wind: WindInfo
 
 
-class DayData(TypedDict):
+@dataclass(frozen=True)
+class DayData:
+    """日ごとのデータ"""
+
     date: datetime.datetime
-    data: list[HourlyData]
+    data: list[HourlyData] = field(default_factory=list)
 
 
-class WeatherResult(TypedDict):
+@dataclass(frozen=True)
+class WeatherResult:
+    """天気取得結果"""
+
     today: DayData
     tomorrow: DayData
 
 
-class ClothingData(TypedDict):
+@dataclass(frozen=True)
+class ClothingData:
+    """服装指数データ"""
+
     date: datetime.datetime
     data: int
 
 
-class ClothingResult(TypedDict):
+@dataclass(frozen=True)
+class ClothingResult:
+    """服装指数取得結果"""
+
     today: ClothingData
     tomorrow: ClothingData
 
 
-class WbgtDailyData(TypedDict):
-    today: list[int | None] | None
-    tomorrow: list[int | None] | None
+@dataclass(frozen=True)
+class WbgtDailyData:
+    """WBGT 日別データ"""
+
+    today: list[int | None] | None = None
+    tomorrow: list[int | None] | None = None
 
 
-class WbgtResult(TypedDict):
-    current: float | None
-    daily: WbgtDailyData
+@dataclass(frozen=True)
+class WbgtResult:
+    """WBGT 取得結果"""
+
+    current: float | None = None
+    daily: WbgtDailyData = field(default_factory=WbgtDailyData)
 
 
-class SunsetResult(TypedDict):
+@dataclass(frozen=True)
+class SunsetResult:
+    """日没時刻取得結果"""
+
     today: str
     tomorrow: str
 
 
-class TenkiHourlyData(TypedDict):
+@dataclass(frozen=True)
+class TenkiHourlyData:
+    """tenki.jp 時間ごとのデータ"""
+
     temp: float
     precip: int
     humi: int
 
 
-class TenkiDayData(TypedDict):
+@dataclass(frozen=True)
+class TenkiDayData:
+    """tenki.jp 日ごとのデータ"""
+
     date: datetime.datetime
-    data: list[TenkiHourlyData]
+    data: list[TenkiHourlyData] = field(default_factory=list)
 
 
-class TenkiResult(TypedDict):
+@dataclass(frozen=True)
+class TenkiResult:
+    """tenki.jp 取得結果"""
+
     today: TenkiDayData
-    tommorow: TenkiDayData
+    tomorrow: TenkiDayData
 
 
 def fetch_page(url: str, encoding: str | None = "UTF-8") -> lxml.html.HtmlElement:
@@ -112,16 +152,16 @@ def fetch_page(url: str, encoding: str | None = "UTF-8") -> lxml.html.HtmlElemen
 
 
 def parse_weather_yahoo(content: lxml.html.HtmlElement) -> WeatherInfo:
-    return {
-        "text": content.text_content().strip(),
-        "icon_url": content.xpath("img/@src")[0].replace("_g.", "."),
-    }
+    return WeatherInfo(
+        text=content.text_content().strip(),
+        icon_url=content.xpath("img/@src")[0].replace("_g.", "."),
+    )
 
 
 def parse_wind_yahoo(content: lxml.html.HtmlElement) -> WindInfo:
     direction, speed = content.text_content().split()
 
-    return {"dir": direction, "speed": int(speed)}
+    return WindInfo(dir=direction, speed=int(speed))
 
 
 def parse_date_yahoo(content: lxml.html.HtmlElement, index: int) -> datetime.datetime:
@@ -156,14 +196,17 @@ def parse_table_yahoo(content: lxml.html.HtmlElement, index: int) -> list[Hourly
             case _:  # pragma: no cover
                 pass
 
-    day_data_list: list[HourlyData] = []
-    for i in range(len(day_info_by_type[ROW_LIST[0]])):
-        day_info: dict[str, Any] = {}
-        for label in ROW_LIST:
-            day_info[label] = day_info_by_type[label][i]
-        day_data_list.append(day_info)  # type: ignore[arg-type]
-
-    return day_data_list
+    return [
+        HourlyData(
+            hour=day_info_by_type["hour"][i],
+            weather=day_info_by_type["weather"][i],
+            temp=day_info_by_type["temp"][i],
+            humi=day_info_by_type["humi"][i],
+            precip=day_info_by_type["precip"][i],
+            wind=day_info_by_type["wind"][i],
+        )
+        for i in range(len(day_info_by_type[ROW_LIST[0]]))
+    ]
 
 
 def parse_clothing_yahoo(content: lxml.html.HtmlElement, index: int) -> int:
@@ -177,19 +220,19 @@ def parse_clothing_yahoo(content: lxml.html.HtmlElement, index: int) -> int:
 def get_weather_yahoo(yahoo_config: dict[str, Any]) -> WeatherResult:
     content = fetch_page(yahoo_config["url"])
 
-    return {
-        "today": {"date": parse_date_yahoo(content, 1), "data": parse_table_yahoo(content, 1)},
-        "tomorrow": {"date": parse_date_yahoo(content, 2), "data": parse_table_yahoo(content, 2)},
-    }
+    return WeatherResult(
+        today=DayData(date=parse_date_yahoo(content, 1), data=parse_table_yahoo(content, 1)),
+        tomorrow=DayData(date=parse_date_yahoo(content, 2), data=parse_table_yahoo(content, 2)),
+    )
 
 
 def get_clothing_yahoo(yahoo_config: dict[str, Any]) -> ClothingResult:
     content = fetch_page(yahoo_config["url"])
 
-    return {
-        "today": {"date": parse_date_yahoo(content, 1), "data": parse_clothing_yahoo(content, 1)},
-        "tomorrow": {"date": parse_date_yahoo(content, 1), "data": parse_clothing_yahoo(content, 2)},
-    }
+    return ClothingResult(
+        today=ClothingData(date=parse_date_yahoo(content, 1), data=parse_clothing_yahoo(content, 1)),
+        tomorrow=ClothingData(date=parse_date_yahoo(content, 1), data=parse_clothing_yahoo(content, 2)),
+    )
 
 
 def parse_wbgt_current(content: lxml.html.HtmlElement) -> float | None:
@@ -208,7 +251,7 @@ def parse_wbgt_daily(
 
     if len(wbgt_col_list) != 35:
         logging.warning("Invalid format")
-        return {"today": None, "tomorrow": None}
+        return WbgtDailyData()
 
     wbgt_col_list = wbgt_col_list[8:]
     wbgt_list: list[int | None] = []
@@ -238,20 +281,20 @@ def parse_wbgt_daily(
                 measured = wbgt_measured_today[i]
                 wbgt_list[i] = int(measured) if measured is not None else None
 
-        return {
-            "today": wbgt_list[0:9],
-            "tomorrow": wbgt_list[9:18],
-        }
+        return WbgtDailyData(
+            today=wbgt_list[0:9],
+            tomorrow=wbgt_list[9:18],
+        )
     else:
         # NOTE: 昨日のデータが本日として表示されている
 
         # NOTE: 日付が入っている部分は誤解を招くので None で上書きしておく
         wbgt_list[9] = None
         wbgt_list[18] = None
-        return {
-            "today": wbgt_list[9:18],
-            "tomorrow": wbgt_list[18:27],
-        }
+        return WbgtDailyData(
+            today=wbgt_list[9:18],
+            tomorrow=wbgt_list[18:27],
+        )
 
 
 def get_wbgt_measured_today(wbgt_config: dict[str, Any]) -> list[float | None]:
@@ -279,7 +322,7 @@ def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
     now = my_lib.time.now()
 
     if (now.month < 3) or ((now.month == 4) and (now.day < 20)) or (now.month > 9):
-        return {"current": None, "daily": {"today": None, "tomorrow": None}}
+        return WbgtResult()
 
     # NOTE: 当日の過去時間のデータは表示されず、
     # 別ページに実測値があるので、それを取ってくる。
@@ -287,10 +330,10 @@ def get_wbgt(wbgt_config: dict[str, Any]) -> WbgtResult:
 
     content = fetch_page(wbgt_config["data"]["env_go"]["url"])
 
-    return {
-        "current": parse_wbgt_current(content),
-        "daily": parse_wbgt_daily(content, wbgt_measured_today),
-    }
+    return WbgtResult(
+        current=parse_wbgt_current(content),
+        daily=parse_wbgt_daily(content, wbgt_measured_today),
+    )
 
 
 def get_sunset_url_nao(sunset_config: dict[str, Any], date: datetime.datetime) -> str:
@@ -321,14 +364,14 @@ def get_sunset_nao(sunset_config: dict[str, Any]) -> SunsetResult:
     now = my_lib.time.now()
 
     try:
-        return {
-            "today": get_sunset_date_nao(sunset_config, now),
-            "tomorrow": get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
-        }
+        return SunsetResult(
+            today=get_sunset_date_nao(sunset_config, now),
+            tomorrow=get_sunset_date_nao(sunset_config, now + datetime.timedelta(days=1)),
+        )
     except Exception:
         logging.exception("Faile to fetch sunset info.")
 
-        return {"today": "?", "tomorrow": "?"}
+        return SunsetResult(today="?", tomorrow="?")
 
 
 def parse_table_tenki(content: lxml.html.HtmlElement, index: int) -> list[TenkiHourlyData]:
@@ -351,14 +394,14 @@ def parse_table_tenki(content: lxml.html.HtmlElement, index: int) -> list[TenkiH
             case _:  # pragma: no cover
                 pass
 
-    day_data_list: list[TenkiHourlyData] = []
-    for i in range(24):
-        day_info: dict[str, int | float] = {}
-        for row_info in ROW_LIST:
-            day_info[str(row_info["label"])] = day_info_by_type[str(row_info["label"])][i]
-        day_data_list.append(day_info)  # type: ignore[arg-type]
-
-    return day_data_list
+    return [
+        TenkiHourlyData(
+            temp=float(day_info_by_type["temp"][i]),
+            precip=int(day_info_by_type["precip"][i]),
+            humi=int(day_info_by_type["humi"][i]),
+        )
+        for i in range(24)
+    ]
 
 
 def parse_date_tenki(content: lxml.html.HtmlElement, index: int) -> datetime.datetime:
@@ -378,10 +421,10 @@ def parse_date_tenki(content: lxml.html.HtmlElement, index: int) -> datetime.dat
 def get_precip_by_hour_tenki(tenki_config: dict[str, Any]) -> TenkiResult:
     content = fetch_page(tenki_config["url"])
 
-    return {
-        "today": {"date": parse_date_tenki(content, 1), "data": parse_table_tenki(content, 1)},
-        "tommorow": {"date": parse_date_tenki(content, 2), "data": parse_table_tenki(content, 2)},
-    }
+    return TenkiResult(
+        today=TenkiDayData(date=parse_date_tenki(content, 1), data=parse_table_tenki(content, 1)),
+        tomorrow=TenkiDayData(date=parse_date_tenki(content, 2), data=parse_table_tenki(content, 2)),
+    )
 
 
 if __name__ == "__main__":

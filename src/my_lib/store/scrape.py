@@ -20,7 +20,8 @@ import re
 import string
 import time
 import urllib
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
@@ -33,41 +34,112 @@ import my_lib.store.captcha
 TIMEOUT_SEC: int = 4
 
 
+# === Action 型定義 ===
+@dataclass(frozen=True)
+class InputAction:
+    """入力アクション"""
+
+    type: Literal["input"]
+    xpath: str
+    value: str
+
+
+@dataclass(frozen=True)
+class ClickAction:
+    """クリックアクション"""
+
+    type: Literal["click"]
+    xpath: str
+
+
+@dataclass(frozen=True)
+class RecaptchaAction:
+    """reCAPTCHA 解決アクション"""
+
+    type: Literal["recaptcha"]
+
+
+@dataclass(frozen=True)
+class CaptchaAction:
+    """CAPTCHA 解決アクション"""
+
+    type: Literal["captcha"]
+
+
+@dataclass(frozen=True)
+class SixDigitAction:
+    """6桁コード入力アクション"""
+
+    type: Literal["sixdigit"]
+
+
+Action = InputAction | ClickAction | RecaptchaAction | CaptchaAction | SixDigitAction
+
+
+def parse_action(data: dict[str, Any]) -> Action:
+    """辞書形式のアクション定義を Action 型に変換する"""
+    action_type = data.get("type")
+
+    if action_type == "input":
+        return InputAction(
+            type="input",
+            xpath=data["xpath"],
+            value=data["value"],
+        )
+    elif action_type == "click":
+        return ClickAction(
+            type="click",
+            xpath=data["xpath"],
+        )
+    elif action_type == "recaptcha":
+        return RecaptchaAction(type="recaptcha")
+    elif action_type == "captcha":
+        return CaptchaAction(type="captcha")
+    elif action_type == "sixdigit":
+        return SixDigitAction(type="sixdigit")
+    else:
+        raise ValueError(f"Unknown action type: {action_type}")
+
+
+def parse_action_list(data_list: list[dict[str, Any]]) -> list[Action]:
+    """辞書形式のアクションリストを Action 型のリストに変換する"""
+    return [parse_action(data) for data in data_list]
+
+
 def resolve_template(template: str, item: dict[str, Any]) -> str:
     tmpl = string.Template(template)
     return tmpl.safe_substitute(item_name=item["name"])
 
 
-def process_action(
+def process_action(  # noqa: C901, PLR0913
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     item: dict[str, Any],
-    action_list: list[dict[str, Any]],
+    action_list: list[Action],
     name: str = "action",
     *,
     dump_path: pathlib.Path,
-) -> None:  # noqa:C901
+) -> None:
     logging.info("Process action: %s", name)
 
     for action in action_list:
-        logging.debug("action: %s.", action["type"])
-        if action["type"] == "input":
-            if not my_lib.selenium_util.xpath_exists(driver, resolve_template(action["xpath"], item)):
+        logging.debug("action: %s.", action.type)
+        if isinstance(action, InputAction):
+            xpath = resolve_template(action.xpath, item)
+            if not my_lib.selenium_util.xpath_exists(driver, xpath):
                 logging.debug("Element not found. Interrupted.")
                 return
-            driver.find_element(
-                selenium.webdriver.common.by.By.XPATH, resolve_template(action["xpath"], item)
-            ).send_keys(resolve_template(action["value"], item))
-        elif action["type"] == "click":
-            if not my_lib.selenium_util.xpath_exists(driver, resolve_template(action["xpath"], item)):
+            value = resolve_template(action.value, item)
+            driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).send_keys(value)
+        elif isinstance(action, ClickAction):
+            xpath = resolve_template(action.xpath, item)
+            if not my_lib.selenium_util.xpath_exists(driver, xpath):
                 logging.debug("Element not found. Interrupted.")
                 return
-            driver.find_element(
-                selenium.webdriver.common.by.By.XPATH, resolve_template(action["xpath"], item)
-            ).click()
-        elif action["type"] == "recaptcha":
+            driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).click()
+        elif isinstance(action, RecaptchaAction):
             my_lib.store.captcha.resolve_recaptcha_auto(driver, wait)
-        elif action["type"] == "captcha":
+        elif isinstance(action, CaptchaAction):
             input_xpath = '//input[@id="captchacharacters"]'
             if not my_lib.selenium_util.xpath_exists(driver, input_xpath):
                 logging.debug("Element not found.")
@@ -81,15 +153,13 @@ def process_action(
 
             driver.find_element(selenium.webdriver.common.by.By.XPATH, input_xpath).send_keys(code)
             driver.find_element(selenium.webdriver.common.by.By.XPATH, '//button[@type="submit"]').click()
-        elif action["type"] == "sixdigit":
+        elif isinstance(action, SixDigitAction):
             # NOTE: これは今のところ Ubiquiti Store USA 専用
             digit_code = input(f"{urllib.parse.urlparse(driver.current_url).netloc} app code: ")
             for i, code in enumerate(list(digit_code)):
                 driver.find_element(
                     selenium.webdriver.common.by.By.XPATH, '//input[@data-id="' + str(i) + '"]'
                 ).send_keys(code)
-        else:
-            raise ValueError("Unknown action")
 
         time.sleep(4)
 
@@ -114,16 +184,17 @@ def process_preload(
     driver.get(item["preload"]["url"])
     time.sleep(2)
 
-    process_action(driver, wait, item, item["preload"]["action"], "preload action", dump_path=dump_path)
+    actions = parse_action_list(item["preload"]["action"])
+    process_action(driver, wait, item, actions, "preload action", dump_path=dump_path)
 
 
-def fetch_price_impl(
+def fetch_price_impl(  # noqa: C901, PLR0912
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     item: dict[str, Any],
     loop: int,
     *,
     dump_path: pathlib.Path,
-) -> dict[str, Any] | bool:  # noqa: PLR0912, C901
+) -> dict[str, Any] | bool:
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, TIMEOUT_SEC)
 
     process_preload(driver, wait, item, loop, dump_path=dump_path)
@@ -139,7 +210,7 @@ def fetch_price_impl(
     time.sleep(2)
 
     if "action" in item:
-        process_action(driver, wait, item, item["action"], dump_path=dump_path)
+        process_action(driver, wait, item, parse_action_list(item["action"]), dump_path=dump_path)
 
     logging.info("Parse: %s", item["name"])
 

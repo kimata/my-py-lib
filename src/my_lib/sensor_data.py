@@ -25,7 +25,8 @@ import datetime
 import logging
 import os
 import time
-from typing import Any, TypedDict
+from dataclasses import dataclass, field
+from typing import Any
 
 import influxdb_client
 from influxdb_client.client.flux_table import TableList
@@ -33,22 +34,28 @@ from influxdb_client.client.flux_table import TableList
 import my_lib.time
 
 
-class SensorDataResult(TypedDict):
-    value: list[float]
-    time: list[datetime.datetime]
-    valid: bool
+@dataclass(frozen=True)
+class SensorDataResult:
+    """センサーデータ取得結果"""
+
+    value: list[float] = field(default_factory=list)
+    time: list[datetime.datetime] = field(default_factory=list)
+    valid: bool = False
 
 
-class DataRequest(TypedDict, total=False):
+@dataclass(frozen=True)
+class DataRequest:
+    """センサーデータ取得リクエスト"""
+
     measure: str
     hostname: str
     field: str
-    start: str
-    stop: str
-    every_min: int
-    window_min: int
-    create_empty: bool
-    last: bool
+    start: str = "-30h"
+    stop: str = "now()"
+    every_min: int = 1
+    window_min: int = 3
+    create_empty: bool = True
+    last: bool = False
 
 # NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
 # timedMovingAverage を使う。timedMovingAverage の計算の結果、データが後ろに
@@ -131,7 +138,7 @@ def _process_query_results(
             time_list = time_list[: (every_min - window_min)]
 
     logging.debug("data count = %s", len(time_list))
-    return {"value": data_list, "time": time_list, "valid": len(time_list) != 0}
+    return SensorDataResult(value=data_list, time=time_list, valid=len(time_list) != 0)
 
 
 def fetch_data_impl(  # noqa: PLR0913
@@ -272,7 +279,7 @@ def fetch_data(  # noqa: PLR0913
     except Exception:
         logging.exception("Failed to fetch data")
 
-        return {"value": [], "time": [], "valid": False}
+        return SensorDataResult()
 
 
 async def fetch_data_async(  # noqa: PLR0913
@@ -338,7 +345,7 @@ async def fetch_data_async(  # noqa: PLR0913
     except Exception:
         logging.exception("Failed to fetch data")
 
-        return {"value": [], "time": [], "valid": False}
+        return SensorDataResult()
 
 
 async def fetch_data_parallel(
@@ -350,16 +357,7 @@ async def fetch_data_parallel(
     Args:
     ----
         db_config: InfluxDBの設定（全リクエスト共通）
-        requests: データ取得リクエストのリスト。各要素は以下のキーを含む辞書:
-            - measure: メジャー名
-            - hostname: ホスト名
-            - field: フィールド名
-            - start: 開始時刻 (オプション、デフォルト: "-30h")
-            - stop: 終了時刻 (オプション、デフォルト: "now()")
-            - every_min: 間隔(分) (オプション、デフォルト: 1)
-            - window_min: ウィンドウ(分) (オプション、デフォルト: 3)
-            - create_empty: 空データ作成フラグ (オプション、デフォルト: True)
-            - last: 最新データのみ取得フラグ (オプション、デフォルト: False)
+        requests: DataRequest のリスト
 
     Returns:
     -------
@@ -370,15 +368,15 @@ async def fetch_data_parallel(
     for req in requests:
         task = fetch_data_async(
             db_config,
-            req["measure"],
-            req["hostname"],
-            req["field"],
-            req.get("start", "-30h"),
-            req.get("stop", "now()"),
-            req.get("every_min", 1),
-            req.get("window_min", 3),
-            req.get("create_empty", True),
-            req.get("last", False),
+            req.measure,
+            req.hostname,
+            req.field,
+            req.start,
+            req.stop,
+            req.every_min,
+            req.window_min,
+            req.create_empty,
+            req.last,
         )
         tasks.append(task)
 
@@ -673,8 +671,8 @@ def get_last_event(
 
 
 def dump_data(data: SensorDataResult) -> None:
-    for i in range(len(data["time"])):
-        logging.info("%s: %s", data["time"][i], data["value"][i])
+    for i in range(len(data.time)):
+        logging.info("%s: %s", data.time[i], data.value[i])
 
 
 if __name__ == "__main__":
