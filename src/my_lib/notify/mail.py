@@ -70,7 +70,9 @@ class ImageAttachmentFromData:
 ImageAttachment = ImageAttachmentFromPath | ImageAttachmentFromData
 
 
-def send(mail_config: MailConfig, message: str) -> None:
+def send(mail_config: MailConfigTypes, message: str) -> None:
+    if isinstance(mail_config, MailEmptyConfig):
+        return
     try:
         _send_impl(mail_config, message)
     except Exception:

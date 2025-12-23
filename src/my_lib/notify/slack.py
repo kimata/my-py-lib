@@ -192,21 +192,25 @@ def format_simple(title: str, message: str) -> FormattedMessage:
 
 
 def info(
-    config: HasInfo,
+    config: HasInfo | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
+    if isinstance(config, SlackEmptyConfig):
+        return
     title = "Info: " + title
     _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
 
 
 def error(
-    config: HasError,
+    config: HasError | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
+    if isinstance(config, SlackEmptyConfig):
+        return
     title = "Error: " + title
 
     _hist_add(message)
@@ -222,12 +226,14 @@ def error(
 
 
 def error_with_image(
-    config: HasError,
+    config: HasError | SlackEmptyConfig,
     title: str,
     message: str,
     attach_img: AttachImage | None,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> None:
+    if isinstance(config, SlackEmptyConfig):
+        return
     title = "Error: " + title
 
     _hist_add(message)
