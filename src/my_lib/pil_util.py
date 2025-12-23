@@ -3,25 +3,36 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from typing import Any
 
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageEnhance
 import PIL.ImageFont
 
+from my_lib.panel_config import HasFontMap, HasIconProperties
 
-def get_font(config: dict[str, Any], font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
-    font_path = pathlib.Path(config["path"]).resolve() / config["map"][font_type]
+# フォントロード済みキャッシュ
+_loaded_fonts: dict[pathlib.Path, bool] = {}
 
-    if font_path not in get_font.loaded:  # type: ignore[attr-defined]
+
+def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
+    """フォントを取得する
+
+    Args:
+        config: フォント設定 (path, map を持つ)
+        font_type: フォントタイプ (例: "jp_bold", "en_medium")
+        size: フォントサイズ
+
+    Returns:
+        PIL フォントオブジェクト
+    """
+    font_path = config.path.resolve() / config.map[font_type]
+
+    if font_path not in _loaded_fonts:
         logging.debug("Load font: %s", font_path)
-        get_font.loaded[font_path] = True  # type: ignore[attr-defined]
+        _loaded_fonts[font_path] = True
 
     return PIL.ImageFont.truetype(font_path, size)
-
-
-get_font.loaded: dict[pathlib.Path, bool] = {}  # type: ignore[attr-defined,misc]
 
 
 def text_size(img: PIL.Image.Image, font: PIL.ImageFont.FreeTypeFont, text: str) -> tuple[int, int]:
@@ -38,7 +49,7 @@ def draw_text(  # noqa: PLR0913
     align: str = "left",
     color: str = "#000",
     stroke_width: int = 0,
-    stroke_fill: str | None = None,
+    stroke_fill: str | tuple[int, int, int, int] | None = None,
 ) -> tuple[int, int]:
     text_line_list = text.split("\n")
 
@@ -70,7 +81,7 @@ def draw_text_line(  # noqa: PLR0913
     align: str = "left",
     color: str = "#000",
     stroke_width: int = 0,
-    stroke_fill: str | None = None,
+    stroke_fill: str | tuple[int, int, int, int] | None = None,
 ) -> tuple[int, int]:
     draw = PIL.ImageDraw.Draw(img)
 
@@ -81,11 +92,6 @@ def draw_text_line(  # noqa: PLR0913
         draw_pos = (int(pos[0] - text_size(img, font, text)[0]), int(pos[1]))
     else:
         draw_pos = pos
-
-    # draw.rectangle(
-    #     (pos[0], pos[1], pos[0] + 4, pos[1] + 4),
-    #     fill="black",
-    # )
 
     draw_pos = (draw_pos[0], int(draw_pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1]))
 
@@ -100,35 +106,35 @@ def draw_text_line(  # noqa: PLR0913
         stroke_fill=stroke_fill,
     )
 
-    # bbox = draw.textbbox(pos, text, font=font)
-    # draw.rectangle(bbox, outline="red")
-
     next_pos = (
         draw_pos[0] + text_size(img, font, text)[0],
         int(draw_pos[1] + PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[3]),
     )
 
-    # draw.rectangle(
-    #     (next_pos[0], next_pos[1], next_pos[0] + 4, next_pos[1] + 4),
-    #     fill="black",
-    # )
-
     return next_pos
 
 
-def load_image(img_config: dict[str, Any]) -> PIL.Image.Image:
-    img: PIL.Image.Image = PIL.Image.open(pathlib.Path(img_config["path"]))
+def load_image(img_config: HasIconProperties) -> PIL.Image.Image:
+    """画像を読み込む
 
-    if "scale" in img_config:
+    Args:
+        img_config: アイコン設定 (path, scale, brightness を持つ)
+
+    Returns:
+        PIL 画像オブジェクト
+    """
+    img: PIL.Image.Image = PIL.Image.open(img_config.path)
+
+    if img_config.scale != 1.0:
         img = img.resize(
             (
-                int(img.size[0] * img_config["scale"]),
-                int(img.size[1] * img_config["scale"]),
+                int(img.size[0] * img_config.scale),
+                int(img.size[1] * img_config.scale),
             ),
             PIL.Image.Resampling.LANCZOS,
         )
-    if "brightness" in img_config:
-        img = PIL.ImageEnhance.Brightness(img).enhance(img_config["brightness"])
+    if img_config.brightness != 1.0:
+        img = PIL.ImageEnhance.Brightness(img).enhance(img_config.brightness)
 
     return img
 

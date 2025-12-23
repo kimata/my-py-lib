@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""パネル関連の共通設定型定義
+
+設計方針:
+- Protocol による構造的部分型付け
+- NullObject パターンで None を回避
+- isinstance の使用を最小限に
+- パスは pathlib.Path で統一
+"""
+
+from __future__ import annotations
+
+import pathlib
+from dataclasses import dataclass, field
+from typing import Protocol
+
+
+# === Protocol 定義 ===
+class HasGeometry(Protocol):
+    """ジオメトリを持つことを表す Protocol"""
+
+    @property
+    def width(self) -> int: ...
+
+    @property
+    def height(self) -> int: ...
+
+
+class HasOffset(Protocol):
+    """オフセットを持つことを表す Protocol"""
+
+    @property
+    def offset_x(self) -> int: ...
+
+    @property
+    def offset_y(self) -> int: ...
+
+
+class HasFontMap(Protocol):
+    """フォントマップを持つことを表す Protocol"""
+
+    @property
+    def path(self) -> pathlib.Path: ...
+
+    @property
+    def map(self) -> dict[str, str]: ...
+
+
+class HasIconProperties(Protocol):
+    """アイコンプロパティを持つことを表す Protocol"""
+
+    @property
+    def path(self) -> pathlib.Path: ...
+
+    @property
+    def scale(self) -> float: ...
+
+    @property
+    def brightness(self) -> float: ...
+
+
+class HasPanelGeometry(Protocol):
+    """panel プロパティにジオメトリを持つことを表す Protocol"""
+
+    @property
+    def panel(self) -> HasGeometry: ...
+
+
+# === 具象クラス ===
+@dataclass(frozen=True)
+class FontConfig:
+    """フォント設定"""
+
+    path: pathlib.Path
+    map: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PanelGeometry:
+    """パネルの位置とサイズ"""
+
+    width: int
+    height: int
+    offset_x: int = 0
+    offset_y: int = 0
+
+
+@dataclass(frozen=True)
+class IconConfig:
+    """アイコン設定"""
+
+    path: pathlib.Path
+    scale: float = 1.0
+    brightness: float = 1.0
+
+
+# === パース関数 ===
+def parse_font_config(data: dict[str, str | dict[str, str]]) -> FontConfig:
+    """フォント設定をパースする"""
+    path = data["path"]
+    if not isinstance(path, str):
+        msg = "font config path must be a string"
+        raise TypeError(msg)
+
+    map_data = data.get("map", {})
+    if not isinstance(map_data, dict):
+        msg = "font config map must be a dict"
+        raise TypeError(msg)
+
+    return FontConfig(
+        path=pathlib.Path(path),
+        map=dict(map_data),
+    )
+
+
+def parse_panel_geometry(data: dict[str, int]) -> PanelGeometry:
+    """パネルジオメトリをパースする"""
+    return PanelGeometry(
+        width=data["width"],
+        height=data["height"],
+        offset_x=data.get("offset_x", 0),
+        offset_y=data.get("offset_y", 0),
+    )
+
+
+def parse_icon_config(data: dict[str, str | float]) -> IconConfig:
+    """アイコン設定をパースする"""
+    path = data["path"]
+    if not isinstance(path, str):
+        msg = "icon config path must be a string"
+        raise TypeError(msg)
+
+    scale = data.get("scale", 1.0)
+    brightness = data.get("brightness", 1.0)
+
+    return IconConfig(
+        path=pathlib.Path(path),
+        scale=float(scale) if scale is not None else 1.0,
+        brightness=float(brightness) if brightness is not None else 1.0,
+    )

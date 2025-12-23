@@ -407,14 +407,17 @@ def test_notify_slack(mocker):
 
 
 def test_pil_util():
-    TEST_IMAGE_PATH = "tests/data/a.png"
+    TEST_IMAGE_PATH = pathlib.Path("tests/data/a.png")
     import PIL.Image
 
     import my_lib.pil_util
+    from my_lib.panel_config import FontConfig, IconConfig
 
-    font = my_lib.pil_util.get_font(
-        {"path": "tests/data", "map": {"test": "migmix-1p-regular.ttf"}}, "test", 12
+    font_config = FontConfig(
+        path=pathlib.Path("tests/data"),
+        map={"test": "migmix-1p-regular.ttf"},
     )
+    font = my_lib.pil_util.get_font(font_config, "test", 12)
 
     img = PIL.Image.new(
         "RGBA",
@@ -428,46 +431,50 @@ def test_pil_util():
     img_gray = my_lib.pil_util.convert_to_gray(img)
     img_gray.save(TEST_IMAGE_PATH)
 
-    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "scale": 1.2, "brightness": 1.1})
-    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "scale": 1.1})
-    my_lib.pil_util.load_image({"path": TEST_IMAGE_PATH, "brightness": 0.9})
+    my_lib.pil_util.load_image(IconConfig(path=TEST_IMAGE_PATH, scale=1.2, brightness=1.1))
+    my_lib.pil_util.load_image(IconConfig(path=TEST_IMAGE_PATH, scale=1.1))
+    my_lib.pil_util.load_image(IconConfig(path=TEST_IMAGE_PATH, brightness=0.9))
 
     my_lib.pil_util.alpha_paste(img, img_gray, (0, 0))
 
 
 def test_panel_util():
+    from dataclasses import dataclass
+
+    import PIL.Image
+
     import my_lib.panel_util
+    from my_lib.notify.slack import SlackEmptyConfig
+    from my_lib.panel_config import FontConfig, PanelGeometry
 
-    config = my_lib.config.load(CONFIG_FILE)
+    # テスト用のパネル設定クラス
+    @dataclass(frozen=True)
+    class TestPanelConfig:
+        panel: PanelGeometry
 
-    my_lib.panel_util.create_error_image(
-        {"panel": {"width": 200, "height": 200}},
-        {
-            "path": "tests/data",
-            "map": {"en_medium": "migmix-1p-regular.ttf", "en_bold": "migmix-1p-regular.ttf"},
-        },
-        "Test",
+    panel_config = TestPanelConfig(panel=PanelGeometry(width=200, height=200))
+    font_config = FontConfig(
+        path=pathlib.Path("tests/data"),
+        map={"en_medium": "migmix-1p-regular.ttf", "en_bold": "migmix-1p-regular.ttf"},
     )
 
-    my_lib.panel_util.notify_error({}, "Test")
-    my_lib.panel_util.notify_error(config, "Test")
+    my_lib.panel_util.create_error_image(panel_config, font_config, "Test")
+
+    my_lib.panel_util.notify_error(SlackEmptyConfig(), "test", "Test")
 
     def draw_panel_pass(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config):  # noqa: ARG001, PLR0913
-        return
+        return PIL.Image.new("RGBA", (10, 10), (255, 255, 255, 0))
 
     def draw_panel_fail(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config):  # noqa: ARG001, PLR0913
         raise Exception("Test")
 
-    my_lib.panel_util.draw_panel_patiently(draw_panel_pass, {}, {}, {}, False)
+    small_panel_config = TestPanelConfig(panel=PanelGeometry(width=100, height=100))
+
     my_lib.panel_util.draw_panel_patiently(
-        draw_panel_fail,
-        {"panel": {"width": 100, "height": 100}},
-        {
-            "path": "tests/data",
-            "map": {"en_medium": "migmix-1p-regular.ttf", "en_bold": "migmix-1p-regular.ttf"},
-        },
-        {},
-        False,
+        draw_panel_pass, small_panel_config, font_config, SlackEmptyConfig(), False
+    )
+    my_lib.panel_util.draw_panel_patiently(
+        draw_panel_fail, small_panel_config, font_config, SlackEmptyConfig(), False
     )
 
 
