@@ -2,26 +2,43 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 import socket
+from dataclasses import dataclass
 
 import requests
 
 import my_lib.footprint
 
 
-def check_liveness(name: str, liveness_file: str, interval: float) -> bool:
-    if not my_lib.footprint.exists(liveness_file):
-        logging.warning("%s is not executed.", name)
+@dataclass
+class HealthzTarget:
+    """Liveness チェック対象を表すデータクラス"""
+
+    name: str
+    liveness_file: pathlib.Path
+    interval: float
+
+
+def check_liveness(target: HealthzTarget) -> bool:
+    """単一ターゲットの liveness をチェックする"""
+    if not my_lib.footprint.exists(target.liveness_file):
+        logging.warning("%s is not executed.", target.name)
         return False
 
-    elapsed = my_lib.footprint.elapsed(liveness_file)
+    elapsed = my_lib.footprint.elapsed(target.liveness_file)
     # NOTE: 少なくとも1分は様子を見る
-    if elapsed > max(interval * 2, 60):
-        logging.warning("Execution interval of %s is too long. %s sec)", name, f"{elapsed:,.1f}")
+    if elapsed > max(target.interval * 2, 60):
+        logging.warning("Execution interval of %s is too long. %s sec)", target.name, f"{elapsed:,.1f}")
         return False
     else:
-        logging.debug("Execution interval of %s: %s sec)", name, f"{elapsed:,.1f}")
+        logging.debug("Execution interval of %s: %s sec)", target.name, f"{elapsed:,.1f}")
         return True
+
+
+def check_liveness_all(target_list: list[HealthzTarget]) -> list[str]:
+    """複数ターゲットの liveness をチェックし、失敗したターゲット名のリストを返す"""
+    return [target.name for target in target_list if not check_liveness(target)]
 
 
 def check_tcp_port(port: int, address: str = "127.0.0.1") -> bool:
