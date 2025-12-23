@@ -15,6 +15,21 @@ from my_lib.panel_config import HasFontMap, HasIconProperties
 _loaded_fonts: dict[pathlib.Path, bool] = {}
 
 
+class FontNotFoundError(Exception):
+    """フォントファイルが見つからないエラー."""
+
+    def __init__(self, message: str, details: str) -> None:
+        """例外を初期化する。
+
+        Args:
+            message: エラーメッセージ
+            details: 詳細なエラー情報
+
+        """
+        super().__init__(message)
+        self.details = details
+
+
 def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
     """フォントを取得する
 
@@ -25,8 +40,38 @@ def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.Fre
 
     Returns:
         PIL フォントオブジェクト
+
+    Raises:
+        FontNotFoundError: フォントファイルが見つからない場合
     """
     font_path = config.path.resolve() / config.map[font_type]
+
+    if not font_path.exists():
+        available_fonts = [f.name for f in config.path.resolve().glob("*") if f.is_file()]
+        available_str = ", ".join(available_fonts) if available_fonts else "(なし)"
+
+        details_lines = [
+            "=" * 60,
+            "フォントファイルが見つかりません",
+            "=" * 60,
+            "",
+            f"  フォントタイプ: {font_type}",
+            f"  ファイルパス: {font_path}",
+            "",
+            "  確認事項:",
+            "    - フォントファイルが存在するか確認してください",
+            "    - 設定ファイルのフォントパスが正しいか確認してください",
+            f"    - フォントディレクトリ: {config.path.resolve()}",
+            f"    - 利用可能なファイル: {available_str}",
+            "",
+            "=" * 60,
+        ]
+        details = "\n".join(details_lines)
+        logging.error("\n%s", details)
+        raise FontNotFoundError(
+            f"フォントファイルが見つかりません: {font_path}",
+            details,
+        )
 
     if font_path not in _loaded_fonts:
         logging.debug("Load font: %s", font_path)

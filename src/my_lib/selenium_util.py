@@ -116,7 +116,7 @@ def create_driver_impl(
     driver = undetected_chromedriver.Chrome(
         service=service,
         options=options,
-        use_subprocess=False,
+        use_subprocess=True,
         version_main=chrome_version,
         user_multi_procs=use_multi_procs,
     )
