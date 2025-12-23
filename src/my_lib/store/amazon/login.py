@@ -39,7 +39,7 @@ WAIT_COUNT: int = 40
 def resolve_puzzle(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    slack_config: my_lib.notify.slack.SlackConfig,
+    slack_config: my_lib.notify.slack.HasCaptcha,
 ) -> None:
     logging.info("Try to resolve PUZZLE")
 
@@ -114,6 +114,10 @@ def handle_password_input(
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@id="auth-captcha-guess"]'):
         slack_config = my_lib.notify.slack.parse_config(config["slack"])
+        if not isinstance(
+            slack_config, (my_lib.notify.slack.SlackConfig, my_lib.notify.slack.SlackCaptchaOnlyConfig)
+        ):
+            raise ValueError("captcha 設定がありません")
         my_lib.store.amazon.captcha.resolve(
             driver,
             wait,
@@ -142,7 +146,7 @@ def handle_password_input(
 
 def handle_quiz(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
-    slack_config: my_lib.notify.slack.SlackConfig,
+    slack_config: my_lib.notify.slack.HasCaptcha,
     dump_path: pathlib.Path,
 ) -> None:
     if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):
@@ -249,14 +253,22 @@ def execute_impl(
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
         slack_config = my_lib.notify.slack.parse_config(config["slack"])
+        if not isinstance(
+            slack_config, (my_lib.notify.slack.SlackConfig, my_lib.notify.slack.SlackCaptchaOnlyConfig)
+        ):
+            raise ValueError("captcha 設定がありません")
         resolve_puzzle(driver, wait, slack_config)
 
     handle_email_input(driver, config)
     handle_password_input(driver, wait, config)
 
-    slack_config = my_lib.notify.slack.parse_config(config["slack"])
+    slack_config_for_quiz = my_lib.notify.slack.parse_config(config["slack"])
+    if not isinstance(
+        slack_config_for_quiz, (my_lib.notify.slack.SlackConfig, my_lib.notify.slack.SlackCaptchaOnlyConfig)
+    ):
+        raise ValueError("captcha 設定がありません")
     dump_path = pathlib.Path(config["data"]["dump"])
-    handle_quiz(driver, slack_config, dump_path)
+    handle_quiz(driver, slack_config_for_quiz, dump_path)
     handle_security_check(driver, config)
 
     wait.until(

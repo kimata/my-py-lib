@@ -22,7 +22,15 @@ def notify_error(config: dict[str, Any], message: str) -> None:
         return
 
     slack_config = my_lib.notify.slack.parse_config(config["slack"])
-    my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
+    if isinstance(
+        slack_config,
+        (
+            my_lib.notify.slack.SlackConfig,
+            my_lib.notify.slack.SlackErrorInfoConfig,
+            my_lib.notify.slack.SlackErrorOnlyConfig,
+        ),
+    ):
+        my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
 
 
 def create_error_image(

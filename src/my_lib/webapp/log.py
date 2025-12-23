@@ -228,7 +228,15 @@ def log_impl(sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None
     if level == LOG_LEVEL.ERROR:
         if config is not None and "slack" in config:
             slack_config = my_lib.notify.slack.parse_config(config["slack"])
-            my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
+            if isinstance(
+                slack_config,
+                (
+                    my_lib.notify.slack.SlackConfig,
+                    my_lib.notify.slack.SlackErrorInfoConfig,
+                    my_lib.notify.slack.SlackErrorOnlyConfig,
+                ),
+            ):
+                my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
 
         if (os.environ.get("DUMMY_MODE", "false") == "true") and (
             os.environ.get("TEST", "false") != "true"

@@ -23,7 +23,7 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, Protocol, TypedDict, Union
 
 import slack_sdk
 import slack_sdk.web.slack_response
@@ -95,15 +95,77 @@ class SlackErrorConfig:
     interval_min: int
 
 
+# === Protocol 定義 ===
+class HasBotToken(Protocol):
+    """bot_token を持つことを表す Protocol"""
+
+    @property
+    def bot_token(self) -> str: ...
+
+
+class HasError(HasBotToken, Protocol):
+    """error 設定を持つことを表す Protocol"""
+
+    @property
+    def error(self) -> SlackErrorConfig: ...
+
+
+class HasInfo(HasBotToken, Protocol):
+    """info 設定を持つことを表す Protocol"""
+
+    @property
+    def info(self) -> SlackInfoConfig: ...
+
+
+class HasCaptcha(HasBotToken, Protocol):
+    """captcha 設定を持つことを表す Protocol"""
+
+    @property
+    def captcha(self) -> SlackCaptchaConfig: ...
+
+
+# === 具象クラス ===
+@dataclass(frozen=True)
+class SlackErrorOnlyConfig:
+    """error のみの Slack 設定"""
+
+    bot_token: str
+    from_name: str
+    error: SlackErrorConfig
+
+
+@dataclass(frozen=True)
+class SlackCaptchaOnlyConfig:
+    """captcha のみの Slack 設定"""
+
+    bot_token: str
+    from_name: str
+    captcha: SlackCaptchaConfig
+
+
+@dataclass(frozen=True)
+class SlackErrorInfoConfig:
+    """error + info の Slack 設定"""
+
+    bot_token: str
+    from_name: str
+    info: SlackInfoConfig
+    error: SlackErrorConfig
+
+
 @dataclass(frozen=True)
 class SlackConfig:
-    """Slack 設定"""
+    """error + info + captcha 全ての Slack 設定"""
 
     bot_token: str
     from_name: str
     info: SlackInfoConfig
     captcha: SlackCaptchaConfig
     error: SlackErrorConfig
+
+
+# 型エイリアス
+SlackConfigTypes = Union[SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig, SlackCaptchaOnlyConfig]
 
 
 # NOTE: テスト用
@@ -121,7 +183,7 @@ def format_simple(title: str, message: str) -> FormattedMessage:
 
 
 def info(
-    config: SlackConfig,
+    config: HasInfo,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -131,7 +193,7 @@ def info(
 
 
 def error(
-    config: SlackConfig,
+    config: HasError,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -151,7 +213,7 @@ def error(
 
 
 def error_with_image(
-    config: SlackConfig,
+    config: HasError,
     title: str,
     message: str,
     attach_img: AttachImage | None,
@@ -178,25 +240,87 @@ def error_with_image(
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
 
 
-def parse_config(data: dict[str, Any]) -> SlackConfig:
-    """Slack 設定をパースする"""
-    return SlackConfig(
-        bot_token=data["bot_token"],
-        from_name=data["from"],
-        info=_parse_slack_info(data["info"]),
-        captcha=_parse_slack_captcha(data["captcha"]),
-        error=_parse_slack_error(data["error"]),
-    )
+def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
+    """Slack 設定をパースする
+
+    存在するフィールドに応じて適切な Config クラスを返す。
+    """
+    has_error = "error" in data
+    has_info = "info" in data
+    has_captcha = "captcha" in data
+
+    bot_token = data["bot_token"]
+    from_name = data["from"]
+
+    # 全て揃っている場合
+    if has_error and has_info and has_captcha:
+        return SlackConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            info=_parse_slack_info(data["info"]),
+            captcha=_parse_slack_captcha(data["captcha"]),
+            error=_parse_slack_error(data["error"]),
+        )
+
+    # error + info
+    if has_error and has_info and not has_captcha:
+        return SlackErrorInfoConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            info=_parse_slack_info(data["info"]),
+            error=_parse_slack_error(data["error"]),
+        )
+
+    # error のみ
+    if has_error and not has_info and not has_captcha:
+        return SlackErrorOnlyConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            error=_parse_slack_error(data["error"]),
+        )
+
+    # captcha のみ
+    if has_captcha and not has_error and not has_info:
+        return SlackCaptchaOnlyConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            captcha=_parse_slack_captcha(data["captcha"]),
+        )
+
+    # 中途半端なパターン: error + captcha (info なし)
+    if has_error and has_captcha and not has_info:
+        logging.warning(
+            "Slack 設定が不完全です。SlackErrorOnlyConfig として処理します。captcha は無視されます。"
+        )
+        return SlackErrorOnlyConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            error=_parse_slack_error(data["error"]),
+        )
+
+    # 中途半端なパターン: info + captcha (error なし)
+    if has_info and has_captcha and not has_error:
+        logging.warning(
+            "Slack 設定が不完全です。SlackCaptchaOnlyConfig として処理します。info は無視されます。"
+        )
+        return SlackCaptchaOnlyConfig(
+            bot_token=bot_token,
+            from_name=from_name,
+            captcha=_parse_slack_captcha(data["captcha"]),
+        )
+
+    # info のみ、または何もない場合
+    raise ValueError("Slack 設定には error または captcha が必要です")
 
 
 def send(
-    config: SlackConfig, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+    config: HasBotToken, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
 def upload_image(  # noqa: PLR0913
-    config: SlackConfig,
+    config: HasBotToken,
     ch_id: str,
     title: str,
     img: Image.Image,
@@ -408,5 +532,7 @@ if __name__ == "__main__":
 
     slack_config = parse_config(raw_config["slack"])
 
-    info(slack_config, "Test", "This is test")
-    error(slack_config, "Test", "This is test")
+    if isinstance(slack_config, (SlackConfig, SlackErrorInfoConfig)):
+        info(slack_config, "Test", "This is test")
+    if isinstance(slack_config, (SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig)):
+        error(slack_config, "Test", "This is test")
