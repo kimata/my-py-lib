@@ -126,6 +126,13 @@ class HasCaptcha(HasBotToken, Protocol):
 
 # === 具象クラス ===
 @dataclass(frozen=True)
+class SlackEmptyConfig:
+    """Slack 設定が存在しない場合のプレースホルダー"""
+
+    pass
+
+
+@dataclass(frozen=True)
 class SlackErrorOnlyConfig:
     """error のみの Slack 設定"""
 
@@ -165,7 +172,9 @@ class SlackConfig:
 
 
 # 型エイリアス
-SlackConfigTypes = Union[SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig, SlackCaptchaOnlyConfig]
+SlackConfigTypes = Union[
+    SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig, SlackCaptchaOnlyConfig, SlackEmptyConfig
+]
 
 
 # NOTE: テスト用
@@ -244,10 +253,19 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
     """Slack 設定をパースする
 
     存在するフィールドに応じて適切な Config クラスを返す。
+    設定が空または不十分な場合は SlackEmptyConfig を返す。
     """
+    # 空の設定の場合
+    if not data or "bot_token" not in data:
+        return SlackEmptyConfig()
+
     has_error = "error" in data
     has_info = "info" in data
     has_captcha = "captcha" in data
+
+    # error も captcha もない場合は空として扱う
+    if not has_error and not has_captcha:
+        return SlackEmptyConfig()
 
     bot_token = data["bot_token"]
     from_name = data["from"]
@@ -309,8 +327,8 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
             captcha=_parse_slack_captcha(data["captcha"]),
         )
 
-    # info のみ、または何もない場合
-    raise ValueError("Slack 設定には error または captcha が必要です")
+    # info のみ、または何もない場合（ここには到達しないはずだが念のため）
+    return SlackEmptyConfig()
 
 
 def send(

@@ -31,7 +31,7 @@ def execute(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptcha | None,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
     dump_path: pathlib.Path,
 ) -> None:  # noqa: PLR0913
     try:
@@ -58,7 +58,7 @@ def _execute_impl(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,  # noqa: ARG001
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptcha | None,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
     dump_path: pathlib.Path,  # noqa: ARG001
 ) -> None:
     logging.info("ログインを行います。")
@@ -112,7 +112,7 @@ def _execute_impl(
 
     code: str | None = None
     ts: str | None = None
-    if slack_config is not None:
+    if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
         logging.info("Slack に SMS で送られてきた認証番号を入力してください")
         ts = my_lib.store.captcha.send_request_text_slack(
             slack_config,
@@ -148,7 +148,7 @@ def _execute_impl(
         )
     )
 
-    if slack_config is not None and ts is not None:
+    if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig) and ts is not None:
         my_lib.notify.slack.send(
             slack_config,
             slack_config.captcha.channel.name,
@@ -163,7 +163,7 @@ def _login_via_line(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptcha | None,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
 ) -> None:
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 
@@ -185,7 +185,7 @@ def _login_via_line(
     if "LINE Login" in driver.title:
         code = my_lib.selenium_util.get_text(driver, '//p[contains(@class, "Number")]', "?", wait)
 
-        if slack_config is not None:
+        if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
             my_lib.store.captcha.send_request_text_slack(
                 slack_config,
                 "LINE",
