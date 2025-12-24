@@ -25,6 +25,7 @@ import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.crc import crc16_modbus
 from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
 
@@ -143,23 +144,8 @@ class SM9561:
         logging.debug("set MCR = 0x%02X", data)
         self.i2cbus.write_byte_data(self.dev_addr, self.REG_MCR, data)
 
-    def calc_crc(self, data_list: list[int]) -> list[int]:
-        POLY = 0xA001
-
-        crc = 0xFFFF
-        for data in data_list:
-            crc ^= data
-
-            for _ in range(8):
-                if crc & 0x0001:
-                    crc = (crc >> 1) ^ POLY
-                else:
-                    crc >>= 1
-
-        return [crc & 0xFF, crc >> 8]
-
     def append_crc(self, data_list: list[int]) -> list[int]:
-        return data_list + self.calc_crc(data_list)
+        return data_list + crc16_modbus(data_list)
 
     def write_bytes(self, data_list: list[int]) -> None:
         self.set_rts(True)
@@ -199,9 +185,9 @@ class SM9561:
         length = data[2]
         data = self.read_bytes(length + 2)
 
-        crc = self.calc_crc([dev_addr, 0x03, length, *data[0:length]])
+        crc = crc16_modbus([dev_addr, 0x03, length, *data[0:length]])
 
-        if crc != data[length:]:
+        if crc != list(data[length:]):
             raise SensorCRCError("CRC mismatch")
 
         return (data[0] << 8) + data[1]

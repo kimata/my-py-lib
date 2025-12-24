@@ -21,6 +21,7 @@ import time
 
 from my_lib.sensor import i2cbus
 from my_lib.sensor.base import I2CSensorBase
+from my_lib.sensor.crc import crc8_sensirion
 from my_lib.sensor.exceptions import SensorCRCError
 
 
@@ -28,22 +29,10 @@ class SHT35(I2CSensorBase):
     NAME: str = "SHT-35"
     DEV_ADDR: int = 0x44  # 7bit
 
-    def crc(self, data: bytes | list[int]) -> int:
-        crc = 0xFF
-        for s in data:
-            crc ^= s
-            for _ in range(8):
-                if crc & 0x80:
-                    crc <<= 1
-                    crc ^= 0x131
-                else:
-                    crc <<= 1
-        return crc
-
     def _ping_impl(self) -> bool:
         self.i2cbus.write_byte_data(self.dev_addr, 0xF3, 0x2D)
         data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 3)
-        return self.crc(data[0:2]) == data[2]
+        return crc8_sensirion(data[0:2]) == data[2]
 
     def get_value(self) -> list[float]:
         self.i2cbus.write_byte_data(self.dev_addr, 0x24, 0x16)
@@ -55,7 +44,7 @@ class SHT35(I2CSensorBase):
 
         data = bytes(read)
 
-        if (self.crc(data[0:2]) != data[2]) or (self.crc(data[3:5]) != data[5]):
+        if (crc8_sensirion(data[0:2]) != data[2]) or (crc8_sensirion(data[3:5]) != data[5]):
             raise SensorCRCError("CRC unmatch")
 
         temp = -45 + (175 * int.from_bytes(data[0:2], byteorder="big")) / float(2**16 - 1)

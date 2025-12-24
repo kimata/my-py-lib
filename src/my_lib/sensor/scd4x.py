@@ -21,6 +21,7 @@ import time
 
 from my_lib.sensor import i2cbus
 from my_lib.sensor.base import I2CSensorBase
+from my_lib.sensor.crc import crc8_sensirion
 from my_lib.sensor.exceptions import SensorCRCError
 
 
@@ -44,25 +45,10 @@ class SCD4X(I2CSensorBase):
         self.i2cbus.write_byte_data(self.dev_addr, 0x36, 0x46)
         time.sleep(0.02)
 
-    def __crc(self, msg: bytes | list[int]) -> int:
-        poly = 0x31
-        crc = 0xFF
-
-        for data in bytearray(msg):
-            crc ^= data
-            for _ in range(8):
-                if crc & 0x80:
-                    crc = (crc << 1) ^ poly
-                else:
-                    crc <<= 1
-            crc &= 0xFF
-
-        return crc
-
     def __decode_response(self, data: bytes) -> list[int]:
         resp: list[int] = []
         for word in zip(*[iter(data)] * 3, strict=False):
-            if self.__crc(list(word[0:2])) != word[2]:
+            if crc8_sensirion(list(word[0:2])) != word[2]:
                 raise SensorCRCError("CRC unmatch")
             resp.extend(word[0:2])
         return resp
