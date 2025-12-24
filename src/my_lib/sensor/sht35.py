@@ -60,6 +60,8 @@ class SHT35(I2CSensorBase):
 
 if __name__ == "__main__":
     # TEST Code
+    import logging
+
     import docopt
 
     import my_lib.logger

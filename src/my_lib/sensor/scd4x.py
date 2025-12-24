@@ -99,6 +99,8 @@ class SCD4X(I2CSensorBase):
 
 if __name__ == "__main__":
     # TEST Code
+    import logging
+
     import docopt
 
     import my_lib.logger
