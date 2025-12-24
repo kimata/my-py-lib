@@ -39,9 +39,7 @@ class ConfigParseError(Exception):
 
 
 class ConfigFileNotFoundError(Exception):
-    def __init__(self, message: str, details: str) -> None:
-        super().__init__(message)
-        self.details = details
+    pass
 
 
 def _format_path(path: list[str | int]) -> str:
@@ -556,9 +554,9 @@ def load(
     logging.info("Load config: %s%s", config_path_obj, schema_info)
 
     if not config_path_obj.exists():
-        details = f"設定ファイルが見つかりません: {config_path_obj}"
-        logging.error(details)
-        raise ConfigFileNotFoundError(details, details)
+        message = f"設定ファイルが見つかりません: {config_path_obj}"
+        logging.error(message)
+        raise ConfigFileNotFoundError(message)
 
     with config_path_obj.open() as file:
         yaml_content = file.read()

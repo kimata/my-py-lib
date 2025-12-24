@@ -16,15 +16,11 @@ _loaded_fonts: dict[pathlib.Path, bool] = {}
 
 
 class FontNotFoundError(Exception):
-    def __init__(self, message: str, details: str) -> None:
-        super().__init__(message)
-        self.details = details
+    pass
 
 
 class ImageNotFoundError(Exception):
-    def __init__(self, message: str, details: str) -> None:
-        super().__init__(message)
-        self.details = details
+    pass
 
 
 def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
@@ -44,9 +40,9 @@ def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.Fre
     font_path = config.path.resolve() / config.map[font_type]
 
     if not font_path.exists():
-        details = f"フォントファイルが見つかりません: {font_path}"
-        logging.error(details)
-        raise FontNotFoundError(details, details)
+        message = f"フォントファイルが見つかりません: {font_path}"
+        logging.error(message)
+        raise FontNotFoundError(message)
 
     if font_path not in _loaded_fonts:
         logging.debug("Load font: %s", font_path)
@@ -149,9 +145,9 @@ def load_image(img_config: HasIconProperties) -> PIL.Image.Image:
     img_path = pathlib.Path(img_config.path)
 
     if not img_path.exists():
-        details = f"画像ファイルが見つかりません: {img_path}"
-        logging.error(details)
-        raise ImageNotFoundError(details, details)
+        message = f"画像ファイルが見つかりません: {img_path}"
+        logging.error(message)
+        raise ImageNotFoundError(message)
 
     img: PIL.Image.Image = PIL.Image.open(img_config.path)
 
