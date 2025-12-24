@@ -26,7 +26,16 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypedDict
+
+
+class InfluxDBConfig(TypedDict):
+    """InfluxDB 接続設定"""
+
+    url: str
+    token: str
+    org: str
+    bucket: str
 
 import influxdb_client
 from influxdb_client.client.flux_table import TableList
@@ -142,7 +151,7 @@ def _process_query_results(
 
 
 def fetch_data_impl(  # noqa: PLR0913
-    db_config: dict[str, Any],
+    db_config: InfluxDBConfig,
     template: str,
     measure: str,
     hostname: str,
@@ -186,7 +195,7 @@ def fetch_data_impl(  # noqa: PLR0913
 
 
 async def fetch_data_impl_async(  # noqa: PLR0913
-    db_config: dict[str, Any],
+    db_config: InfluxDBConfig,
     template: str,
     measure: str,
     hostname: str,
@@ -218,7 +227,7 @@ async def fetch_data_impl_async(  # noqa: PLR0913
 
 
 def fetch_data(  # noqa: PLR0913
-    db_config: dict[str, Any],
+    db_config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -283,7 +292,7 @@ def fetch_data(  # noqa: PLR0913
 
 
 async def fetch_data_async(  # noqa: PLR0913
-    db_config: dict[str, Any],
+    db_config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -349,7 +358,7 @@ async def fetch_data_async(  # noqa: PLR0913
 
 
 async def fetch_data_parallel(
-    db_config: dict[str, Any], requests: list[DataRequest]
+    db_config: InfluxDBConfig, requests: list[DataRequest]
 ) -> list[SensorDataResult | BaseException]:
     """
     複数のデータ取得リクエストを並列実行
@@ -384,7 +393,7 @@ async def fetch_data_parallel(
 
 
 def get_equip_on_minutes(  # noqa: PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -453,7 +462,7 @@ def get_equip_on_minutes(  # noqa: PLR0913
 
 
 def get_equip_mode_period(  # noqa: C901, PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -561,7 +570,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
 
 
 def get_sum(  # noqa: PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -583,16 +592,15 @@ def get_sum(  # noqa: PLR0913
             sum_value = value_list[0][1]
             if isinstance(sum_value, (int, float)):
                 return float(sum_value)
-            raise ValueError(f"Unexpected sum value type: {type(sum_value).__name__} (value={sum_value})")
-    except ValueError:
-        raise
+            logging.warning("Unexpected sum value type: %s (value=%s)", type(sum_value).__name__, sum_value)
+            return 0
     except Exception:
         logging.exception("Failed to fetch data")
         return 0
 
 
 def get_day_sum(  # noqa: PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -615,7 +623,7 @@ def get_day_sum(  # noqa: PLR0913
 
 
 def get_hour_sum(  # noqa: PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -631,7 +639,7 @@ def get_hour_sum(  # noqa: PLR0913
 
 
 def get_minute_sum(  # noqa: PLR0913
-    config: dict[str, Any],
+    config: InfluxDBConfig,
     measure: str,
     hostname: str,
     field: str,
@@ -647,7 +655,7 @@ def get_minute_sum(  # noqa: PLR0913
 
 
 def get_last_event(
-    config: dict[str, Any], measure: str, hostname: str, field: str, start: str = "-7d"
+    config: InfluxDBConfig, measure: str, hostname: str, field: str, start: str = "-7d"
 ) -> datetime.datetime | None:
     try:
         table_list = fetch_data_impl(
@@ -662,9 +670,8 @@ def get_last_event(
             time_value = value_list[0][0]
             if isinstance(time_value, datetime.datetime):
                 return time_value
-            raise ValueError(f"Unexpected time value type: {type(time_value).__name__} (value={time_value})")
-    except ValueError:
-        raise
+            logging.warning("Unexpected time value type: %s (value=%s)", type(time_value).__name__, time_value)
+            return None
     except Exception:
         logging.exception("Failed to fetch data")
         return None
