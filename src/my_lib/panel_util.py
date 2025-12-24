@@ -20,7 +20,7 @@ P = TypeVar("P", bound=my_lib.panel_config.PanelConfigProtocol)
 
 
 def notify_error(
-    slack_config: my_lib.notify.slack.HasError | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
     from_name: str,
     message: str,
 ) -> None:
@@ -91,7 +91,7 @@ PanelDrawFunc = Callable[
     [
         my_lib.panel_config.PanelConfigProtocol,
         my_lib.panel_config.FontConfigProtocol,
-        my_lib.notify.slack.HasError | my_lib.notify.slack.SlackEmptyConfig,
+        my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
         bool,
         int,
         object,
@@ -104,7 +104,7 @@ def draw_panel_patiently(  # noqa: PLR0913
     func: PanelDrawFunc,
     panel_config: my_lib.panel_config.PanelConfigProtocol,
     font_config: my_lib.panel_config.FontConfigProtocol,
-    slack_config: my_lib.notify.slack.HasError | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
     is_side_by_side: bool,
     opt_config: object = None,
     error_image: bool = True,

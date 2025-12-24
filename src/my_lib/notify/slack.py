@@ -103,21 +103,21 @@ class HasBotToken(Protocol):
     def bot_token(self) -> str: ...
 
 
-class HasError(HasBotToken, Protocol):
+class HasErrorConfig(HasBotToken, Protocol):
     """Slack エラー通知設定の Protocol"""
 
     @property
     def error(self) -> SlackErrorConfig: ...
 
 
-class HasInfo(HasBotToken, Protocol):
+class HasInfoConfig(HasBotToken, Protocol):
     """Slack 情報通知設定の Protocol"""
 
     @property
     def info(self) -> SlackInfoConfig: ...
 
 
-class HasCaptcha(HasBotToken, Protocol):
+class HasCaptchaConfig(HasBotToken, Protocol):
     """Slack CAPTCHA 通知設定の Protocol"""
 
     @property
@@ -192,7 +192,7 @@ def format_simple(title: str, message: str) -> FormattedMessage:
 
 
 def info(
-    config: HasInfo | SlackEmptyConfig,
+    config: HasInfoConfig | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -204,7 +204,7 @@ def info(
 
 
 def error(
-    config: HasError | SlackEmptyConfig,
+    config: HasErrorConfig | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -226,7 +226,7 @@ def error(
 
 
 def error_with_image(
-    config: HasError | SlackEmptyConfig,
+    config: HasErrorConfig | SlackEmptyConfig,
     title: str,
     message: str,
     attach_img: AttachImage | None,
