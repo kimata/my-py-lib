@@ -6,7 +6,7 @@ Usage:
   echonetenergy.py [-c CONFIG] [-i IF_DEV] [-d DEV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -i IF_DEV         : ECHONET Lite のインターフェースデバイスを指定します。[default: BP35A1]
   -d DEV_FILE       : デバイスファイルを指定します。[default: /dev/ttyAMA0]
   -D                : デバッグモードで動作します。

@@ -6,7 +6,7 @@ Usage:
   api.py [-c CONFIG] [-t ASIN...] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
   -D                : デバッグモードで動作します。
 """

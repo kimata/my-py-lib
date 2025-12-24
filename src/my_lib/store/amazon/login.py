@@ -6,7 +6,7 @@ Usage:
   login.py [-c CONFIG] [-t TARGET] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -D                : デバッグモードで動作します。
 """
 

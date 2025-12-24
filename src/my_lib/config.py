@@ -6,7 +6,7 @@ Usage:
   config.py [-c CONFIG] [-S] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -S                : YAML 記述をもとにして、JSON Schema の雛形を生成します。
   -D                : デバッグモードで動作します。
 """

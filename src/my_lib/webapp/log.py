@@ -6,7 +6,7 @@ Usage:
   log.py [-c CONFIG] [-p PORT] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -p PORT           : WEB サーバのポートを指定します。[default: 5000]
   -D                : デバッグモードで動作します。
 """

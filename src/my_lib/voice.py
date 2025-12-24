@@ -6,7 +6,7 @@ Usage:
   voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-o WAV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -m MESSAGE        : 音声化するメッセージ。[default: テストです]
   -s SPEAKER_ID     : スピーカ。[default: 3]
   -o WAV            : 書き出す音声ファイル。[default: text.wav]

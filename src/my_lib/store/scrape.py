@@ -6,7 +6,7 @@ Usage:
   scrape.py [-c CONFIG] [-s DATA_PATH] [-D]
 
 Options:n
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: config.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
   -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
   -D                : デバッグモードで動作します。
 """
