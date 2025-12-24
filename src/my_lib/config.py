@@ -27,46 +27,19 @@ CONFIG_PATH: str = "config.yaml"
 
 
 class ConfigValidationError(Exception):
-    """YAML 設定ファイルの検証エラー."""
-
     def __init__(self, message: str, details: str) -> None:
-        """例外を初期化する。
-
-        Args:
-            message: エラーメッセージ
-            details: 詳細なエラー情報
-
-        """
         super().__init__(message)
         self.details = details
 
 
 class ConfigParseError(Exception):
-    """YAML パースエラー."""
-
     def __init__(self, message: str, details: str) -> None:
-        """例外を初期化する。
-
-        Args:
-            message: エラーメッセージ
-            details: 詳細なエラー情報
-
-        """
         super().__init__(message)
         self.details = details
 
 
 class ConfigFileNotFoundError(Exception):
-    """設定ファイルが見つからないエラー."""
-
     def __init__(self, message: str, details: str) -> None:
-        """例外を初期化する。
-
-        Args:
-            message: エラーメッセージ
-            details: 詳細なエラー情報
-
-        """
         super().__init__(message)
         self.details = details
 
@@ -583,26 +556,9 @@ def load(
     logging.info("Load config: %s%s", config_path_obj, schema_info)
 
     if not config_path_obj.exists():
-        details_lines = [
-            "=" * 60,
-            "設定ファイルが見つかりません",
-            "=" * 60,
-            "",
-            f"  ファイルパス: {config_path_obj}",
-            "",
-            "  確認事項:",
-            "    - ファイルパスが正しいか確認してください",
-            "    - ファイルが存在するか確認してください",
-            "    - ファイル名のスペルミスがないか確認してください",
-            "",
-            "=" * 60,
-        ]
-        details = "\n".join(details_lines)
-        logging.error("\n%s", details)
-        raise ConfigFileNotFoundError(
-            f"設定ファイルが見つかりません: {config_path_obj}",
-            details,
-        )
+        details = f"設定ファイルが見つかりません: {config_path_obj}"
+        logging.error(details)
+        raise ConfigFileNotFoundError(details, details)
 
     with config_path_obj.open() as file:
         yaml_content = file.read()
