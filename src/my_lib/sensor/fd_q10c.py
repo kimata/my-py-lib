@@ -17,7 +17,6 @@ import logging
 import os
 import pathlib
 import time
-import traceback
 from types import TracebackType
 from typing import Any
 
@@ -89,22 +88,13 @@ class FD_Q10C:  # noqa: N801
         except Exception:
             return False
 
-    def get_value(self, force_power_on: bool = True) -> float | None:
-        try:
-            raw = self.read_param(0x94, driver.DATA_TYPE_UINT16, force_power_on)
+    def get_value(self, force_power_on: bool = True) -> float:
+        raw = self.read_param(0x94, driver.DATA_TYPE_UINT16, force_power_on)
 
-            if raw is None:
-                return None
-            else:
-                return round(raw * 0.01, 2)
-        except Exception:
-            try:
-                self.stop()
-            except Exception:
-                logging.debug("Failed to stop")
+        if raw is None:
+            raise RuntimeError("Sensor is powered OFF and force_power_on is False")
 
-            logging.warning(traceback.format_exc())
-            return None
+        return round(raw * 0.01, 2)
 
     def get_state(self) -> bool:
         with Lock():
@@ -149,7 +139,7 @@ class FD_Q10C:  # noqa: N801
                     driver.com_close(spi, is_reset=True)
                     raise
 
-    def get_value_map(self, force_power_on: bool = True) -> dict[str, float | None]:
+    def get_value_map(self, force_power_on: bool = True) -> dict[str, float]:
         value = self.get_value(force_power_on)
 
         return {"flow": value}
