@@ -13,6 +13,7 @@ import spidev
 
 import my_lib.sensor
 import my_lib.sensor.io_link
+from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
 DEBUG: bool = True
 
@@ -171,9 +172,9 @@ def dir_param_read(spi: spidev.SpiDev, ser: serial.Serial, addr: int) -> int:
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise OSError("response is too short")
+        raise SensorCommunicationError("response is too short")
     elif data[1] != msq_checksum([data[0]]):  # noqa:RET506
-        raise OSError("checksum unmatch")
+        raise SensorCRCError("checksum unmatch")
 
     return data[0]
 
@@ -193,9 +194,9 @@ def dir_param_write(spi: spidev.SpiDev, ser: serial.Serial, addr: int, value: in
     data = com_read(spi, ser, 4)[3:]
 
     if len(data) < 1:
-        raise OSError("response is too short")
+        raise SensorCommunicationError("response is too short")
     elif data[0] != msq_checksum([]):  # noqa: RET506
-        raise OSError("checksum unmatch")
+        raise SensorCRCError("checksum unmatch")
 
 
 def isdu_req_build(index: int, length: int) -> list[list[int]]:
@@ -234,9 +235,9 @@ def isdu_res_read(spi: spidev.SpiDev, ser: serial.Serial, flow: int) -> int:
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise OSError("response is too short")
+        raise SensorCommunicationError("response is too short")
     if data[1] != msq_checksum([data[0]]):
-        raise OSError("checksum unmatch")
+        raise SensorCRCError("checksum unmatch")
 
     return data[0]
 
@@ -270,9 +271,9 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
             logging.warning("WAIT response")
             continue
         elif (header >> 4) == 0x0C:
-            raise OSError("ERROR reponse")
+            raise SensorCommunicationError("ERROR response")
         else:
-            raise OSError(f"INVALID response: {pprint.pformat(header)}")
+            raise SensorCommunicationError(f"INVALID response: {pprint.pformat(header)}")
 
     for _ in range(remain - 1):
         res = isdu_res_read(spi, ser, flow & 0xF)
@@ -283,7 +284,7 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
     chk ^= isdu_res_read(spi, ser, flow)
 
     if chk != 0x00:
-        raise OSError("ISDU checksum unmatch")
+        raise SensorCRCError("ISDU checksum unmatch")
 
     if data_type == DATA_TYPE_STRING:
         return bytes(data_list).decode("utf-8")

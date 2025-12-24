@@ -21,6 +21,7 @@ import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.exceptions import SensorCRCError
 
 
 class SCD4X:
@@ -71,7 +72,7 @@ class SCD4X:
         resp: list[int] = []
         for word in zip(*[iter(data)] * 3, strict=False):
             if self.__crc(list(word[0:2])) != word[2]:
-                raise OSError("CRC unmatch")
+                raise SensorCRCError("CRC unmatch")
             resp.extend(word[0:2])
         return resp
 

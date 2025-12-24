@@ -25,6 +25,7 @@ import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
 
 class SM9561:
@@ -194,14 +195,14 @@ class SM9561:
         )
         data = self.read_bytes(3)
         if (data[0] != dev_addr) or (data[1] != 0x03):
-            raise OSError("Invalid response")
+            raise SensorCommunicationError("Invalid response")
         length = data[2]
         data = self.read_bytes(length + 2)
 
         crc = self.calc_crc([dev_addr, 0x03, length, *data[0:length]])
 
         if crc != data[length:]:
-            raise OSError("CRC mismatch")
+            raise SensorCRCError("CRC mismatch")
 
         return (data[0] << 8) + data[1]
 

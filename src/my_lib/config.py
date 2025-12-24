@@ -26,19 +26,25 @@ import yaml
 CONFIG_PATH: str = "config.yaml"
 
 
-class ConfigValidationError(Exception):
+class ConfigError(Exception):
+    """設定関連エラーの基底クラス"""
+
+    pass
+
+
+class ConfigValidationError(ConfigError):
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
-class ConfigParseError(Exception):
+class ConfigParseError(ConfigError):
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
-class ConfigFileNotFoundError(Exception):
+class ConfigFileNotFoundError(ConfigError):
     pass
 
 

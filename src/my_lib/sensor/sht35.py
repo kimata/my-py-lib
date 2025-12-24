@@ -21,6 +21,7 @@ import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.exceptions import SensorCRCError
 
 
 class SHT35:
@@ -68,7 +69,7 @@ class SHT35:
         data = bytes(read)
 
         if (self.crc(data[0:2]) != data[2]) or (self.crc(data[3:5]) != data[5]):
-            raise OSError("ERROR: CRC unmatch.")
+            raise SensorCRCError("CRC unmatch")
 
         temp = -45 + (175 * int.from_bytes(data[0:2], byteorder="big")) / float(2**16 - 1)
         humi = 100 * int.from_bytes(data[3:5], byteorder="big") / float(2**16 - 1)
