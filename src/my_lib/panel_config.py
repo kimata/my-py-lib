@@ -16,8 +16,8 @@ from typing import Protocol
 
 
 # === Protocol 定義 ===
-class HasGeometry(Protocol):
-    """ジオメトリを持つことを表す Protocol"""
+class GeometryProtocol(Protocol):
+    """ジオメトリ（幅・高さ）を持つオブジェクトの Protocol"""
 
     @property
     def width(self) -> int: ...
@@ -26,8 +26,8 @@ class HasGeometry(Protocol):
     def height(self) -> int: ...
 
 
-class HasOffset(Protocol):
-    """オフセットを持つことを表す Protocol"""
+class OffsetProtocol(Protocol):
+    """オフセット（位置）を持つオブジェクトの Protocol"""
 
     @property
     def offset_x(self) -> int: ...
@@ -36,8 +36,8 @@ class HasOffset(Protocol):
     def offset_y(self) -> int: ...
 
 
-class HasFontMap(Protocol):
-    """フォントマップを持つことを表す Protocol"""
+class FontConfigProtocol(Protocol):
+    """フォント設定の Protocol"""
 
     @property
     def path(self) -> pathlib.Path: ...
@@ -46,8 +46,8 @@ class HasFontMap(Protocol):
     def map(self) -> dict[str, str]: ...
 
 
-class HasIconProperties(Protocol):
-    """アイコンプロパティを持つことを表す Protocol"""
+class IconConfigProtocol(Protocol):
+    """アイコン設定の Protocol"""
 
     @property
     def path(self) -> pathlib.Path: ...
@@ -59,11 +59,11 @@ class HasIconProperties(Protocol):
     def brightness(self) -> float: ...
 
 
-class HasPanelGeometry(Protocol):
-    """panel プロパティにジオメトリを持つことを表す Protocol"""
+class PanelConfigProtocol(Protocol):
+    """パネル設定（panel プロパティを持つ）の Protocol"""
 
     @property
-    def panel(self) -> HasGeometry: ...
+    def panel(self) -> GeometryProtocol: ...
 
 
 # === 具象クラス ===

@@ -12,37 +12,36 @@ import PIL.Image
 import PIL.ImageDraw
 
 import my_lib.notify.slack
+import my_lib.panel_config
 import my_lib.pil_util
-from my_lib.notify.slack import HasError, SlackEmptyConfig
-from my_lib.panel_config import HasFontMap, HasPanelGeometry
 
 # Panel config の型変数
-P = TypeVar("P", bound=HasPanelGeometry)
+P = TypeVar("P", bound=my_lib.panel_config.PanelConfigProtocol)
 
 
 def notify_error(
-    slack_config: HasError | SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.SlackErrorProtocol | my_lib.notify.slack.SlackEmptyConfig,
     from_name: str,
     message: str,
 ) -> None:
     """エラーを Slack に通知する
 
     Args:
-        slack_config: Slack 設定 (HasError を満たす、または SlackEmptyConfig)
+        slack_config: Slack 設定 (SlackErrorProtocol を満たす、または SlackEmptyConfig)
         from_name: 送信元の名前
         message: エラーメッセージ
     """
     logging.error(message)
 
-    if isinstance(slack_config, SlackEmptyConfig):
+    if isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
         return
 
     my_lib.notify.slack.error(slack_config, from_name, message)
 
 
 def create_error_image(
-    panel_config: HasPanelGeometry,
-    font_config: HasFontMap,
+    panel_config: my_lib.panel_config.PanelConfigProtocol,
+    font_config: my_lib.panel_config.FontConfigProtocol,
     message: str,
 ) -> PIL.Image.Image:
     """エラー画像を生成する
@@ -89,16 +88,23 @@ def create_error_image(
 # Panel 描画関数のコールバック型
 # func(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config) -> Image
 PanelDrawFunc = Callable[
-    [HasPanelGeometry, HasFontMap, HasError | SlackEmptyConfig, bool, int, object],
+    [
+        my_lib.panel_config.PanelConfigProtocol,
+        my_lib.panel_config.FontConfigProtocol,
+        my_lib.notify.slack.SlackErrorProtocol | my_lib.notify.slack.SlackEmptyConfig,
+        bool,
+        int,
+        object,
+    ],
     PIL.Image.Image,
 ]
 
 
 def draw_panel_patiently(  # noqa: PLR0913
     func: PanelDrawFunc,
-    panel_config: HasPanelGeometry,
-    font_config: HasFontMap,
-    slack_config: HasError | SlackEmptyConfig,
+    panel_config: my_lib.panel_config.PanelConfigProtocol,
+    font_config: my_lib.panel_config.FontConfigProtocol,
+    slack_config: my_lib.notify.slack.SlackErrorProtocol | my_lib.notify.slack.SlackEmptyConfig,
     is_side_by_side: bool,
     opt_config: object = None,
     error_image: bool = True,

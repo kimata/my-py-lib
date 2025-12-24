@@ -96,29 +96,29 @@ class SlackErrorConfig:
 
 
 # === Protocol 定義 ===
-class HasBotToken(Protocol):
-    """bot_token を持つことを表す Protocol"""
+class SlackBotTokenProtocol(Protocol):
+    """Slack bot_token を持つオブジェクトの Protocol"""
 
     @property
     def bot_token(self) -> str: ...
 
 
-class HasError(HasBotToken, Protocol):
-    """error 設定を持つことを表す Protocol"""
+class SlackErrorProtocol(SlackBotTokenProtocol, Protocol):
+    """Slack エラー通知設定の Protocol"""
 
     @property
     def error(self) -> SlackErrorConfig: ...
 
 
-class HasInfo(HasBotToken, Protocol):
-    """info 設定を持つことを表す Protocol"""
+class SlackInfoProtocol(SlackBotTokenProtocol, Protocol):
+    """Slack 情報通知設定の Protocol"""
 
     @property
     def info(self) -> SlackInfoConfig: ...
 
 
-class HasCaptcha(HasBotToken, Protocol):
-    """captcha 設定を持つことを表す Protocol"""
+class SlackCaptchaProtocol(SlackBotTokenProtocol, Protocol):
+    """Slack CAPTCHA 通知設定の Protocol"""
 
     @property
     def captcha(self) -> SlackCaptchaConfig: ...
@@ -192,7 +192,7 @@ def format_simple(title: str, message: str) -> FormattedMessage:
 
 
 def info(
-    config: HasInfo | SlackEmptyConfig,
+    config: SlackInfoProtocol | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -204,7 +204,7 @@ def info(
 
 
 def error(
-    config: HasError | SlackEmptyConfig,
+    config: SlackErrorProtocol | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -226,7 +226,7 @@ def error(
 
 
 def error_with_image(
-    config: HasError | SlackEmptyConfig,
+    config: SlackErrorProtocol | SlackEmptyConfig,
     title: str,
     message: str,
     attach_img: AttachImage | None,
@@ -338,13 +338,13 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
 
 
 def send(
-    config: HasBotToken, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+    config: SlackBotTokenProtocol, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
 def upload_image(  # noqa: PLR0913
-    config: HasBotToken,
+    config: SlackBotTokenProtocol,
     ch_id: str,
     title: str,
     img: Image.Image,

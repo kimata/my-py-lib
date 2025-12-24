@@ -37,7 +37,7 @@ import my_lib.store.amazon.captcha
 def fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    slack_config: my_lib.notify.slack.HasError | None,
+    slack_config: my_lib.notify.slack.SlackErrorProtocol | None,
     item: dict[str, Any],
 ) -> dict[str, Any]:  # noqa: C901, PLR0912
     PRICE_ELEM_LIST: list[dict[str, str]] = [
@@ -189,7 +189,7 @@ def fetch_price(
             slack_config_parsed = (
                 my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
             )
-            slack_config: my_lib.notify.slack.HasError | None = (
+            slack_config: my_lib.notify.slack.SlackErrorProtocol | None = (
                 slack_config_parsed
                 if isinstance(
                     slack_config_parsed,

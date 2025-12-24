@@ -39,7 +39,7 @@ WAIT_COUNT: int = 40
 def resolve_puzzle(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    slack_config: my_lib.notify.slack.HasCaptcha,
+    slack_config: my_lib.notify.slack.SlackCaptchaProtocol,
 ) -> None:
     logging.info("Try to resolve PUZZLE")
 
@@ -146,7 +146,7 @@ def handle_password_input(
 
 def handle_quiz(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
-    slack_config: my_lib.notify.slack.HasCaptcha,
+    slack_config: my_lib.notify.slack.SlackCaptchaProtocol,
     dump_path: pathlib.Path,
 ) -> None:
     if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):

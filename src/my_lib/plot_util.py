@@ -7,7 +7,7 @@ import pathlib
 
 import matplotlib.font_manager
 
-from my_lib.panel_config import HasFontMap
+import my_lib.panel_config
 
 
 @functools.lru_cache(maxsize=32)
@@ -17,7 +17,7 @@ def _get_font_properties(font_path: pathlib.Path, size: int) -> matplotlib.font_
 
 
 def get_plot_font(
-    font_config: HasFontMap, font_type: str, size: int
+    font_config: my_lib.panel_config.FontConfigProtocol, font_type: str, size: int
 ) -> matplotlib.font_manager.FontProperties:
     """matplotlib 用フォントを取得する
 

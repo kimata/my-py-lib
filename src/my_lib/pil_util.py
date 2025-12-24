@@ -9,7 +9,7 @@ import PIL.ImageDraw
 import PIL.ImageEnhance
 import PIL.ImageFont
 
-from my_lib.panel_config import HasFontMap, HasIconProperties
+import my_lib.panel_config
 
 # フォントロード済みキャッシュ
 _loaded_fonts: dict[pathlib.Path, bool] = {}
@@ -23,7 +23,7 @@ class ImageNotFoundError(Exception):
     pass
 
 
-def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
+def get_font(config: my_lib.panel_config.FontConfigProtocol, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
     """フォントを取得する
 
     Args:
@@ -130,7 +130,7 @@ def draw_text_line(  # noqa: PLR0913
     return next_pos
 
 
-def load_image(img_config: HasIconProperties) -> PIL.Image.Image:
+def load_image(img_config: my_lib.panel_config.IconConfigProtocol) -> PIL.Image.Image:
     """画像を読み込む
 
     Args:
