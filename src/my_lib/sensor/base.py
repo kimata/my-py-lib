@@ -5,15 +5,38 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
 
 from my_lib.sensor import i2cbus
 
+# センサー値の型定義
+SensorValue = float | int | bool
 
-class I2CSensorBase(ABC):
-    """I2C センサーの基底クラス"""
+
+class SensorBase(ABC):
+    """全センサーの基底クラス"""
 
     NAME: str = "Unknown"
+    TYPE: str = "Unknown"
+    required: bool = False
+
+    @abstractmethod
+    def ping(self) -> bool:
+        """センサーが応答するかを確認する
+
+        Returns:
+            応答があれば True、なければ False
+        """
+        ...
+
+    @abstractmethod
+    def get_value_map(self) -> dict[str, SensorValue]:
+        """センサー値を辞書で取得する"""
+        ...
+
+
+class I2CSensorBase(SensorBase):
+    """I2C センサーの基底クラス"""
+
     TYPE: str = "I2C"
     DEV_ADDR: int = 0x00
 
@@ -44,14 +67,4 @@ class I2CSensorBase(ABC):
     @abstractmethod
     def _ping_impl(self) -> bool:
         """ping の実装（サブクラスでオーバーライド）"""
-        ...
-
-    @abstractmethod
-    def get_value(self) -> list[Any]:
-        """センサー値をリストで取得する"""
-        ...
-
-    @abstractmethod
-    def get_value_map(self) -> dict[str, Any]:
-        """センサー値を辞書で取得する"""
         ...
