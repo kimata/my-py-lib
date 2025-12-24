@@ -18,7 +18,6 @@ import pathlib
 import tempfile
 import time
 import urllib
-from typing import Any
 
 import PIL.Image
 import pydub
