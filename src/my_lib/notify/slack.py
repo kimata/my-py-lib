@@ -338,19 +338,23 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
 
 
 def send(
-    config: HasBotToken, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+    config: HasBotToken | SlackEmptyConfig, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
+    if isinstance(config, SlackEmptyConfig):
+        return None
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
 def upload_image(  # noqa: PLR0913
-    config: HasBotToken,
+    config: HasBotToken | SlackEmptyConfig,
     ch_id: str,
     title: str,
     img: Image.Image,
     text: str,
     thread_ts: str | None = None,
 ) -> str | None:
+    if isinstance(config, SlackEmptyConfig):
+        return None
     return _upload_image(config.bot_token, ch_id, title, img, text, thread_ts)
 
 
