@@ -6,7 +6,6 @@ import textwrap
 import time
 import traceback
 from collections.abc import Callable
-from typing import TypeVar
 
 import PIL.Image
 import PIL.ImageDraw
@@ -14,9 +13,6 @@ import PIL.ImageDraw
 import my_lib.notify.slack
 import my_lib.panel_config
 import my_lib.pil_util
-
-# Panel config の型変数
-P = TypeVar("P", bound=my_lib.panel_config.PanelConfigProtocol)
 
 
 def notify_error(
@@ -82,38 +78,30 @@ def create_error_image(
 
 
 # Panel 描画関数のコールバック型
-# func(panel_config, font_config, slack_config, is_side_by_side, trial, opt_config) -> Image
+# func(panel_config, context, opt_config) -> Image
 PanelDrawFunc = Callable[
     [
         my_lib.panel_config.PanelConfigProtocol,
-        my_lib.panel_config.FontConfigProtocol,
-        my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
-        bool,
-        int,
+        my_lib.panel_config.NormalPanelContext,
         object,
-        pp,
     ],
     PIL.Image.Image,
 ]
 
 
-def draw_panel_patiently(  # noqa: PLR0913
+def draw_panel_patiently(
     func: PanelDrawFunc,
     panel_config: my_lib.panel_config.PanelConfigProtocol,
-    font_config: my_lib.panel_config.FontConfigProtocol,
-    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
-    is_side_by_side: bool,
+    context: my_lib.panel_config.NormalPanelContext,
     opt_config: object = None,
     error_image: bool = True,
 ) -> tuple[PIL.Image.Image, float] | tuple[PIL.Image.Image, float, str]:
     """パネル描画を忍耐強くリトライする
 
     Args:
-        func: パネル描画関数
+        func: パネル描画関数 (panel_config, context) -> Image
         panel_config: パネル設定
-        font_config: フォント設定
-        slack_config: Slack 設定
-        is_side_by_side: 横並びモードかどうか
+        context: パネルコンテキスト（font_config, slack_config, is_side_by_side を含む）
         opt_config: オプション設定
         error_image: エラー時にエラー画像を返すかどうか
 
@@ -127,8 +115,15 @@ def draw_panel_patiently(  # noqa: PLR0913
     error_message: str = "Unknown error"
     for i in range(RETRY_COUNT):
         try:
+            # trial を更新したコンテキストを作成
+            trial_context = my_lib.panel_config.NormalPanelContext(
+                font_config=context.font_config,
+                slack_config=context.slack_config,
+                is_side_by_side=context.is_side_by_side,
+                trial=i + 1,
+            )
             return (
-                func(panel_config, font_config, slack_config, is_side_by_side, i + 1, opt_config),
+                func(panel_config, trial_context, opt_config),
                 time.perf_counter() - start,
             )
         except Exception:
@@ -140,7 +135,7 @@ def draw_panel_patiently(  # noqa: PLR0913
 
     if error_image:
         return (
-            create_error_image(panel_config, font_config, error_message),
+            create_error_image(panel_config, context.font_config, error_message),
             time.perf_counter() - start,
             error_message,
         )
