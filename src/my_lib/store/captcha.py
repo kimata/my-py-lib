@@ -110,7 +110,7 @@ def resolve_recaptcha_auto(
 def resolve_recaptcha_mail(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: dict[str, Any],
+    config: my_lib.notify.mail.MailConfigTypes,
 ) -> None:
     wait.until(
         selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
@@ -140,12 +140,12 @@ def resolve_recaptcha_mail(
             my_lib.notify.mail.build_message(
                 "reCAPTCHA",
                 "reCAPTCHA",
-                {
-                    "data": driver.find_element(
+                my_lib.notify.mail.ImageAttachmentFromData(
+                    id="recaptcha",
+                    data=driver.find_element(
                         selenium.webdriver.common.by.By.XPATH, "//body"
                     ).screenshot_as_png,
-                    "id": "recaptcha",
-                },
+                ),
             ),
         )
 
