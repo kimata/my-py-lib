@@ -31,7 +31,7 @@ def execute(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.SlackCaptchaProtocol | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
     dump_path: pathlib.Path,
 ) -> None:  # noqa: PLR0913
     try:
@@ -58,7 +58,7 @@ def _execute_impl(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,  # noqa: ARG001
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.SlackCaptchaProtocol | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
     dump_path: pathlib.Path,  # noqa: ARG001
 ) -> None:
     logging.info("ログインを行います。")
@@ -163,7 +163,7 @@ def _login_via_line(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
-    slack_config: my_lib.notify.slack.SlackCaptchaProtocol | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.HasCaptcha | my_lib.notify.slack.SlackEmptyConfig,
 ) -> None:
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 

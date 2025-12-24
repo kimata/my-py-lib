@@ -96,28 +96,28 @@ class SlackErrorConfig:
 
 
 # === Protocol 定義 ===
-class SlackBotTokenProtocol(Protocol):
+class HasBotToken(Protocol):
     """Slack bot_token を持つオブジェクトの Protocol"""
 
     @property
     def bot_token(self) -> str: ...
 
 
-class SlackErrorProtocol(SlackBotTokenProtocol, Protocol):
+class HasError(HasBotToken, Protocol):
     """Slack エラー通知設定の Protocol"""
 
     @property
     def error(self) -> SlackErrorConfig: ...
 
 
-class SlackInfoProtocol(SlackBotTokenProtocol, Protocol):
+class HasInfo(HasBotToken, Protocol):
     """Slack 情報通知設定の Protocol"""
 
     @property
     def info(self) -> SlackInfoConfig: ...
 
 
-class SlackCaptchaProtocol(SlackBotTokenProtocol, Protocol):
+class HasCaptcha(HasBotToken, Protocol):
     """Slack CAPTCHA 通知設定の Protocol"""
 
     @property
@@ -192,7 +192,7 @@ def format_simple(title: str, message: str) -> FormattedMessage:
 
 
 def info(
-    config: SlackInfoProtocol | SlackEmptyConfig,
+    config: HasInfo | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -204,7 +204,7 @@ def info(
 
 
 def error(
-    config: SlackErrorProtocol | SlackEmptyConfig,
+    config: HasError | SlackEmptyConfig,
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
@@ -226,7 +226,7 @@ def error(
 
 
 def error_with_image(
-    config: SlackErrorProtocol | SlackEmptyConfig,
+    config: HasError | SlackEmptyConfig,
     title: str,
     message: str,
     attach_img: AttachImage | None,
@@ -338,13 +338,13 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
 
 
 def send(
-    config: SlackBotTokenProtocol, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+    config: HasBotToken, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
 def upload_image(  # noqa: PLR0913
-    config: SlackBotTokenProtocol,
+    config: HasBotToken,
     ch_id: str,
     title: str,
     img: Image.Image,

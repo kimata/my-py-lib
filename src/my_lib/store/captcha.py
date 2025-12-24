@@ -202,7 +202,7 @@ def resolve_recaptcha_mail(
     driver.switch_to.default_content()
 
 
-def send_request_text_slack(config: my_lib.notify.slack.SlackCaptchaProtocol, title: str, message: str) -> str | None:
+def send_request_text_slack(config: my_lib.notify.slack.HasCaptcha, title: str, message: str) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
     title = "CAPTCHA: " + title
@@ -220,7 +220,7 @@ def send_request_text_slack(config: my_lib.notify.slack.SlackCaptchaProtocol, ti
 
 
 def recv_response_text_slack(
-    config: my_lib.notify.slack.SlackCaptchaProtocol, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.HasCaptcha, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [text]")
 
@@ -260,7 +260,7 @@ def recv_response_text_slack(
 
 
 def send_challenge_image_slack(
-    config: my_lib.notify.slack.SlackCaptchaProtocol, title: str, img: PIL.Image.Image, text: str
+    config: my_lib.notify.slack.HasCaptcha, title: str, img: PIL.Image.Image, text: str
 ) -> str | None:
     logging.info("CAPTCHA: send challenge [image]")
 
@@ -272,7 +272,7 @@ def send_challenge_image_slack(
 
 
 def recv_response_image_slack(
-    config: my_lib.notify.slack.SlackCaptchaProtocol, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.HasCaptcha, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [image]")
 

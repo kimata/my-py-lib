@@ -18,7 +18,7 @@ import my_lib.store.captcha
 def resolve(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,  # noqa: ARG001
-    slack_config: my_lib.notify.slack.SlackCaptchaProtocol,
+    slack_config: my_lib.notify.slack.HasCaptcha,
     xpath: dict[str, str],
 ) -> None:
     file_id = my_lib.store.captcha.send_challenge_image_slack(
