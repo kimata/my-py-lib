@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         NAME: str
         TYPE: str
         required: bool
+        dev_addr: int  # I2C デバイスアドレス（I2C センサーの場合）
 
         def ping(self) -> bool: ...
         def get_value_map(self) -> dict[str, Any]: ...
@@ -57,10 +58,10 @@ __all__ = [
 ]
 
 
-def load(sensor_def_list: list[dict[str, Any]]) -> list[Any]:
+def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorProtocol]:
     logging.info("Load drivers...")
 
-    sensor_list: list[Any] = []
+    sensor_list: list[SensorProtocol] = []
     for sensor_def in sensor_def_list:
         logging.info("Load %s driver", sensor_def["name"])
 
@@ -93,17 +94,17 @@ def load(sensor_def_list: list[dict[str, Any]]) -> list[Any]:
     return sensor_list
 
 
-def sensor_info(sensor: Any) -> str:
+def sensor_info(sensor: SensorProtocol) -> str:
     if sensor.TYPE == "I2C":
         return f"{sensor.NAME} (I2C: 0x{sensor.dev_addr:02X})"
     else:
         return f"{sensor.NAME} ({sensor.TYPE})"
 
 
-def ping(sensor_list: list[Any]) -> list[Any]:
+def ping(sensor_list: list[SensorProtocol]) -> list[SensorProtocol]:
     logging.info("Check sensor existences...")
 
-    active_sensor_list: list[Any] = []
+    active_sensor_list: list[SensorProtocol] = []
     for sensor in sensor_list:
         if sensor.ping():
             logging.info("Sensor %s exists.", sensor.NAME)
@@ -119,7 +120,7 @@ def ping(sensor_list: list[Any]) -> list[Any]:
     return active_sensor_list
 
 
-def sense(sensor_list: list[Any]) -> tuple[dict[str, Any], bool]:
+def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, Any], bool]:
     value_map: dict[str, Any] = {}
     is_success = True
     for sensor in sensor_list:
