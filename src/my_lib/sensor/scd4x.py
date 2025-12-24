@@ -17,33 +17,24 @@ Options:
 
 from __future__ import annotations
 
-import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.base import I2CSensorBase
 from my_lib.sensor.exceptions import SensorCRCError
 
 
-class SCD4X:
+class SCD4X(I2CSensorBase):
     NAME: str = "SCD4X"
-    TYPE: str = "I2C"
     DEV_ADDR: int = 0x62  # 7bit
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int | None = None) -> None:
+        super().__init__(bus_id, dev_addr)
         self.is_init: bool = False
 
-    def ping(self) -> bool:
-        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
-        try:
-            self.__get_data_ready()
-
-            return True
-        except Exception:
-            logging.debug("Failed to detect %s", self.NAME, exc_info=True)
-            return False
+    def _ping_impl(self) -> bool:
+        self.__get_data_ready()
+        return True
 
     def __reset(self) -> None:
         # sto_periodic_measurement
