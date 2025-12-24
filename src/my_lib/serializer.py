@@ -113,6 +113,6 @@ if __name__ == "__main__":
         store(file_path, data)
         f.flush()
 
-    assert load(file_path) == data  # noqa: S101
+        assert load(file_path) == data  # noqa: S101
 
-    logging.info("OK")
+        logging.info("OK")
