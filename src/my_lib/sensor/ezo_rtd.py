@@ -13,32 +13,26 @@ Options:
 
 from __future__ import annotations
 
-import logging
 import time
 
-from my_lib.sensor import i2cbus
+from my_lib.sensor.base import I2CSensorBase
 
 
-class EZO_RTD:  # noqa: N801
+class EZO_RTD(I2CSensorBase):  # noqa: N801
     NAME: str = "EZO-RTD"
-    TYPE: str = "I2C"
     DEV_ADDR: int = 0x66  # 7bit
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int | None = None, dev_addr: int | None = None) -> None:  # noqa: D107
+        from my_lib.sensor import i2cbus
 
-    def ping(self) -> bool:
-        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
+        super().__init__(
+            bus_id=bus_id if bus_id is not None else i2cbus.I2CBUS.ARM,
+            dev_addr=dev_addr if dev_addr is not None else self.DEV_ADDR,
+        )
 
-        try:
-            value = self.exec_command("i")
-
-            return value[1:].decode().split(",")[1] == "RTD"
-        except Exception:
-            logging.debug("Failed to detect %s", self.NAME, exc_info=True)
-            return False
+    def _ping_impl(self) -> bool:
+        value = self.exec_command("i")
+        return value[1:].decode().split(",")[1] == "RTD"
 
     def get_value(self) -> float:
         value = self.exec_command("R")
@@ -65,6 +59,8 @@ class EZO_RTD:  # noqa: N801
 
 if __name__ == "__main__":
     # TEST Code
+    import logging
+
     import docopt
 
     import my_lib.logger

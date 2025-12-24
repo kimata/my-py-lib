@@ -13,31 +13,25 @@ Options:
 
 from __future__ import annotations
 
-import logging
-
-from my_lib.sensor import i2cbus
+from my_lib.sensor.base import I2CSensorBase
 
 
-class APDS9250:
+class APDS9250(I2CSensorBase):
     NAME: str = "APDS9250"
-    TYPE: str = "I2C"
     DEV_ADDR: int = 0x52  # 7bit
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int | None = None, dev_addr: int | None = None) -> None:  # noqa: D107
+        from my_lib.sensor import i2cbus
+
+        super().__init__(
+            bus_id=bus_id if bus_id is not None else i2cbus.I2CBUS.ARM,
+            dev_addr=dev_addr if dev_addr is not None else self.DEV_ADDR,
+        )
         self.is_init: bool = False
 
-    def ping(self) -> bool:
-        logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
-
-        try:
-            data = self.i2cbus.read_byte_data(self.dev_addr, 0x06)
-            return (data & 0xF0) == 0xB0
-        except Exception:
-            logging.debug("Failed to detect %s", self.NAME, exc_info=True)
-            return False
+    def _ping_impl(self) -> bool:
+        data = self.i2cbus.read_byte_data(self.dev_addr, 0x06)
+        return (data & 0xF0) == 0xB0
 
     def get_value(self) -> float:
         # Resolution = 20bit/400ms, Rate = 1000ms
@@ -65,10 +59,11 @@ class APDS9250:
 
 if __name__ == "__main__":
     # TEST Code
+    import logging
+
     import docopt
 
     import my_lib.logger
-    import my_lib.sensor.scd4x
 
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
