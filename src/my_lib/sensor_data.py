@@ -700,7 +700,7 @@ if __name__ == "__main__":
     window = args["-w"]
     infxlux_db_spec = args["-i"]
     sensor_spec = args["-s"]
-    field = args["-f"]
+    field_name = args["-f"]
     period = int(args["-p"])
     debug_mode = args["-D"]
 
@@ -720,7 +720,7 @@ if __name__ == "__main__":
             db_config,
             sensor_config["measure"],
             sensor_config["hostname"],
-            field,
+            field_name,
             start="-10m",
             stop="now()",
             every_min=1,
@@ -729,11 +729,11 @@ if __name__ == "__main__":
             last=False,
         )
     elif mode == "day_sum":
-        result = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
     elif mode == "hour_sum":
-        result = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
     elif mode == "minute_sum":
-        result = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field, period)
+        result = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
     else:
         logging.error("Unknown mode: %s", mode)
         result = 0.0
