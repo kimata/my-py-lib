@@ -11,6 +11,7 @@ import my_lib.sensor.i2cbus
 
 from .ads1015 import ADS1015 as ads1015  # noqa: N811
 from .apds9250 import APDS9250 as apds9250  # noqa: N811
+from .base import SensorBase, SensorValue
 from .bp35a1 import BP35A1 as bp35a1  # noqa: N811
 from .echonetenergy import EchonetEnergy as echonetenergy  # noqa: N813
 from .echonetlite import ECHONETLite as echonetlite  # noqa: N813
@@ -34,11 +35,13 @@ if TYPE_CHECKING:
         dev_addr: int  # I2C デバイスアドレス（I2C センサーの場合）
 
         def ping(self) -> bool: ...
-        def get_value_map(self) -> dict[str, Any]: ...
+        def get_value_map(self) -> dict[str, SensorValue]: ...
 
 iolink = importlib.import_module(".io_link", __package__)
 
 __all__ = [
+    "SensorBase",
+    "SensorValue",
     "ads1015",
     "apds9250",
     "bp35a1",
@@ -120,8 +123,8 @@ def ping(sensor_list: list[SensorProtocol]) -> list[SensorProtocol]:
     return active_sensor_list
 
 
-def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, Any], bool]:
-    value_map: dict[str, Any] = {}
+def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, SensorValue], bool]:
+    value_map: dict[str, SensorValue] = {}
     is_success = True
     for sensor in sensor_list:
         try:
