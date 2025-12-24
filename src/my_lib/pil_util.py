@@ -16,16 +16,13 @@ _loaded_fonts: dict[pathlib.Path, bool] = {}
 
 
 class FontNotFoundError(Exception):
-    """フォントファイルが見つからないエラー."""
-
     def __init__(self, message: str, details: str) -> None:
-        """例外を初期化する。
+        super().__init__(message)
+        self.details = details
 
-        Args:
-            message: エラーメッセージ
-            details: 詳細なエラー情報
 
-        """
+class ImageNotFoundError(Exception):
+    def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
@@ -47,31 +44,9 @@ def get_font(config: HasFontMap, font_type: str, size: int) -> PIL.ImageFont.Fre
     font_path = config.path.resolve() / config.map[font_type]
 
     if not font_path.exists():
-        available_fonts = [f.name for f in config.path.resolve().glob("*") if f.is_file()]
-        available_str = ", ".join(available_fonts) if available_fonts else "(なし)"
-
-        details_lines = [
-            "=" * 60,
-            "フォントファイルが見つかりません",
-            "=" * 60,
-            "",
-            f"  フォントタイプ: {font_type}",
-            f"  ファイルパス: {font_path}",
-            "",
-            "  確認事項:",
-            "    - フォントファイルが存在するか確認してください",
-            "    - 設定ファイルのフォントパスが正しいか確認してください",
-            f"    - フォントディレクトリ: {config.path.resolve()}",
-            f"    - 利用可能なファイル: {available_str}",
-            "",
-            "=" * 60,
-        ]
-        details = "\n".join(details_lines)
-        logging.error("\n%s", details)
-        raise FontNotFoundError(
-            f"フォントファイルが見つかりません: {font_path}",
-            details,
-        )
+        details = f"フォントファイルが見つかりません: {font_path}"
+        logging.error(details)
+        raise FontNotFoundError(details, details)
 
     if font_path not in _loaded_fonts:
         logging.debug("Load font: %s", font_path)
@@ -167,7 +142,17 @@ def load_image(img_config: HasIconProperties) -> PIL.Image.Image:
 
     Returns:
         PIL 画像オブジェクト
+
+    Raises:
+        ImageNotFoundError: 画像ファイルが見つからない場合
     """
+    img_path = pathlib.Path(img_config.path)
+
+    if not img_path.exists():
+        details = f"画像ファイルが見つかりません: {img_path}"
+        logging.error(details)
+        raise ImageNotFoundError(details, details)
+
     img: PIL.Image.Image = PIL.Image.open(img_config.path)
 
     if img_config.scale != 1.0:
