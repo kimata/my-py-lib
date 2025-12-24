@@ -32,10 +32,6 @@ def notify_error(
         message: エラーメッセージ
     """
     logging.error(message)
-
-    if isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
-        return
-
     my_lib.notify.slack.error(slack_config, from_name, message)
 
 
@@ -95,6 +91,7 @@ PanelDrawFunc = Callable[
         bool,
         int,
         object,
+        pp,
     ],
     PIL.Image.Image,
 ]
