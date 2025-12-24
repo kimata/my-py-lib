@@ -22,6 +22,7 @@ import re
 import signal
 import subprocess
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import psutil
@@ -445,6 +446,106 @@ class browser_tab:  # noqa: N801
         except Exception:
             # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
             logging.exception("Failed to close browser tab (Chrome may have crashed)")
+
+
+class error_handler:  # noqa: N801
+    """Selenium操作時のエラーハンドリング用コンテキストマネージャ
+
+    エラー発生時に自動でログ出力、スクリーンショット取得、コールバック呼び出しを行う。
+
+    Args:
+        driver: WebDriver インスタンス
+        message: ログに出力するエラーメッセージ
+        on_error: エラー時に呼ばれるコールバック関数 (exception, screenshot) -> None
+        capture_screenshot: スクリーンショットを自動取得するか（デフォルト: True）
+        reraise: 例外を再送出するか（デフォルト: True）
+
+    Attributes:
+        exception: 発生した例外（エラーがなければ None）
+        screenshot: 取得したスクリーンショット（PNG バイナリ、取得失敗時は None）
+
+    Examples:
+        基本的な使用方法::
+
+            with my_lib.selenium_util.error_handler(driver, message="ログイン処理に失敗") as handler:
+                driver.get(login_url)
+                driver.find_element(...).click()
+
+        コールバック付き（Slack通知など）::
+
+            def notify(exc, screenshot):
+                slack.error("エラー発生", str(exc), screenshot)
+
+            with my_lib.selenium_util.error_handler(
+                driver,
+                message="クロール処理に失敗",
+                on_error=notify,
+            ):
+                crawl_page(driver)
+
+        例外を抑制して続行::
+
+            with my_lib.selenium_util.error_handler(driver, reraise=False) as handler:
+                risky_operation()
+
+            if handler.exception:
+                logging.warning("処理をスキップしました")
+    """
+
+    def __init__(
+        self,
+        driver: selenium.webdriver.remote.webdriver.WebDriver,
+        message: str = "Selenium operation failed",
+        on_error: Callable[[Exception, bytes | None], None] | None = None,
+        capture_screenshot: bool = True,
+        reraise: bool = True,
+    ) -> None:
+        self.driver = driver
+        self.message = message
+        self.on_error = on_error
+        self.capture_screenshot = capture_screenshot
+        self.reraise = reraise
+        self.exception: Exception | None = None
+        self.screenshot: bytes | None = None
+
+    def __enter__(self) -> "error_handler":
+        return self
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception_value: BaseException | None,
+        traceback: Any,
+    ) -> bool:
+        if exception_value is None:
+            return False
+
+        # 例外を記録
+        if isinstance(exception_value, Exception):
+            self.exception = exception_value
+        else:
+            # BaseException（KeyboardInterrupt など）は処理せず再送出
+            return False
+
+        # ログ出力
+        logging.exception(self.message)
+
+        # スクリーンショット取得
+        if self.capture_screenshot:
+            try:
+                self.screenshot = self.driver.get_screenshot_as_png()
+            except Exception:
+                logging.debug("Failed to capture screenshot for error handling")
+
+        # コールバック呼び出し
+        if self.on_error is not None:
+            try:
+                self.on_error(self.exception, self.screenshot)
+            except Exception:
+                logging.exception("Error in on_error callback")
+
+        # reraise=False なら例外を抑制
+        return not self.reraise
 
 
 def _is_chrome_related_process(process: psutil.Process) -> bool:
