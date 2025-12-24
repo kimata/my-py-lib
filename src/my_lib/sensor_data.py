@@ -37,6 +37,7 @@ class InfluxDBConfig(TypedDict):
     org: str
     bucket: str
 
+
 import influxdb_client
 from influxdb_client.client.flux_table import TableList
 
@@ -65,6 +66,7 @@ class DataRequest:
     window_min: int = 3
     create_empty: bool = True
     last: bool = False
+
 
 # NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
 # timedMovingAverage を使う。timedMovingAverage の計算の結果、データが後ろに
@@ -670,7 +672,9 @@ def get_last_event(
             time_value = value_list[0][0]
             if isinstance(time_value, datetime.datetime):
                 return time_value
-            logging.warning("Unexpected time value type: %s (value=%s)", type(time_value).__name__, time_value)
+            logging.warning(
+                "Unexpected time value type: %s (value=%s)", type(time_value).__name__, time_value
+            )
             return None
     except Exception:
         logging.exception("Failed to fetch data")
@@ -736,11 +740,17 @@ if __name__ == "__main__":
             last=False,
         )
     elif mode == "day_sum":
-        result = get_day_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
+        result = get_day_sum(
+            db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period
+        )
     elif mode == "hour_sum":
-        result = get_hour_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
+        result = get_hour_sum(
+            db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period
+        )
     elif mode == "minute_sum":
-        result = get_minute_sum(db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period)
+        result = get_minute_sum(
+            db_config, sensor_config["measure"], sensor_config["hostname"], field_name, period
+        )
     else:
         logging.error("Unknown mode: %s", mode)
         result = 0.0
