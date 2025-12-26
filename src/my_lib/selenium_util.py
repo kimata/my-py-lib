@@ -14,15 +14,19 @@ from __future__ import annotations
 
 import datetime
 import inspect
+import json
 import logging
 import os
 import pathlib
 import random
 import re
+import shutil
 import signal
+import sqlite3
 import subprocess
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import psutil
@@ -127,6 +131,146 @@ def create_driver_impl(
     return driver
 
 
+@dataclass
+class ProfileHealthResult:
+    """プロファイル健全性チェックの結果"""
+
+    is_healthy: bool
+    errors: list[str]
+    has_lock_files: bool = False
+    has_corrupted_json: bool = False
+    has_corrupted_db: bool = False
+
+
+def _check_json_file(file_path: pathlib.Path) -> str | None:
+    """JSON ファイルの整合性をチェック
+
+    Returns:
+        エラーメッセージ（正常な場合は None）
+    """
+    if not file_path.exists():
+        return None
+
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        json.loads(content)
+        return None
+    except json.JSONDecodeError as e:
+        return f"{file_path.name} is corrupted: {e}"
+    except Exception as e:
+        return f"{file_path.name} read error: {e}"
+
+
+def _check_sqlite_db(db_path: pathlib.Path) -> str | None:
+    """SQLite データベースの整合性をチェック
+
+    Returns:
+        エラーメッセージ（正常な場合は None）
+    """
+    if not db_path.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        if result[0] != "ok":
+            return f"{db_path.name} database is corrupted: {result[0]}"
+        return None
+    except sqlite3.DatabaseError as e:
+        return f"{db_path.name} database error: {e}"
+    except Exception as e:
+        return f"{db_path.name} check error: {e}"
+
+
+def check_profile_health(profile_path: pathlib.Path) -> ProfileHealthResult:
+    """Chrome プロファイルの健全性をチェック
+
+    Args:
+        profile_path: Chrome プロファイルのディレクトリパス
+
+    Returns:
+        ProfileHealthResult: チェック結果
+    """
+    errors: list[str] = []
+    has_lock_files = False
+    has_corrupted_json = False
+    has_corrupted_db = False
+
+    if not profile_path.exists():
+        # プロファイルが存在しない場合は健全（新規作成される）
+        return ProfileHealthResult(is_healthy=True, errors=[])
+
+    default_path = profile_path / "Default"
+
+    # 1. ロックファイルのチェック
+    lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    for lock_file in lock_files:
+        lock_path = profile_path / lock_file
+        if lock_path.exists() or lock_path.is_symlink():
+            errors.append(f"Lock file exists: {lock_file}")
+            has_lock_files = True
+
+    # 2. Local State の JSON チェック
+    local_state_error = _check_json_file(profile_path / "Local State")
+    if local_state_error:
+        errors.append(local_state_error)
+        has_corrupted_json = True
+
+    # 3. Preferences の JSON チェック
+    if default_path.exists():
+        prefs_error = _check_json_file(default_path / "Preferences")
+        if prefs_error:
+            errors.append(prefs_error)
+            has_corrupted_json = True
+
+        # 4. SQLite データベースの整合性チェック
+        for db_name in ["Cookies", "History", "Web Data"]:
+            db_error = _check_sqlite_db(default_path / db_name)
+            if db_error:
+                errors.append(db_error)
+                has_corrupted_db = True
+
+    is_healthy = len(errors) == 0
+
+    return ProfileHealthResult(
+        is_healthy=is_healthy,
+        errors=errors,
+        has_lock_files=has_lock_files,
+        has_corrupted_json=has_corrupted_json,
+        has_corrupted_db=has_corrupted_db,
+    )
+
+
+def recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
+    """破損したプロファイルをバックアップして新規作成を可能にする
+
+    Args:
+        profile_path: Chrome プロファイルのディレクトリパス
+
+    Returns:
+        bool: リカバリが成功したかどうか
+    """
+    if not profile_path.exists():
+        return True
+
+    # バックアップ先を決定（タイムスタンプ付き）
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = profile_path.parent / f"{profile_path.name}.corrupted.{timestamp}"
+
+    try:
+        shutil.move(str(profile_path), str(backup_path))
+        logging.warning(
+            "Corrupted profile moved to backup: %s -> %s",
+            profile_path,
+            backup_path,
+        )
+        return True
+    except Exception as e:
+        logging.exception("Failed to backup corrupted profile: %s", e)
+        return False
+
+
 def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
     """プロファイルのロックファイルを削除する"""
     lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
@@ -145,12 +289,46 @@ def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
                 logging.warning("Failed to remove lock file %s: %s", lock_path, e)
 
 
+def _is_running_in_container() -> bool:
+    """コンテナ内で実行中かどうかを判定"""
+    return os.path.exists("/.dockerenv")
+
+
+def _cleanup_orphaned_chrome_processes_in_container() -> None:
+    """コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
+
+    NOTE: プロセスツリーに関係なくプロセス名で一律終了するのはコンテナ内限定
+    """
+    if not _is_running_in_container():
+        return
+
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            proc_name = proc.info["name"].lower() if proc.info["name"] else ""
+            if "chrome" in proc_name:
+                logging.info("Terminating orphaned Chrome process: PID %d", proc.info["pid"])
+                os.kill(proc.info["pid"], signal.SIGTERM)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, OSError):
+            pass
+    time.sleep(1)
+
+
 def create_driver(
     profile_name: str,
     data_path: pathlib.Path,
     is_headless: bool = True,
     clean_profile: bool = False,
+    auto_recover: bool = True,
 ) -> WebDriver:
+    """Chrome WebDriver を作成する
+
+    Args:
+        profile_name: プロファイル名
+        data_path: データディレクトリのパス
+        is_headless: ヘッドレスモードで起動するか
+        clean_profile: 起動前にロックファイルを削除するか
+        auto_recover: プロファイル破損時に自動リカバリするか
+    """
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
@@ -161,6 +339,23 @@ def create_driver(
     actual_profile_name = profile_name + ("." + suffix if suffix is not None else "")
     profile_path = data_path / "chrome" / actual_profile_name
 
+    # プロファイル健全性チェック
+    health = check_profile_health(profile_path)
+    if not health.is_healthy:
+        logging.warning("Profile health check failed: %s", health.errors)
+
+        if health.has_lock_files and not (health.has_corrupted_json or health.has_corrupted_db):
+            # ロックファイルのみの問題なら削除して続行
+            logging.info("Cleaning up lock files only")
+            _cleanup_profile_lock(profile_path)
+        elif auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
+            # JSON または DB が破損している場合はプロファイルをリカバリ
+            logging.warning("Profile is corrupted, attempting recovery")
+            if recover_corrupted_profile(profile_path):
+                logging.info("Profile recovery successful, will create new profile")
+            else:
+                logging.error("Profile recovery failed")
+
     if clean_profile:
         _cleanup_profile_lock(profile_path)
 
@@ -169,20 +364,18 @@ def create_driver(
         return create_driver_impl(profile_name, data_path, is_headless)
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
-        # NOTE: コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
-        if os.path.exists("/.dockerenv"):
-            for proc in psutil.process_iter(["pid", "name"]):
-                try:
-                    proc_name = proc.info["name"].lower() if proc.info["name"] else ""
-                    if "chrome" in proc_name:
-                        logging.info("Terminating orphaned Chrome process: PID %d", proc.info["pid"])
-                        os.kill(proc.info["pid"], signal.SIGTERM)
-                except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, OSError):
-                    pass
-            time.sleep(1)
 
-        # NOTE: プロファイルのロックファイルを削除
+        # コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
+        _cleanup_orphaned_chrome_processes_in_container()
+
+        # プロファイルのロックファイルを削除
         _cleanup_profile_lock(profile_path)
+
+        # 再度健全性チェック
+        health = check_profile_health(profile_path)
+        if not health.is_healthy and auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
+            logging.warning("Profile still corrupted after first attempt, recovering")
+            recover_corrupted_profile(profile_path)
 
         return create_driver_impl(profile_name, data_path, is_headless)
 
@@ -735,15 +928,76 @@ def reap_chrome_processes(chrome_pids: list[int]) -> None:
         _reap_single_process(pid)
 
 
+def _get_remaining_chrome_pids(chrome_pids: list[int]) -> list[int]:
+    """指定されたPIDリストから、まだ生存しているChrome関連プロセスを取得"""
+    remaining = []
+    for pid in chrome_pids:
+        try:
+            if psutil.pid_exists(pid):
+                process = psutil.Process(pid)
+                if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
+                    if _is_chrome_related_process(process):
+                        remaining.append(pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return remaining
+
+
+def _wait_for_processes_with_check(
+    chrome_pids: list[int],
+    timeout: float,
+    poll_interval: float = 0.5,
+) -> list[int]:
+    """プロセスの終了を待機しつつ、残存プロセスをチェック
+
+    Args:
+        chrome_pids: 監視対象のプロセスIDリスト
+        timeout: 最大待機時間（秒）
+        poll_interval: チェック間隔（秒）
+
+    Returns:
+        タイムアウト後も残存しているプロセスIDのリスト
+    """
+    elapsed = 0.0
+    remaining_pids = list(chrome_pids)
+
+    while remaining_pids and elapsed < timeout:
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+        remaining_pids = _get_remaining_chrome_pids(remaining_pids)
+
+        if remaining_pids:
+            logging.debug(
+                "Still waiting for %d Chrome processes to exit (%.1fs / %.1fs)",
+                len(remaining_pids),
+                elapsed,
+                timeout,
+            )
+
+    return remaining_pids
+
+
 def quit_driver_gracefully(
     driver: WebDriver | None,
-    wait_sec: float = 5,
+    wait_sec: float = 5.0,
+    sigterm_wait_sec: float = 5.0,
+    sigkill_wait_sec: float = 5.0,
 ) -> None:  # noqa: C901, PLR0912
     """Chrome WebDriverを確実に終了する
+
+    終了フロー:
+    1. driver.quit() を呼び出し
+    2. wait_sec 秒待機しつつプロセス終了をチェック
+    3. 残存プロセスがあれば SIGTERM を送信
+    4. sigterm_wait_sec 秒待機しつつプロセス終了をチェック
+    5. 残存プロセスがあれば SIGKILL を送信
+    6. sigkill_wait_sec 秒待機
 
     Args:
         driver: 終了する WebDriver インスタンス
         wait_sec: quit 後にプロセス終了を待機する秒数（デフォルト: 5秒）
+        sigterm_wait_sec: SIGTERM 後にプロセス終了を待機する秒数（デフォルト: 5秒）
+        sigkill_wait_sec: SIGKILL 後にプロセス回収を待機する秒数（デフォルト: 5秒）
     """
     if driver is None:
         return
@@ -758,54 +1012,59 @@ def quit_driver_gracefully(
     except Exception:
         logging.exception("Failed to quit driver normally")
 
-    # quit後に残存プロセスをチェック（Chromeがファイル削除を完了する時間を確保）
-    time.sleep(wait_sec)
-    remaining_pids = []
-    for pid in chrome_pids_before:
-        try:
-            if psutil.pid_exists(pid):
-                process = psutil.Process(pid)
-                if _is_chrome_related_process(process):
-                    remaining_pids.append(pid)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):  # noqa: PERF203
-            # プロセスが既に終了している場合は無視
-            pass
+    # ChromeDriverサービスの停止を試行
+    try:
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):
+            driver.service.stop()
+    except Exception:
+        logging.exception("Failed to stop Chrome service")
 
-    # 残存プロセスがある場合は強化した終了処理を実行
-    if remaining_pids:
-        logging.info(
-            "Found %d remaining Chrome processes after quit, attempting cleanup", len(remaining_pids)
-        )
+    # Step 1: quit 後に wait_sec 秒待機しつつプロセス終了をチェック
+    remaining_pids = _wait_for_processes_with_check(chrome_pids_before, wait_sec)
 
-        # ChromeDriverサービスの停止を試行
-        try:
-            if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):
-                driver.service.stop()
-        except Exception:
-            logging.exception("Failed to stop Chrome service")
+    if not remaining_pids:
+        logging.debug("All Chrome processes exited normally")
+        return
 
-        # プロセスの強制終了
-        terminate_chrome_processes(remaining_pids)
+    # Step 2: 残存プロセスに SIGTERM を送信
+    logging.info(
+        "Found %d remaining Chrome processes after %.1fs, sending SIGTERM",
+        len(remaining_pids),
+        wait_sec,
+    )
+    _send_signal_to_processes(remaining_pids, signal.SIGTERM, "SIGTERM")
 
-        # プロセス回収
-        time.sleep(0.5)
-        reap_chrome_processes(remaining_pids)
+    # Step 3: SIGTERM 後に sigterm_wait_sec 秒待機しつつプロセス終了をチェック
+    remaining_pids = _wait_for_processes_with_check(remaining_pids, sigterm_wait_sec)
 
-        # 最終チェック：まだ残っているプロセスがあるか確認
-        still_remaining = []
-        for pid in remaining_pids:
+    if not remaining_pids:
+        logging.info("All Chrome processes exited after SIGTERM")
+        reap_chrome_processes(chrome_pids_before)
+        return
+
+    # Step 4: 残存プロセスに SIGKILL を送信
+    logging.warning(
+        "Chrome processes still alive after SIGTERM + %.1fs, sending SIGKILL to %d processes",
+        sigterm_wait_sec,
+        len(remaining_pids),
+    )
+    _send_signal_to_processes(remaining_pids, signal.SIGKILL, "SIGKILL")
+
+    # Step 5: SIGKILL 後に sigkill_wait_sec 秒待機してプロセス回収
+    time.sleep(sigkill_wait_sec)
+    reap_chrome_processes(chrome_pids_before)
+
+    # 最終チェック：まだ残っているプロセスがあるか確認
+    still_remaining = _get_remaining_chrome_pids(remaining_pids)
+
+    # 回収できなかったプロセスについて警告
+    if still_remaining:
+        for pid in still_remaining:
             try:
-                if psutil.pid_exists(pid):
-                    process = psutil.Process(pid)
-                    if _is_chrome_related_process(process):
-                        still_remaining.append((pid, process.name()))
-            except (psutil.NoSuchProcess, psutil.AccessDenied):  # noqa: PERF203
+                process = psutil.Process(pid)
+                logging.warning("Failed to collect Chrome-related process: PID %d (%s)", pid, process.name())
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
-
-        # 回収できなかったプロセスについて警告
-        if still_remaining:
-            for pid, name in still_remaining:
-                logging.warning("Failed to collect Chrome-related process: PID %d (%s)", pid, name)
 
 
 if __name__ == "__main__":
