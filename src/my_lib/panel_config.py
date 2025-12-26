@@ -154,7 +154,7 @@ class NormalPanelContext:
     """
 
     font_config: FontConfigProtocol
-    slack_config: my_lib.notify.slack.SlackConfigTypes
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig
     is_side_by_side: bool = True
     trial: int = 0
 

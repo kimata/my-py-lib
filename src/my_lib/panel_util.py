@@ -6,6 +6,7 @@ import textwrap
 import time
 import traceback
 from collections.abc import Callable
+from typing import TypeVar
 
 import PIL.Image
 import PIL.ImageDraw
@@ -13,6 +14,9 @@ import PIL.ImageDraw
 import my_lib.notify.slack
 import my_lib.panel_config
 import my_lib.pil_util
+
+# Panel描画関数のオプション設定用TypeVar
+OptConfigT = TypeVar("OptConfigT")
 
 
 def notify_error(
@@ -77,23 +81,18 @@ def create_error_image(
     return img
 
 
-# Panel 描画関数のコールバック型
-# func(panel_config, context, opt_config) -> Image
-PanelDrawFunc = Callable[
-    [
-        my_lib.panel_config.PanelConfigProtocol,
-        my_lib.panel_config.NormalPanelContext,
-        object,
-    ],
-    PIL.Image.Image,
-]
-
-
 def draw_panel_patiently(
-    func: PanelDrawFunc,
+    func: Callable[
+        [
+            my_lib.panel_config.PanelConfigProtocol,
+            my_lib.panel_config.NormalPanelContext,
+            OptConfigT,
+        ],
+        PIL.Image.Image,
+    ],
     panel_config: my_lib.panel_config.PanelConfigProtocol,
     context: my_lib.panel_config.NormalPanelContext,
-    opt_config: object = None,
+    opt_config: OptConfigT = None,  # type: ignore[assignment]
     error_image: bool = True,
 ) -> tuple[PIL.Image.Image, float] | tuple[PIL.Image.Image, float, str]:
     """パネル描画を忍耐強くリトライする
