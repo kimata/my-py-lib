@@ -94,6 +94,8 @@ def create_driver_impl(
     options.add_argument("--disable-webgl")
     options.add_argument("--disable-webgl2")
     options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--use-gl=disabled")  # より確実にGL無効化
+    options.add_argument("--disable-3d-apis")  # 3D API全体を無効化
 
     # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
