@@ -1,9 +1,0 @@
-(undo-tree-save-format-version . 1)
-"7b54fe716634784edf5cebdf58c1df502d55e325"
-[nil nil nil nil (26955 43683 704313 426000) 0 nil]
-([nil nil ((#("." 0 1 (fontified t)) . -407) (undo-tree-id2 . -1) 408 (t 26952 40612 44542 362000)) nil (26955 43683 704311 822000) 0 nil])
-([nil nil ((407 . 408)) nil (26955 43683 704309 865000) 0 nil])
-([nil nil ((436 . 440)) nil (26955 43683 704308 950000) 0 nil])
-([nil nil ((440 . 448)) nil (26955 43683 704308 98000) 0 nil])
-([nil current ((#("    logging." 0 12 (fontified t)) . 436) (undo-tree-id0 . -4) (undo-tree-id1 . -12)) nil (26955 43683 704302 240000) 0 nil])
-nil
