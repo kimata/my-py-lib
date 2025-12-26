@@ -93,8 +93,7 @@ def create_driver_impl(
     # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
 
-    # ゾンビプロセス対策のオプション
-    options.add_argument("--no-zygote")
+    # バックグラウンド処理の抑制
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-background-networking")
     options.add_argument("--no-first-run")
