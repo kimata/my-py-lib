@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     import my_lib.notify.slack
+    from my_lib.sensor_data import InfluxDBConfig
 
 
 # === Protocol 定義 ===
@@ -143,23 +144,6 @@ def parse_icon_config(data: dict[str, str | float]) -> IconConfig:
     )
 
 
-# === データベース設定 Protocol ===
-class DatabaseConfigProtocol(Protocol):
-    """データベース接続設定の Protocol"""
-
-    @property
-    def url(self) -> str: ...
-
-    @property
-    def org(self) -> str: ...
-
-    @property
-    def token(self) -> str: ...
-
-    @property
-    def bucket(self) -> str: ...
-
-
 # === パネルコンテキスト ===
 @dataclass(frozen=True)
 class NormalPanelContext:
@@ -179,9 +163,9 @@ class NormalPanelContext:
 class DatabasePanelContext:
     """データベースパネル用コンテキスト
 
-    InfluxDB などのデータソースを使用するパネル向け。
+    InfluxDB を使用するパネル向け。
     sensor_graph, power_graph, rain_fall などで使用。
     """
 
     font_config: FontConfigProtocol
-    db_config: DatabaseConfigProtocol
+    db_config: InfluxDBConfig
