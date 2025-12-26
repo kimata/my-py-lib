@@ -83,10 +83,9 @@ def create_driver_impl(
     options = selenium.webdriver.chrome.options.Options()
 
     if is_headless:
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")
 
     options.add_argument("--no-sandbox")  # for Docker
-    options.add_argument("--disable-dev-shm-usage")  # for Docker
 
     options.add_argument("--disable-gpu")
 
