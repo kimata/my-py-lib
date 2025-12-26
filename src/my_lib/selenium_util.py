@@ -89,7 +89,6 @@ def create_driver_impl(
     options.add_argument("--disable-dev-shm-usage")  # for Docker
     options.add_argument("--disable-gpu")
 
-    # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-plugins")
 
@@ -103,9 +102,9 @@ def create_driver_impl(
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
-    # Chrome のログを有効化
     options.add_argument("--enable-logging")
     options.add_argument("--v=1")
+
     chrome_log_file = log_path / f"chrome_{profile_name}.log"
     options.add_argument(f"--log-file={chrome_log_file!s}")
 
