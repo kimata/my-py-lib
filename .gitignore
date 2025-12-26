@@ -16,3 +16,6 @@ config.yaml
 # test data (Chrome profile, etc.)
 data/
 .coverage
+
+# Emacs
+*~undo-tree~
