@@ -92,11 +92,6 @@ def create_driver_impl(
     # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
 
-    # バックグラウンド処理の抑制
-    options.add_argument("--disable-background-timer-throttling")
-    options.add_argument("--disable-background-networking")
-    options.add_argument("--disable-renderer-backgrounding")  # レンダラーのバックグラウンド化無効
-    options.add_argument("--disable-ipc-flooding-protection")  # IPC制限を緩和
     options.add_argument("--no-first-run")
 
     options.add_argument("--lang=ja-JP")
