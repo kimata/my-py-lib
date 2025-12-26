@@ -107,6 +107,12 @@ def create_driver_impl(
 
     options.add_argument("--user-data-dir=" + str(chrome_data_path / profile_name))
 
+    # Chrome のログを有効化
+    options.add_argument("--enable-logging")
+    options.add_argument("--v=1")
+    chrome_log_file = log_path / f"chrome_{profile_name}.log"
+    options.add_argument(f"--log-file={chrome_log_file!s}")
+
     if not is_headless:
         options.add_argument("--auto-open-devtools-for-tabs")
 
