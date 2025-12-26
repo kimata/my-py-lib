@@ -89,6 +89,12 @@ def create_driver_impl(
 
     options.add_argument("--disable-gpu")
 
+    # NOTE: WebGL/SwiftShader の無効化
+    # headless モードで長時間動作すると SwiftShader が不安定になりハングする問題への対策
+    options.add_argument("--disable-webgl")
+    options.add_argument("--disable-webgl2")
+    options.add_argument("--disable-software-rasterizer")
+
     # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
 
