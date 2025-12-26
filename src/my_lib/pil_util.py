@@ -60,7 +60,7 @@ def text_size(img: PIL.Image.Image, font: PIL.ImageFont.FreeTypeFont, text: str)
 def draw_text(  # noqa: PLR0913
     img: PIL.Image.Image,
     text: str,
-    pos: tuple[int, int],
+    pos: tuple[float, float],
     font: PIL.ImageFont.FreeTypeFont,
     align: str = "left",
     color: str = "#000",
@@ -92,7 +92,7 @@ def draw_text(  # noqa: PLR0913
 def draw_text_line(  # noqa: PLR0913
     img: PIL.Image.Image,
     text: str,
-    pos: tuple[int, int],
+    pos: tuple[float, float],
     font: PIL.ImageFont.FreeTypeFont,
     align: str = "left",
     color: str = "#000",
@@ -107,7 +107,7 @@ def draw_text_line(  # noqa: PLR0913
     elif align == "right":
         draw_pos = (int(pos[0] - text_size(img, font, text)[0]), int(pos[1]))
     else:
-        draw_pos = pos
+        draw_pos = (int(pos[0]), int(pos[1]))
 
     draw_pos = (draw_pos[0], int(draw_pos[1] - PIL.ImageDraw.Draw(img).textbbox((0, 0), text, font)[1]))
 
