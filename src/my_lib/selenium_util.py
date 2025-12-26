@@ -98,9 +98,6 @@ def create_driver_impl(
     options.add_argument("--disable-background-networking")
     options.add_argument("--no-first-run")
 
-    # BackForwardCache を無効化（タイムアウト問題の回避）
-    options.add_argument("--disable-features=BackForwardCache")
-
     options.add_argument("--lang=ja-JP")
     options.add_argument("--window-size=1920,1080")
 
