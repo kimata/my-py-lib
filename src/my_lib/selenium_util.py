@@ -86,7 +86,7 @@ def create_driver_impl(
         options.add_argument("--headless=new")
 
     options.add_argument("--no-sandbox")  # for Docker
-
+    options.add_argument("--disable-dev-shm-usage")  # for Docker
     options.add_argument("--disable-gpu")
 
     # NOTE: WebGL/SwiftShader の無効化
