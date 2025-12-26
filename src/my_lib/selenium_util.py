@@ -64,7 +64,10 @@ def get_chrome_version() -> int | None:
 
 
 def create_driver_impl(
-    profile_name: str, data_path: pathlib.Path, is_headless: bool
+    profile_name: str,
+    data_path: pathlib.Path,
+    is_headless: bool,
+    use_subprocess: bool = True,
 ) -> WebDriver:  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
@@ -121,7 +124,7 @@ def create_driver_impl(
     driver = undetected_chromedriver.Chrome(
         service=service,
         options=options,
-        use_subprocess=True,
+        use_subprocess=use_subprocess,
         version_main=chrome_version,
         user_multi_procs=use_multi_procs,
     )
@@ -319,6 +322,7 @@ def create_driver(
     is_headless: bool = True,
     clean_profile: bool = False,
     auto_recover: bool = True,
+    use_subprocess: bool = True,
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -328,6 +332,7 @@ def create_driver(
         is_headless: ヘッドレスモードで起動するか
         clean_profile: 起動前にロックファイルを削除するか
         auto_recover: プロファイル破損時に自動リカバリするか
+        use_subprocess: サブプロセスで Chrome を起動するか
     """
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
@@ -361,7 +366,7 @@ def create_driver(
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return create_driver_impl(profile_name, data_path, is_headless)
+        return create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
 
@@ -377,7 +382,7 @@ def create_driver(
             logging.warning("Profile still corrupted after first attempt, recovering")
             recover_corrupted_profile(profile_path)
 
-        return create_driver_impl(profile_name, data_path, is_headless)
+        return create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
 
 
 def xpath_exists(driver: WebDriver, xpath: str) -> bool:
