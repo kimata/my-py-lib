@@ -1,0 +1,710 @@
+(undo-tree-save-format-version . 1)
+"41ea1533caafbed81d31e0413489a379a701883b"
+[nil nil nil nil (26955 43321 233913 884000) 0 nil]
+([nil nil ((6015 . 6016) (t 26955 40972 403349 333000)) nil (26955 43613 568901 210000) 0 nil])
+([nil nil ((#("a" 0 1 (fontified t)) . -6015) (undo-tree-id88 . -1) (undo-tree-id89 . -1) (undo-tree-id90 . -1) 6016) nil (26955 43613 568899 824000) 0 nil])
+([nil current ((1071 . 20915) (#("import influxdb_client
+from influxdb_client.client.flux_table import TableList
+
+import my_lib.time
+
+
+@dataclass(frozen=True)
+class SensorDataResult:
+    \"\"\"センサーデータ取得結果\"\"\"
+
+    value: list[float] = field(default_factory=list)
+    time: list[datetime.datetime] = field(default_factory=list)
+    valid: bool = False
+
+
+@dataclass(frozen=True)
+class DataRequest:
+    \"\"\"センサーデータ取得リクエスト\"\"\"
+
+    measure: str
+    hostname: str
+    field: str
+    start: str = \"-30h\"
+    stop: str = \"now()\"
+    every_min: int = 1
+    window_min: int = 3
+    create_empty: bool = True
+    last: bool = False
+
+# NOTE: データが欠損している期間も含めてデータを敷き詰めるため、
+# timedMovingAverage を使う。timedMovingAverage の計算の結果、データが後ろに
+# ずれるので、あらかじめ offset を使って前にずらしておく。
+FLUX_QUERY = \"\"\"
+from(bucket: \"{bucket}\")
+|> range(start: {start}, stop: {stop})
+    |> filter(fn:(r) => r._measurement == \"{measure}\")
+    |> filter(fn: (r) => r.hostname == \"{hostname}\")
+    |> filter(fn: (r) => r[\"_field\"] == \"{field}\")
+    |> aggregateWindow(every: {window}m, offset:-{window}m, fn: mean, createEmpty: {create_empty})
+    |> fill(usePrevious: true)
+    |> timedMovingAverage(every: {every}m, period: {window}m)
+\"\"\"
+
+FLUX_QUERY_WITHOUT_AGGREGATION = \"\"\"
+from(bucket: \"{bucket}\")
+|> range(start: {start}, stop: {stop})
+    |> filter(fn:(r) => r._measurement == \"{measure}\")
+    |> filter(fn: (r) => r.hostname == \"{hostname}\")
+    |> filter(fn: (r) => r[\"_field\"] == \"{field}\")
+    |> fill(usePrevious: true)
+\"\"\"
+
+FLUX_SUM_QUERY = \"\"\"
+from(bucket: \"{bucket}\")
+    |> range(start: {start}, stop: {stop})
+    |> filter(fn:(r) => r._measurement == \"{measure}\")
+    |> filter(fn: (r) => r.hostname == \"{hostname}\")
+    |> filter(fn: (r) => r[\"_field\"] == \"{field}\")
+    |> aggregateWindow(every: {every}m, offset:-{every}m, fn: mean, createEmpty: {create_empty})
+    |> filter(fn: (r) => exists r._value)
+    |> fill(usePrevious: true)
+    |> reduce(
+        fn: (r, accumulator) => ({{sum: r._value + accumulator.sum, count: accumulator.count + 1}}),
+        identity: {{sum: 0.0, count: 0}},
+    )
+\"\"\"
+
+FLUX_EVENT_QUERY = \"\"\"
+from(bucket: \"{bucket}\")
+    |> range(start: {start})
+    |> filter(fn: (r) => r._measurement == \"{measure}\")
+    |> filter(fn: (r) => r.hostname == \"{hostname}\")
+    |> filter(fn: (r) => r[\"_field\"] == \"{field}\")
+    |> map(fn: (r) => ({{ r with _value: if r._value then 1 else 0 }}))
+    |> difference()
+    |> filter(fn: (r) => r._value == 1)
+    |> sort(columns: [\"_time\"], desc: true)
+    |> limit(n: 1)
+\"\"\"
+
+
+def _process_query_results(
+    table_list: list[Any], create_empty: bool, last: bool, every_min: int, window_min: int
+) -> SensorDataResult:
+    \"\"\"共通のクエリ結果処理ロジック\"\"\"
+    data_list = []
+    time_list = []
+    localtime_offset = datetime.timedelta(hours=9)
+
+    if len(table_list) != 0:
+        for record in table_list[0].records:
+            # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
+            # だとタイミングによって、先頭に None が入る
+            if record.get_value() is None:
+                logging.debug(\"DELETE %s\", record.get_time() + localtime_offset)
+                continue
+
+            data_list.append(record.get_value())
+            time_list.append(record.get_time() + localtime_offset)
+
+    if create_empty and not last:
+        # NOTE: aggregateWindow(createEmpty: true) と timedMovingAverage を使うと、
+        # 末尾に余分なデータが入るので取り除く
+        every_min = int(every_min)
+        window_min = int(window_min)
+        if window_min > every_min:
+            data_list = data_list[: (every_min - window_min)]
+            time_list = time_list[: (every_min - window_min)]
+
+    logging.debug(\"data count = %s\", len(time_list))
+    return SensorDataResult(value=data_list, time=time_list, valid=len(time_list) != 0)
+
+
+def fetch_data_impl(  # noqa: PLR0913
+    db_config: InfluxDBConfig,
+    template: str,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str,
+    stop: str,
+    every: int,
+    window: int,
+    create_empty: bool,
+    last: bool = False,
+) -> TableList:
+    client = None
+    try:
+        token = os.environ.get(\"INFLUXDB_TOKEN\", db_config[\"token\"])
+
+        query = template.format(
+            bucket=db_config[\"bucket\"],
+            measure=measure,
+            hostname=hostname,
+            field=field,
+            start=start,
+            stop=stop,
+            every=every,
+            window=window,
+            create_empty=str(create_empty).lower(),
+        )
+        if last:
+            query += \" |> last()\"
+
+        logging.debug(\"Flux query = %s\", query)
+        client = influxdb_client.InfluxDBClient(url=db_config[\"url\"], token=token, org=db_config[\"org\"])
+        query_api = client.query_api()
+
+        return query_api.query(query=query)
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+        raise
+    finally:
+        if client is not None:
+            client.close()
+
+
+async def fetch_data_impl_async(  # noqa: PLR0913
+    db_config: InfluxDBConfig,
+    template: str,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str,
+    stop: str,
+    every: int,
+    window: int,
+    create_empty: bool,
+    last: bool = False,
+) -> TableList:
+    \"\"\"非同期版のデータ取得実装\"\"\"
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        fetch_data_impl,
+        db_config,
+        template,
+        measure,
+        hostname,
+        field,
+        start,
+        stop,
+        every,
+        window,
+        create_empty,
+        last,
+    )
+
+
+def fetch_data(  # noqa: PLR0913
+    db_config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = \"-30h\",
+    stop: str = \"now()\",
+    every_min: int = 1,
+    window_min: int = 3,
+    create_empty: bool = True,
+    last: bool = False,
+) -> SensorDataResult:
+    time_start = time.time()
+    logging.debug(
+        (
+            \"Fetch data (measure: %s, host: %s, field: %s, \"
+            \"start: %s, stop: %s, every: %dmin, window: %dmin, \"
+            \"create_empty: %s, last: %s)\"
+        ),
+        measure,
+        hostname,
+        field,
+        start,
+        stop,
+        every_min,
+        window_min,
+        create_empty,
+        last,
+    )
+
+    try:
+        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
+
+        table_list = fetch_data_impl(
+            db_config,
+            template,
+            measure,
+            hostname,
+            field,
+            start,
+            stop,
+            every_min,
+            window_min,
+            create_empty,
+            last,
+        )
+        time_fetched = time.time()
+
+        result = _process_query_results(table_list, create_empty, last, every_min, window_min)
+
+        time_finish = time.time()
+        if ((time_fetched - time_start) > 1) or ((time_finish - time_fetched) > 0.1):
+            logging.warning(
+                \"It's taking too long to retrieve the data. (fetch: %.2f sec, modify: %.2f sec)\",
+                time_fetched - time_start,
+                time_finish - time_fetched,
+            )
+
+        return result
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+
+        return SensorDataResult()
+
+
+async def fetch_data_async(  # noqa: PLR0913
+    db_config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = \"-30h\",
+    stop: str = \"now()\",
+    every_min: int = 1,
+    window_min: int = 3,
+    create_empty: bool = True,
+    last: bool = False,
+) -> SensorDataResult:
+    \"\"\"非同期版のfetch_data\"\"\"
+    time_start = time.time()
+    logging.debug(
+        (
+            \"Fetch data async (measure: %s, host: %s, field: %s, \"
+            \"start: %s, stop: %s, every: %dmin, window: %dmin, \"
+            \"create_empty: %s, last: %s)\"
+        ),
+        measure,
+        hostname,
+        field,
+        start,
+        stop,
+        every_min,
+        window_min,
+        create_empty,
+        last,
+    )
+
+    try:
+        template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
+
+        table_list = await fetch_data_impl_async(
+            db_config,
+            template,
+            measure,
+            hostname,
+            field,
+            start,
+            stop,
+            every_min,
+            window_min,
+            create_empty,
+            last,
+        )
+        time_fetched = time.time()
+
+        result = _process_query_results(table_list, create_empty, last, every_min, window_min)
+
+        time_finish = time.time()
+        if ((time_fetched - time_start) > 1) or ((time_finish - time_fetched) > 0.1):
+            logging.warning(
+                \"It's taking too long to retrieve the data. (fetch: %.2f sec, modify: %.2f sec)\",
+                time_fetched - time_start,
+                time_finish - time_fetched,
+            )
+
+        return result
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+
+        return SensorDataResult()
+
+
+async def fetch_data_parallel(
+    db_config: InfluxDBConfig, requests: list[DataRequest]
+) -> list[SensorDataResult | BaseException]:
+    \"\"\"
+    複数のデータ取得リクエストを並列実行
+
+    Args:
+    ----
+        db_config: InfluxDBの設定（全リクエスト共通）
+        requests: DataRequest のリスト
+
+    Returns:
+    -------
+        各リクエストの結果を含むリスト
+
+    \"\"\"
+    tasks = []
+    for req in requests:
+        task = fetch_data_async(
+            db_config,
+            req.measure,
+            req.hostname,
+            req.field,
+            req.start,
+            req.stop,
+            req.every_min,
+            req.window_min,
+            req.create_empty,
+            req.last,
+        )
+        tasks.append(task)
+
+    return await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def get_equip_on_minutes(  # noqa: PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    threshold: float,
+    start: str = \"-30h\",
+    stop: str = \"now()\",
+    every_min: int = 1,
+    window_min: int = 5,
+    create_empty: bool = True,
+) -> int:
+    logging.info(
+        (
+            \"Get 'ON' minutes (type: %s, host: %d, field: %d{field}, \"
+            \"threshold: %.2f, start: %s, stop: %s, every: %smin, \"
+            \"window: %dmin, create_empty: %s)\"
+        ),
+        measure,
+        hostname,
+        field,
+        threshold,
+        start,
+        stop,
+        every_min,
+        window_min,
+        create_empty,
+    )
+
+    try:
+        table_list = fetch_data_impl(
+            config,
+            FLUX_QUERY,
+            measure,
+            hostname,
+            field,
+            start,
+            stop,
+            every_min,
+            window_min,
+            create_empty,
+        )
+
+        if len(table_list) == 0:
+            return 0
+
+        count = 0
+
+        every_min = int(every_min)
+        window_min = int(window_min)
+        record_num = len(table_list[0].records)
+        for i, record in enumerate(table_list[0].records):
+            if create_empty and (window_min > every_min) and (i > record_num - 1 - (window_min - every_min)):
+                # NOTE: timedMovingAverage を使うと、末尾に余分なデータが入るので取り除く
+                continue
+
+            # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
+            # だとタイミングによって、先頭に None が入る
+            if record.get_value() is None:
+                continue
+            if record.get_value() >= threshold:
+                count += 1
+
+        return count * int(every_min)
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+        return 0
+
+
+def get_equip_mode_period(  # noqa: C901, PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    threshold_list: list[float],
+    start: str = \"-30h\",
+    stop: str = \"now()\",
+    every_min: int = 10,
+    window_min: int = 10,
+    create_empty: bool = True,
+) -> list[list[Any]]:
+    logging.info(
+        (
+            \"Get equipment mode period (type: %s, host: %s, field: %s, \"
+            \"threshold: %.2f, start: %s, stop: %s, every: %dmin, \"
+            \"window: %dmin, create_empty: %s)\",
+        ),
+        measure,
+        hostname,
+        field,
+        f\"[{','.join(f'{v:.1f}' for v in threshold_list)}]\",
+        start,
+        stop,
+        every_min,
+        window_min,
+        create_empty,
+    )
+
+    try:
+        table_list = fetch_data_impl(
+            config,
+            FLUX_QUERY,
+            measure,
+            hostname,
+            field,
+            start,
+            stop,
+            every_min,
+            window_min,
+            create_empty,
+        )
+
+        if len(table_list) == 0:
+            return []
+
+        # NOTE: 常時冷却と間欠冷却の期間を求める
+        on_range = []
+        state = -1
+        start_time = None
+        prev_time = None
+        localtime_offset = datetime.timedelta(hours=9)
+
+        for record in table_list[0].records:
+            # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
+            # だとタイミングによって、先頭に None が入る
+            if record.get_value() is None:
+                logging.debug(\"DELETE %s\", record.get_time() + localtime_offset)
+                continue
+
+            is_idle = True
+            for i in range(len(threshold_list)):
+                if record.get_value() > threshold_list[i]:
+                    if state != i:
+                        if state != -1:
+                            assert start_time is not None
+                            assert prev_time is not None
+                            on_range.append(
+                                [
+                                    start_time + localtime_offset,
+                                    prev_time + localtime_offset,
+                                    state,
+                                ]
+                            )
+                        state = i
+                        start_time = record.get_time()
+                    is_idle = False
+                    break
+            if is_idle and state != -1:
+                assert start_time is not None
+                assert prev_time is not None
+                on_range.append(
+                    [
+                        start_time + localtime_offset,
+                        prev_time + localtime_offset,
+                        state,
+                    ]
+                )
+                state = -1
+                start_time = record.get_time()
+
+            prev_time = record.get_time()
+
+        if state != -1:
+            assert start_time is not None
+            on_range.append(
+                [
+                    start_time + localtime_offset,
+                    table_list[0].records[-1].get_time() + localtime_offset,
+                    state,
+                ]
+            )
+        return on_range
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+        return []
+
+
+def get_sum(  # noqa: PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    start: str = \"-3m\",
+    stop: str = \"now()\",
+    every_min: int = 1,
+    window_min: int = 3,
+) -> float:
+    try:
+        table_list = fetch_data_impl(
+            config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
+        )
+
+        value_list = table_list.to_values(columns=[\"count\", \"sum\"])
+
+        if len(value_list) == 0:
+            return 0
+        else:
+            sum_value = value_list[0][1]
+            if isinstance(sum_value, (int, float)):
+                return float(sum_value)
+            logging.warning(\"Unexpected sum value type: %s (value=%s)\", type(sum_value).__name__, sum_value)
+            return 0
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+        return 0
+
+
+def get_day_sum(  # noqa: PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    days: int,
+    day_before: int = 0,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 5,
+) -> float:
+    now = my_lib.time.now()
+
+    if day_before == 0:
+        start = f\"-{day_offset + days - 1}d{now.hour}h{now.minute}m\"
+        stop = f\"-{day_offset}d\"
+    else:
+        start = f\"-{day_before + day_offset + days - 1}d{now.hour}h{now.minute}m\"
+        stop = f\"-{day_before + day_offset - 1}d{now.hour}h{now.minute}m\"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
+
+
+def get_hour_sum(  # noqa: PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    hours: int,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 1,
+) -> float:
+    start = f\"-{day_offset * 24 + hours}h\"
+    stop = f\"-{day_offset * 24}h\"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
+
+
+def get_minute_sum(  # noqa: PLR0913
+    config: InfluxDBConfig,
+    measure: str,
+    hostname: str,
+    field: str,
+    minutes: int,
+    day_offset: int = 0,
+    every_min: int = 1,
+    window_min: int = 1,
+) -> float:
+    start = f\"-{day_offset * 24 * 60 + minutes}m\"
+    stop = f\"-{day_offset * 24 * 60}m\"
+
+    return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
+
+
+def get_last_event(
+    config: InfluxDBConfig, measure: str, hostname: str, field: str, start: str = \"-7d\"
+) -> datetime.datetime | None:
+    try:
+        table_list = fetch_data_impl(
+            config, FLUX_EVENT_QUERY, measure, hostname, field, start, \"now()\", 0, 0, False
+        )
+
+        value_list = table_list.to_values(columns=[\"_time\"])
+
+        if len(value_list) == 0:
+            return None
+        else:
+            time_value = value_list[0][0]
+            if isinstance(time_value, datetime.datetime):
+                return time_value
+            logging.warning(\"Unexpected time value type: %s (value=%s)\", type(time_value).__name__, time_value)
+            return None
+    except Exception:
+        logging.exception(\"Failed to fetch data\")
+        return None
+
+
+def dump_data(data: SensorDataResult) -> None:
+    for i in range(len(data.time)):
+        logging.info(\"%s: %s\", data.time[i], data.value[i])
+
+
+if __name__ == \"__main__\":
+    # TEST Code
+    import docopt
+
+    import my_lib.config
+    import my_lib.logger
+    import my_lib.pretty
+
+    def get_config(config, dotted_key):
+        keys = dotted_key.split(\".\")
+        value = config
+
+        for key in keys:
+            value = value[key]
+
+        return value
+
+    args = docopt.docopt(__doc__)
+
+    config_file = args[\"-c\"]
+    mode = args[\"-m\"]
+    every = args[\"-e\"]
+    window = args[\"-w\"]
+    infxlux_db_spec = args[\"-i\"]
+    sensor_spec = args[\"-s\"]
+    field_name = args[\"-f\"]
+    period = int(args[\"-p\"])
+    debug_mode = args[\"-D\"]
+
+    my_lib.logger.init(\"test\", level=logging.DEBUG if debug_mode else logging.INFO)
+
+    config = my_lib.config.load(config_file)
+
+    db_config = get_config(config, infxlux_db_spec)
+    sensor_config = get_config(config, sensor_spec)
+
+    logging.info(\"DB config: %s\", my_lib.pretty.format(db_config))
+    logging.info(\"Sensor config: %s\", my_lib.pretty.format(sensor_config))
+
+    result: SensorDataResult | float
+    if mode == \"data\":
+        result = fetch_data(
+            db_config,
+            sensor_config[\"measure\"],
+            sensor_config[\"hostname\"],
+            field_name,
+            start=\"-10m\",
+            stop=\"now()\",
+            every_min=1,
+            window_min=3,
+            create_empty=True,
+            last=False,
+        )
+    elif mode == \"day_sum\":
+        result = get_day_sum(db_config, sensor_config[\"measure\"], sensor_config[\"hostname\"], field_name, period)
+    elif mode == \"hour_sum\":
+        result = get_hour_sum(db_config, sensor_config[\"measure\"], sensor_config[\"hostname\"], field_name, period)
+    elif mode == \"minute_sum\":
+        result = get_minute_sum(db_config, sensor_config[\"measure\"], sensor_config[\"hostname\"], field_name, period" 0 6 (face font-lock-keyword-face fontified t) 6 23 (fontified t) 23 27 (face font-lock-keyword-face fontified t) 27 62 (fontified t) 62 68 (face font-lock-keyword-face fontified t) 68 80 (fontified t) 80 86 (face font-lock-keyword-face fontified t) 86 101 (fontified t) 101 111 (face font-lock-type-face fontified t) 111 118 (fontified t) 118 119 (face font-lock-operator-face fontified t) 119 123 (face font-lock-constant-face fontified t) 123 125 (fontified t) 125 130 (face font-lock-keyword-face fontified t) 130 131 (fontified t) 131 147 (face font-lock-type-face fontified t) 147 153 (fontified t) 153 155 (face font-lock-doc-face fontified t) 155 156 (face font-lock-doc-face fontified t syntax-table (15)) 156 167 (face font-lock-doc-face fontified t) 167 168 (face font-lock-doc-face fontified t syntax-table (15)) 168 170 (face font-lock-doc-face fontified t) 170 176 (fontified t) 176 181 (face font-lock-variable-name-face fontified t) 181 183 (fontified t) 183 187 (face font-lock-builtin-face fontified t) 187 188 (fontified t) 188 193 (face font-lock-builtin-face fontified t) 193 195 (fontified t) 195 196 (face font-lock-operator-face fontified t) 196 218 (fontified t) 218 219 (face font-lock-operator-face fontified t) 219 223 (face font-lock-builtin-face fontified t) 223 229 (fontified t) 229 233 (face font-lock-variable-name-face fontified t) 233 235 (fontified t) 235 239 (face font-lock-builtin-face fontified t) 239 259 (fontified t) 259 260 (face font-lock-operator-face fontified t) 260 282 (fontified t) 282 283 (face font-lock-operator-face fontified t) 283 287 (face font-lock-builtin-face fontified t) 287 293 (fontified t) 293 298 (face font-lock-variable-name-face fontified t) 298 300 (fontified t) 300 304 (face font-lock-builtin-face fontified t) 304 305 (fontified t) 305 306 (face font-lock-operator-face fontified t) 306 307 (fontified t) 307 312 (face font-lock-constant-face fontified t) 312 315 (fontified t) 315 325 (face font-lock-type-face fontified t) 325 332 (fontified t) 332 333 (face font-lock-operator-face fontified t) 333 337 (face font-lock-constant-face fontified t) 337 339 (fontified t) 339 344 (face font-lock-keyword-face fontified t) 344 345 (fontified t) 345 356 (face font-lock-type-face fontified t) 356 362 (fontified t) 362 364 (face font-lock-doc-face fontified t) 364 365 (face font-lock-doc-face fontified t syntax-table (15)) 365 379 (face font-lock-doc-face fontified t) 379 380 (face font-lock-doc-face fontified t syntax-table (15)) 380 382 (face font-lock-doc-face fontified t) 382 397 (fontified t) 397 400 (face font-lock-builtin-face fontified t) 400 415 (fontified t) 415 418 (face font-lock-builtin-face fontified t) 418 430 (fontified t) 430 433 (face font-lock-builtin-face fontified t) 433 434 (fontified t) 434 438 (fontified t) 438 443 (face font-lock-variable-name-face fontified t) 443 445 (fontified t) 445 448 (face font-lock-builtin-face fontified t) 448 449 (fontified t) 449 450 (face font-lock-operator-face fontified t) 450 451 (fontified t) 451 457 (face font-lock-string-face fontified t) 457 462 (fontified t) 462 466 (face font-lock-variable-name-face fontified t) 466 468 (fontified t) 468 471 (face font-lock-builtin-face fontified t) 471 472 (fontified t) 472 473 (face font-lock-operator-face fontified t) 473 474 (fontified t) 474 481 (face font-lock-string-face fontified t) 481 486 (fontified t) 486 495 (face font-lock-variable-name-face fontified t) 495 497 (fontified t) 497 500 (face font-lock-builtin-face fontified t) 500 501 (fontified t) 501 502 (face font-lock-operator-face fontified t) 502 509 (fontified t) 509 519 (face font-lock-variable-name-face fontified t) 519 521 (fontified t) 521 524 (face font-lock-builtin-face fontified t) 524 525 (fontified t) 525 526 (face font-lock-operator-face fontified t) 526 533 (fontified t) 533 545 (face font-lock-variable-name-face fontified t) 545 547 (fontified t) 547 551 (face font-lock-builtin-face fontified t) 551 552 (fontified t) 552 553 (face font-lock-operator-face fontified t) 553 554 (fontified t) 554 558 (face font-lock-constant-face fontified t) 558 563 (fontified t) 563 567 (face font-lock-variable-name-face fontified t) 567 569 (fontified t) 569 573 (face font-lock-builtin-face fontified t) 573 574 (fontified t) 574 575 (face font-lock-operator-face fontified t) 575 576 (fontified t) 576 581 (face font-lock-constant-face fontified t) 581 583 (fontified t) 583 585 (face font-lock-comment-delimiter-face fontified t) 585 620 (face font-lock-comment-face fontified t) 620 622 (face font-lock-comment-delimiter-face fontified t) 622 679 (face font-lock-comment-face fontified t) 679 681 (face font-lock-comment-delimiter-face fontified t) 681 714 (face font-lock-comment-face fontified t) 714 724 (face font-lock-variable-name-face fontified t) 724 725 (fontified t) 725 726 (face font-lock-operator-face fontified t) 726 727 (fontified t) 727 729 (face font-lock-string-face fontified t) 729 730 (face font-lock-string-face fontified t syntax-table (15)) 730 1146 (face font-lock-string-face fontified t) 1146 1147 (face font-lock-string-face fontified t syntax-table (15)) 1147 1149 (face font-lock-string-face fontified t) 1149 1151 (fontified t) 1151 1181 (face font-lock-variable-name-face fontified t) 1181 1182 (fontified t) 1182 1183 (face font-lock-operator-face fontified t) 1183 1184 (fontified t) 1184 1186 (face font-lock-string-face fontified t) 1186 1187 (face font-lock-string-face fontified t syntax-table (15)) 1187 1442 (face font-lock-string-face fontified t) 1442 1443 (face font-lock-string-face fontified t syntax-table (15)) 1443 1445 (face font-lock-string-face fontified t) 1445 1447 (fontified t) 1447 1461 (face font-lock-variable-name-face fontified t) 1461 1462 (fontified t) 1462 1463 (face font-lock-operator-face fontified t) 1463 1464 (fontified t) 1464 1466 (face font-lock-string-face fontified t) 1466 1467 (face font-lock-string-face fontified t syntax-table (15)) 1467 1934 (face font-lock-string-face fontified t) 1934 1981 (face font-lock-string-face fontified t) 1981 2029 (face font-lock-string-face fontified t) 2029 2030 (face font-lock-string-face syntax-table (15) fontified t) 2030 2032 (face font-lock-string-face fontified t) 2032 2034 (fontified t) 2034 2050 (face font-lock-variable-name-face fontified t) 2050 2051 (fontified t) 2051 2052 (face font-lock-operator-face fontified t) 2052 2053 (fontified t) 2053 2055 (face font-lock-string-face fontified t) 2055 2056 (face font-lock-string-face syntax-table (15) fontified t) 2056 2466 (face font-lock-string-face fontified t) 2466 2467 (face font-lock-string-face syntax-table (15) fontified t) 2467 2469 (face font-lock-string-face fontified t) 2469 2472 (fontified t) 2472 2475 (face font-lock-keyword-face fontified t) 2475 2476 (fontified t) 2476 2498 (face font-lock-function-name-face fontified t) 2498 2516 (fontified t) 2516 2520 (face font-lock-builtin-face fontified t) 2520 2541 (fontified t) 2541 2545 (face font-lock-builtin-face fontified t) 2545 2553 (fontified t) 2553 2557 (face font-lock-builtin-face fontified t) 2557 2570 (fontified t) 2570 2573 (face font-lock-builtin-face fontified t) 2573 2587 (fontified t) 2587 2590 (face font-lock-builtin-face fontified t) 2590 2593 (fontified t) 2593 2594 (face font-lock-operator-face fontified t) 2594 2595 (face font-lock-operator-face fontified t) 2595 2618 (fontified t) 2618 2620 (face font-lock-doc-face fontified t) 2620 2621 (face font-lock-doc-face syntax-table (15) fontified t) 2621 2635 (face font-lock-doc-face fontified t) 2635 2636 (face font-lock-doc-face syntax-table (15) fontified t) 2636 2638 (face font-lock-doc-face fontified t) 2638 2643 (fontified t) 2643 2652 (face font-lock-variable-name-face fontified t) 2652 2653 (fontified t) 2653 2654 (face font-lock-operator-face fontified t) 2654 2662 (fontified t) 2662 2671 (face font-lock-variable-name-face fontified t) 2671 2672 (fontified t) 2672 2673 (face font-lock-operator-face fontified t) 2673 2681 (fontified t) 2681 2697 (face font-lock-variable-name-face fontified t) 2697 2698 (fontified t) 2698 2699 (face font-lock-operator-face fontified t) 2699 2724 (fontified t) 2724 2725 (face font-lock-operator-face fontified t) 2725 2733 (fontified t) 2733 2735 (face font-lock-keyword-face fontified t) 2735 2736 (fontified t) 2736 2739 (face font-lock-builtin-face fontified t) 2739 2752 (fontified t) 2752 2754 (face font-lock-operator-face fontified t) 2754 2766 (fontified t) 2766 2769 (face font-lock-keyword-face fontified t) 2769 2777 (fontified t) 2777 2779 (face font-lock-keyword-face fontified t) 2779 2815 (fontified t) 2815 2817 (face font-lock-comment-delimiter-face fontified t) 2817 2891 (face font-lock-comment-face fontified t) 2891 2903 (fontified t) 2903 2905 (face font-lock-comment-delimiter-face fontified t) 2905 2930 (face font-lock-comment-face fontified t) 2930 2942 (fontified t) 2942 2944 (face font-lock-keyword-face fontified t) 2944 2964 (fontified t) 2964 2966 (face font-lock-keyword-face fontified t) 2966 2967 (fontified t) 2967 2971 (face font-lock-constant-face fontified t) 2971 3003 (fontified t) 3003 3014 (face font-lock-string-face fontified t) 3014 3034 (fontified t) 3034 3035 (face font-lock-operator-face fontified t) 3035 3070 (fontified t) 3070 3078 (face font-lock-keyword-face fontified t) 3078 3176 (fontified t) 3176 3177 (face font-lock-operator-face fontified t) 3177 3201 (fontified t) 3201 3203 (face font-lock-keyword-face fontified t) 3203 3217 (fontified t) 3217 3220 (face font-lock-keyword-face fontified t) 3220 3221 (fontified t) 3221 3224 (face font-lock-keyword-face fontified t) 3224 3239 (fontified t) 3239 3241 (face font-lock-comment-delimiter-face fontified t) 3241 3309 (face font-lock-comment-face fontified t) 3309 3317 (fontified t) 3317 3319 (face font-lock-comment-delimiter-face fontified t) 3319 3338 (face font-lock-comment-face fontified t) 3338 3346 (fontified t) 3346 3355 (face font-lock-variable-name-face fontified t) 3355 3356 (fontified t) 3356 3357 (face font-lock-operator-face fontified t) 3357 3358 (fontified t) 3358 3361 (face font-lock-builtin-face fontified t) 3361 3381 (fontified t) 3381 3391 (face font-lock-variable-name-face fontified t) 3391 3392 (fontified t) 3392 3393 (face font-lock-operator-face fontified t) 3393 3394 (fontified t) 3394 3397 (face font-lock-builtin-face fontified t) 3397 3418 (fontified t) 3418 3420 (face font-lock-keyword-face fontified t) 3420 3432 (fontified t) 3432 3433 (face font-lock-operator-face fontified t) 3433 3457 (fontified t) 3457 3466 (face font-lock-variable-name-face fontified t) 3466 3467 (fontified t) 3467 3468 (face font-lock-operator-face fontified t) 3468 3481 (fontified t) 3481 3492 (fontified t) 3492 3493 (face font-lock-operator-face fontified t) 3493 3507 (fontified t) 3507 3519 (fontified t) 3519 3528 (face font-lock-variable-name-face fontified t) 3528 3529 (fontified t) 3529 3530 (face font-lock-operator-face fontified t) 3530 3554 (fontified t) 3554 3555 (face font-lock-operator-face fontified t) 3555 3588 (fontified t) 3588 3605 (face font-lock-string-face fontified t) 3605 3607 (fontified t) 3607 3610 (face font-lock-builtin-face fontified t) 3610 3627 (fontified t) 3627 3633 (face font-lock-keyword-face fontified t) 3633 3656 (fontified t) 3656 3657 (face font-lock-operator-face fontified t) 3657 3672 (fontified t) 3672 3673 (face font-lock-operator-face fontified t) 3673 3689 (fontified t) 3689 3690 (face font-lock-operator-face fontified t) 3690 3693 (face font-lock-builtin-face fontified t) 3693 3705 (fontified t) 3705 3707 (face font-lock-operator-face fontified t) 3707 3713 (fontified t) 3713 3716 (face font-lock-keyword-face fontified t) 3716 3717 (fontified t) 3717 3732 (face font-lock-function-name-face fontified t) 3732 3735 (fontified t) 3735 3737 (face font-lock-comment-delimiter-face fontified t) 3737 3751 (face font-lock-comment-face fontified t) 3751 3796 (fontified t) 3796 3799 (face font-lock-builtin-face fontified t) 3799 3814 (fontified t) 3814 3817 (face font-lock-builtin-face fontified t) 3817 3833 (fontified t) 3833 3836 (face font-lock-builtin-face fontified t) 3836 3849 (fontified t) 3849 3852 (face font-lock-builtin-face fontified t) 3852 3865 (fontified t) 3865 3868 (face font-lock-builtin-face fontified t) 3868 3880 (fontified t) 3880 3883 (face font-lock-builtin-face fontified t) 3883 3896 (fontified t) 3896 3899 (face font-lock-builtin-face fontified t) 3899 3913 (fontified t) 3913 3916 (face font-lock-builtin-face fontified t) 3916 3936 (fontified t) 3936 3940 (face font-lock-builtin-face fontified t) 3940 3952 (fontified t) 3952 3956 (face font-lock-builtin-face fontified t) 3956 3957 (fontified t) 3957 3958 (face font-lock-operator-face fontified t) 3958 3959 (fontified t) 3959 3964 (face font-lock-constant-face fontified t) 3964 3968 (fontified t) 3968 3969 (face font-lock-operator-face fontified t) 3969 3970 (face font-lock-operator-face fontified t) 3970 3986 (fontified t) 3986 3992 (face font-lock-variable-name-face fontified t) 3992 3993 (fontified t) 3993 3994 (face font-lock-operator-face fontified t) 3994 3995 (fontified t) 3995 3999 (face font-lock-constant-face fontified t) 3999 4004 (fontified t) 4004 4007 (face font-lock-keyword-face fontified t) 4007 4017 (fontified t) 4017 4022 (face font-lock-variable-name-face fontified t) 4022 4023 (fontified t) 4023 4024 (face font-lock-operator-face fontified t) 4024 4040 (fontified t) 4040 4056 (face font-lock-string-face fontified t) 4056 4068 (fontified t) 4068 4075 (face font-lock-string-face fontified t) 4075 4087 (fontified t) 4087 4092 (face font-lock-variable-name-face fontified t) 4092 4093 (fontified t) 4093 4094 (face font-lock-operator-face fontified t) 4094 4104 (fontified t) 4104 4110 (face font-lock-builtin-face fontified t) 4110 4130 (fontified t) 4130 4131 (face font-lock-operator-face fontified t) 4131 4141 (fontified t) 4141 4149 (face font-lock-string-face fontified t) 4149 4171 (fontified t) 4171 4172 (face font-lock-operator-face fontified t) 4172 4201 (fontified t) 4201 4202 (face font-lock-operator-face fontified t) 4202 4229 (fontified t) 4229 4230 (face font-lock-operator-face fontified t) 4230 4254 (fontified t) 4254 4255 (face font-lock-operator-face fontified t) 4255 4278 (fontified t) 4278 4279 (face font-lock-operator-face fontified t) 4279 4302 (fontified t) 4302 4303 (face font-lock-operator-face fontified t) 4303 4328 (fontified t) 4328 4329 (face font-lock-operator-face fontified t) 4329 4361 (fontified t) 4361 4362 (face font-lock-operator-face fontified t) 4362 4365 (face font-lock-builtin-face fontified t) 4365 4407 (fontified t) 4407 4409 (face font-lock-keyword-face fontified t) 4409 4428 (fontified t) 4428 4433 (face font-lock-variable-name-face fontified t) 4433 4434 (fontified t) 4434 4436 (face font-lock-operator-face fontified t) 4436 4437 (fontified t) 4437 4449 (face font-lock-string-face fontified t) 4449 4473 (fontified t) 4473 4490 (face font-lock-string-face fontified t) 4490 4507 (fontified t) 4507 4513 (face font-lock-variable-name-face fontified t) 4513 4514 (fontified t) 4514 4515 (face font-lock-operator-face fontified t) 4515 4550 (fontified t) 4550 4551 (face font-lock-operator-face fontified t) 4551 4561 (fontified t) 4561 4566 (face font-lock-string-face fontified t) 4566 4574 (fontified t) 4574 4575 (face font-lock-operator-face fontified t) 4575 4585 (fontified t) 4585 4586 (face font-lock-operator-face fontified t) 4586 4596 (fontified t) 4596 4601 (face font-lock-string-face fontified t) 4601 4612 (fontified t) 4612 4621 (face font-lock-variable-name-face fontified t) 4621 4622 (fontified t) 4622 4623 (face font-lock-operator-face fontified t) 4623 4652 (fontified t) 4652 4658 (face font-lock-keyword-face fontified t) 4658 4680 (fontified t) 4680 4681 (face font-lock-operator-face fontified t) 4681 4692 (fontified t) 4692 4698 (face font-lock-keyword-face fontified t) 4698 4699 (fontified t) 4699 4708 (face font-lock-type-face fontified t) 4708 4736 (fontified t) 4736 4758 (face font-lock-string-face fontified t) 4758 4768 (fontified t) 4768 4773 (face font-lock-keyword-face fontified t) 4773 4778 (fontified t) 4778 4785 (face font-lock-keyword-face fontified t) 4785 4795 (fontified t) 4795 4797 (face font-lock-keyword-face fontified t) 4797 4805 (fontified t) 4805 4807 (face font-lock-keyword-face fontified t) 4807 4808 (fontified t) 4808 4811 (face font-lock-keyword-face fontified t) 4811 4812 (fontified t) 4812 4816 (face font-lock-constant-face fontified t) 4816 4847 (fontified t) 4847 4856 (face font-lock-keyword-face fontified t) 4856 4857 (fontified t) 4857 4878 (face font-lock-function-name-face fontified t) 4878 4881 (fontified t) 4881 4883 (face font-lock-comment-delimiter-face fontified t) 4883 4897 (face font-lock-comment-face fontified t) 4897 4928 (fontified t) 4928 4942 (fontified t) 4942 4945 (face font-lock-builtin-face fontified t) 4945 4947 (fontified t) 4947 4960 (fontified t) 4960 4963 (face font-lock-builtin-face fontified t) 4963 4979 (fontified t) 4979 4982 (face font-lock-builtin-face fontified t) 4982 4995 (fontified t) 4995 4998 (face font-lock-builtin-face fontified t) 4998 5007 (fontified t) 5007 5011 (fontified t) 5011 5014 (face font-lock-builtin-face fontified t) 5014 5016 (fontified t) 5016 5026 (fontified t) 5026 5029 (face font-lock-builtin-face fontified t) 5029 5042 (fontified t) 5042 5045 (face font-lock-builtin-face fontified t) 5045 5059 (fontified t) 5059 5062 (face font-lock-builtin-face fontified t) 5062 5082 (fontified t) 5082 5086 (face font-lock-builtin-face fontified t) 5086 5098 (fontified t) 5098 5102 (face font-lock-builtin-face fontified t) 5102 5103 (fontified t) 5103 5104 (face font-lock-operator-face fontified t) 5104 5105 (fontified t) 5105 5110 (face font-lock-constant-face fontified t) 5110 5114 (fontified t) 5114 5115 (face font-lock-operator-face fontified t) 5115 5116 (face font-lock-operator-face fontified t) 5116 5132 (fontified t) 5132 5134 (face font-lock-doc-face fontified t) 5134 5135 (syntax-table (15) face font-lock-doc-face fontified t) 5135 5147 (face font-lock-doc-face fontified t) 5147 5148 (syntax-table (15) face font-lock-doc-face fontified t) 5148 5150 (face font-lock-doc-face fontified t) 5150 5155 (fontified t) 5155 5159 (face font-lock-variable-name-face fontified t) 5159 5160 (fontified t) 5160 5161 (face font-lock-operator-face fontified t) 5161 5191 (fontified t) 5191 5197 (face font-lock-keyword-face fontified t) 5197 5198 (fontified t) 5198 5203 (face font-lock-keyword-face fontified t) 5203 5234 (fontified t) 5234 5238 (face font-lock-constant-face fontified t) 5238 5456 (fontified t) 5456 5459 (face font-lock-keyword-face fontified t) 5459 5460 (fontified t) 5460 5470 (face font-lock-function-name-face fontified t) 5470 5473 (fontified t) 5473 5475 (face font-lock-comment-delimiter-face fontified t) 5475 5489 (face font-lock-comment-face fontified t) 5489 5533 (fontified t) 5533 5536 (face font-lock-builtin-face fontified t) 5536 5552 (fontified t) 5552 5555 (face font-lock-builtin-face fontified t) 5555 5568 (fontified t) 5568 5571 (face font-lock-builtin-face fontified t) 5571 5584 (fontified t) 5584 5587 (face font-lock-builtin-face fontified t) 5587 5588 (fontified t) 5588 5589 (face font-lock-operator-face fontified t) 5589 5590 (fontified t) 5590 5596 (face font-lock-string-face fontified t) 5596 5608 (fontified t) 5608 5611 (face font-lock-builtin-face fontified t) 5611 5612 (fontified t) 5612 5613 (face font-lock-operator-face fontified t) 5613 5614 (fontified t) 5614 5621 (face font-lock-string-face fontified t) 5621 5638 (fontified t) 5638 5641 (face font-lock-builtin-face fontified t) 5641 5642 (fontified t) 5642 5643 (face font-lock-operator-face fontified t) 5643 5663 (fontified t) 5663 5666 (face font-lock-builtin-face fontified t) 5666 5667 (fontified t) 5667 5668 (face font-lock-operator-face fontified t) 5668 5690 (fontified t) 5690 5694 (face font-lock-builtin-face fontified t) 5694 5695 (fontified t) 5695 5696 (face font-lock-operator-face fontified t) 5696 5697 (fontified t) 5697 5701 (face font-lock-constant-face fontified t) 5701 5713 (fontified t) 5713 5717 (face font-lock-builtin-face fontified t) 5717 5718 (fontified t) 5718 5719 (face font-lock-operator-face fontified t) 5719 5720 (fontified t) 5720 5725 (face font-lock-constant-face fontified t) 5725 5729 (fontified t) 5729 5730 (face font-lock-operator-face fontified t) 5730 5731 (face font-lock-operator-face fontified t) 5731 5754 (fontified t) 5754 5764 (face font-lock-variable-name-face fontified t) 5764 5765 (fontified t) 5765 5766 (face font-lock-operator-face fontified t) 5766 5820 (fontified t) 5820 5868 (face font-lock-string-face fontified t) 5868 5881 (fontified t) 5881 5933 (face font-lock-string-face fontified t) 5933 5946 (fontified t) 5946 5975 (face font-lock-string-face fontified t) 5975 6152 (fontified t) 6152 6155 (face font-lock-keyword-face fontified t) 6155 6165 (fontified t) 6165 6173 (face font-lock-variable-name-face fontified t) 6173 6174 (fontified t) 6174 6175 (face font-lock-operator-face fontified t) 6175 6207 (fontified t) 6207 6209 (face font-lock-keyword-face fontified t) 6209 6221 (fontified t) 6221 6223 (face font-lock-operator-face fontified t) 6223 6226 (fontified t) 6226 6230 (face font-lock-keyword-face fontified t) 6230 6251 (fontified t) 6251 6261 (face font-lock-variable-name-face fontified t) 6261 6262 (fontified t) 6262 6263 (face font-lock-operator-face fontified t) 6263 6447 (fontified t) 6447 6448 (fontified t) 7450 7451 (syntax-table (15)) 7466 7467 (syntax-table (15)) 9017 9018 (syntax-table (15)) 9193 9194 (syntax-table (15))) . 1071) (undo-tree-id0 . -4451) (undo-tree-id1 . -4944) (undo-tree-id2 . -4944) (undo-tree-id3 . -4944) (undo-tree-id4 . -4451) (undo-tree-id5 . -5132) (undo-tree-id6 . -5132) (undo-tree-id7 . -5132) (undo-tree-id8 . -5132) (undo-tree-id9 . -5150) (undo-tree-id10 . -5132) (undo-tree-id11 . -4847) (undo-tree-id12 . -4847) (undo-tree-id13 . -5127) (undo-tree-id14 . -4847) (undo-tree-id15 . -4847) (undo-tree-id16 . -5127) (undo-tree-id17 . -4847) (undo-tree-id18 . -4847) (undo-tree-id19 . -4847) (undo-tree-id20 . -4847) (undo-tree-id21 . -4847) (undo-tree-id22 . -4847) (undo-tree-id23 . -4847) (undo-tree-id24 . -4847) (undo-tree-id25 . -4847) (undo-tree-id26 . -5132) (undo-tree-id27 . -5132) (undo-tree-id28 . -5132) (undo-tree-id29 . -5132) (undo-tree-id30 . -5150) (undo-tree-id31 . -5132) (undo-tree-id32 . -4847) (undo-tree-id33 . -4847) (undo-tree-id34 . -5127) (undo-tree-id35 . -4847) (undo-tree-id36 . -4847) (undo-tree-id37 . -5127) (undo-tree-id38 . -4847) (undo-tree-id39 . -4847) (undo-tree-id40 . -4847) (undo-tree-id41 . -4847) (undo-tree-id42 . -4847) (undo-tree-id43 . -4847) (undo-tree-id44 . -4847) (undo-tree-id45 . -4847) (undo-tree-id46 . -4847) (undo-tree-id47 . -5132) (undo-tree-id48 . -5132) (undo-tree-id49 . -5132) (undo-tree-id50 . -5132) (undo-tree-id51 . -5150) (undo-tree-id52 . -5132) (undo-tree-id53 . -4847) (undo-tree-id54 . -4847) (undo-tree-id55 . -5127) (undo-tree-id56 . -4847) (undo-tree-id57 . -4847) (undo-tree-id58 . -5127) (undo-tree-id59 . -4847) (undo-tree-id60 . -4847) (undo-tree-id61 . -4847) (undo-tree-id62 . -4847) (undo-tree-id63 . -4847) (undo-tree-id64 . -4847) (undo-tree-id65 . -4847) (undo-tree-id66 . -4847) (undo-tree-id67 . -4847) (undo-tree-id68 . -5456) (undo-tree-id69 . -5456) (undo-tree-id70 . -5456) (undo-tree-id71 . -5456) (undo-tree-id72 . -5456) (undo-tree-id73 . -5456) (undo-tree-id74 . -5783) (undo-tree-id75 . -5783) (undo-tree-id76 . -5783) (undo-tree-id77 . -5783) (undo-tree-id78 . -5783) (undo-tree-id79 . -5783) (undo-tree-id80 . -5783) (undo-tree-id81 . -5783) (undo-tree-id82 . -5783) (undo-tree-id83 . -5783) (undo-tree-id84 . -5783) (undo-tree-id85 . -5783) (undo-tree-id86 . -4928) (undo-tree-id87 . -4944) 6015) nil (26955 43613 568889 425000) 0 nil])
+nil

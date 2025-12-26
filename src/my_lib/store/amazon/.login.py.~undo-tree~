@@ -1,0 +1,14 @@
+(undo-tree-save-format-version . 1)
+"4627e7fd452bf87969ce13bc041c02eebb7b2e9c"
+[nil nil nil nil (26955 45049 62608 778000) 0 nil]
+([nil nil ((5255 . 5259) (t 26955 18078 425339 122000)) nil (26955 45049 62606 989000) 0 nil])
+([nil nil ((5259 . 5260)) nil (26955 45049 62605 941000) 0 nil])
+([nil nil ((#("m" 0 1 (fontified t)) . -5259) (undo-tree-id11 . -1) 5260) nil (26955 45049 62604 833000) 0 nil])
+([nil nil ((5259 . 5260)) nil (26955 45049 62602 768000) 0 nil])
+([nil nil ((#("," 0 1 (fontified t)) . -5259) (undo-tree-id10 . -1) 5260) nil (26955 45049 62601 800000) 0 nil])
+([nil nil ((5259 . 5266)) nil (26955 45049 62599 490000) 0 nil])
+([nil nil ((5266 . 5272)) nil (26955 45049 62598 679000) 0 nil])
+([nil nil ((5272 . 5273)) nil (26955 45049 62597 758000) 0 nil])
+([nil nil ((#("." 0 1 (fontified t)) . -5272) (undo-tree-id5 . -1) (undo-tree-id6 . -1) (undo-tree-id7 . -1) (undo-tree-id8 . -1) (undo-tree-id9 . -1) 5273) nil (26955 45049 62595 920000) 0 nil])
+([nil current ((#("    my_lib.logger" 0 11 (fontified t) 11 17 (fontified t)) . 5255) (undo-tree-id0 . -17) (undo-tree-id1 . -17) (undo-tree-id2 . -17) (undo-tree-id3 . -17) (undo-tree-id4 . -17)) nil (26955 45049 62582 664000) 0 nil])
+nil
