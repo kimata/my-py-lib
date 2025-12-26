@@ -117,9 +117,6 @@ def create_driver_impl(
     chrome_log_file = log_path / f"chrome_{profile_name}.log"
     options.add_argument(f"--log-file={chrome_log_file!s}")
 
-    # 広告ドメインをブロック（SSL 証明書エラー回避）
-    options.add_argument("--host-rules=MAP aax-fe.amazon-adsystem.com 127.0.0.1")
-
     if not is_headless:
         options.add_argument("--auto-open-devtools-for-tabs")
 
