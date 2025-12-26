@@ -37,8 +37,8 @@ import selenium.webdriver.support.expected_conditions
 import undetected_chromedriver
 
 if TYPE_CHECKING:
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.support.wait
+    from selenium.webdriver.remote.webdriver import WebDriver
+    from selenium.webdriver.support.wait import WebDriverWait
 
 WAIT_RETRY_COUNT: int = 1
 
@@ -61,7 +61,7 @@ def get_chrome_version() -> int | None:
 
 def create_driver_impl(
     profile_name: str, data_path: pathlib.Path, is_headless: bool
-) -> selenium.webdriver.remote.webdriver.WebDriver:  # noqa: ARG001
+) -> WebDriver:  # noqa: ARG001
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -150,7 +150,7 @@ def create_driver(
     data_path: pathlib.Path,
     is_headless: bool = True,
     clean_profile: bool = False,
-) -> selenium.webdriver.remote.webdriver.WebDriver:
+) -> WebDriver:
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
@@ -187,15 +187,15 @@ def create_driver(
         return create_driver_impl(profile_name, data_path, is_headless)
 
 
-def xpath_exists(driver: selenium.webdriver.remote.webdriver.WebDriver, xpath: str) -> bool:
+def xpath_exists(driver: WebDriver, xpath: str) -> bool:
     return len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0
 
 
 def get_text(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    driver: WebDriver,
     xpath: str,
     safe_text: str,
-    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+    wait: WebDriverWait[WebDriver] | None = None,
 ) -> str:
     if wait is not None:
         wait.until(
@@ -211,10 +211,10 @@ def get_text(
 
 
 def input_xpath(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    driver: WebDriver,
     xpath: str,
     text: str,
-    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+    wait: WebDriverWait[WebDriver] | None = None,
     is_warn: bool = True,
 ) -> bool:
     if wait is not None:
@@ -235,9 +235,9 @@ def input_xpath(
 
 
 def click_xpath(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    driver: WebDriver,
     xpath: str,
-    wait: selenium.webdriver.support.wait.WebDriverWait | None = None,
+    wait: WebDriverWait[WebDriver] | None = None,
     is_warn: bool = True,
     move: bool = False,
 ) -> bool:
@@ -264,7 +264,7 @@ def click_xpath(
         return False
 
 
-def is_display(driver: selenium.webdriver.remote.webdriver.WebDriver, xpath: str) -> bool:
+def is_display(driver: WebDriver, xpath: str) -> bool:
     return (len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, xpath)) != 0) and (
         driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).is_displayed()
     )
@@ -277,8 +277,8 @@ def random_sleep(sec: float) -> None:
 
 
 def wait_patiently(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    driver: WebDriver,
+    wait: WebDriverWait[WebDriver],
     target: Any,
 ) -> None:
     error: selenium.common.exceptions.TimeoutException | None = None
@@ -305,7 +305,7 @@ def wait_patiently(
 
 
 def dump_page(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    driver: WebDriver,
     index: int,
     dump_path: pathlib.Path,
     stack_index: int = 1,
@@ -331,7 +331,7 @@ def dump_page(
     )
 
 
-def clear_cache(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
+def clear_cache(driver: WebDriver) -> None:
     driver.execute_cdp_cmd("Network.clearBrowserCache", {})
 
 
@@ -357,7 +357,7 @@ def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
             item.unlink(missing_ok=True)
 
 
-def get_memory_info(driver: selenium.webdriver.remote.webdriver.WebDriver) -> dict[str, int]:
+def get_memory_info(driver: WebDriver) -> dict[str, int]:
     """ブラウザのメモリ使用量を取得（単位: KB）"""
     total_bytes = subprocess.Popen(  # noqa: S602
         "smem -t -c pss -P chrome | tail -n 1",  # noqa: S607
@@ -387,7 +387,7 @@ def get_memory_info(driver: selenium.webdriver.remote.webdriver.WebDriver) -> di
     }
 
 
-def log_memory_usage(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
+def log_memory_usage(driver: WebDriver) -> None:
     mem_info = get_memory_info(driver)
     logging.info(
         "Chrome memory: %s MB (JS heap: %s MB)",
@@ -397,7 +397,7 @@ def log_memory_usage(driver: selenium.webdriver.remote.webdriver.WebDriver) -> N
 
 
 def warmup(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    driver: WebDriver,
     keyword: str,
     url_pattern: str,
     sleep_sec: int = 3,
@@ -421,7 +421,7 @@ def warmup(
 
 
 class browser_tab:  # noqa: N801
-    def __init__(self, driver: selenium.webdriver.remote.webdriver.WebDriver, url: str) -> None:  # noqa: D107
+    def __init__(self, driver: WebDriver, url: str) -> None:  # noqa: D107
         self.driver = driver
         self.url = url
         self.original_window: str | None = None
@@ -494,7 +494,7 @@ class error_handler:  # noqa: N801
 
     def __init__(
         self,
-        driver: selenium.webdriver.remote.webdriver.WebDriver,
+        driver: WebDriver,
         message: str = "Selenium operation failed",
         on_error: Callable[[Exception, bytes | None], None] | None = None,
         capture_screenshot: bool = True,
@@ -587,7 +587,7 @@ def _get_chrome_processes_by_pgid(chromedriver_pid: int, existing_pids: set[int]
     return additional_pids
 
 
-def get_chrome_related_processes(driver: selenium.webdriver.remote.webdriver.WebDriver) -> list[int]:
+def get_chrome_related_processes(driver: WebDriver) -> list[int]:
     """Chrome関連の全子プロセスを取得
 
     undetected_chromedriver 使用時、Chrome プロセスは chromedriver の子ではなく
@@ -736,7 +736,7 @@ def reap_chrome_processes(chrome_pids: list[int]) -> None:
 
 
 def quit_driver_gracefully(
-    driver: selenium.webdriver.remote.webdriver.WebDriver | None,
+    driver: WebDriver | None,
     wait_sec: float = 5,
 ) -> None:  # noqa: C901, PLR0912
     """Chrome WebDriverを確実に終了する
