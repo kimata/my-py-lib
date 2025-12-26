@@ -91,6 +91,7 @@ def create_driver_impl(
 
     # ポップアップブロックを無効化（新しいタブを開くために必要）
     options.add_argument("--disable-popup-blocking")
+    options.add_argument("--disable-plugins")
 
     options.add_argument("--no-first-run")
 
