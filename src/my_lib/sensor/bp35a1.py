@@ -18,7 +18,7 @@ class BP35A1:
     def __init__(self, port: str = "/dev/ttyAMA0", debug: bool = False) -> None:  # noqa: D107
         self.ser: serial.Serial = serial.Serial(port=port, baudrate=115200, timeout=5)
         self.opt: int | None = None
-        self.ser.flushInput()
+        self.ser.reset_input_buffer()
 
         self.logger: logging.Logger = logging.getLogger(__name__)
         self.logger.addHandler(logging.NullHandler())
@@ -39,7 +39,7 @@ class BP35A1:
     def write(self, data: str | bytes) -> None:
         self.logger.debug("SEND: [%s]", pprint.pformat(data))
 
-        if type(data) is str:
+        if isinstance(data, str):
             data = data.encode()
 
         self.ser.write(data)
@@ -51,8 +51,8 @@ class BP35A1:
 
     def reset(self) -> None:
         # Clear buffer
-        self.ser.flushInput()
-        self.ser.flushOutput()
+        self.ser.reset_input_buffer()
+        self.ser.reset_output_buffer()
 
         self.logger.debug("reset")
         self.__send_command_without_check("SKRESET")
