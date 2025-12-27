@@ -31,10 +31,10 @@ from my_lib.store.amazon.util import get_item_url
 if TYPE_CHECKING:
     from typing import Any
 
-PAAPI_SPLIT: int = 10
+_PAAPI_SPLIT: int = 10
 
 
-def get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.DefaultApi:
+def _get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.DefaultApi:
     return paapi5_python_sdk.api.default_api.DefaultApi(
         access_key=config.access_key,
         secret_key=config.secret_key,
@@ -43,24 +43,24 @@ def get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.Defa
     )
 
 
-def set_item_category(item: AmazonItem, data: Any) -> None:
+def _set_item_category(item: AmazonItem, data: Any) -> None:
     try:
         item.category = data.item_info.classifications.product_group.display_value
     except Exception:
         logging.warning("Unable to get category.")
 
 
-def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
+def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
     logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
 
-    default_api = get_paapi(config)
+    default_api = _get_paapi(config)
 
     price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
-        [asin_list[i : (i + PAAPI_SPLIT)] for i in range(0, len(asin_list), PAAPI_SPLIT)]
+        [asin_list[i : (i + _PAAPI_SPLIT)] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
     ):
         if i != 0:
             time.sleep(10)
@@ -112,7 +112,7 @@ def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[st
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
-                set_item_category(item, item_data)
+                _set_item_category(item, item_data)
 
                 price_map[item_data.asin] = item
 
@@ -127,11 +127,11 @@ def fetch_price_new(  # noqa: C901
 
     logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
 
-    default_api = get_paapi(config)
+    default_api = _get_paapi(config)
 
     price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
-        [asin_list[i : i + PAAPI_SPLIT] for i in range(0, len(asin_list), PAAPI_SPLIT)]
+        [asin_list[i : i + _PAAPI_SPLIT] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
     ):
         if i != 0:
             time.sleep(10)
@@ -184,7 +184,7 @@ def fetch_price_new(  # noqa: C901
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
-                set_item_category(item, item_data)
+                _set_item_category(item, item_data)
 
                 price_map[item_data.asin] = item
 
@@ -192,7 +192,7 @@ def fetch_price_new(  # noqa: C901
 
 
 def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
-    price_map = fetch_price_outlet(config, asin_list)
+    price_map = _fetch_price_outlet(config, asin_list)
     price_map |= fetch_price_new(config, list(set(asin_list) - set(price_map.keys())))
 
     return price_map
