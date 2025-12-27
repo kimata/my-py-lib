@@ -1026,7 +1026,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         # problem_mark が None の ScannerError をシミュレート
-        error = yaml.scanner.ScannerError(
+        error = yaml.scanner.ScannerError(  # type: ignore[attr-defined]
             context=None,
             context_mark=None,
             problem="test problem",
@@ -1042,7 +1042,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         # problem_mark が None の ParserError をシミュレート
-        error = yaml.parser.ParserError(
+        error = yaml.parser.ParserError(  # type: ignore[attr-defined]
             context=None,
             context_mark=None,
             problem="test problem",
@@ -1071,7 +1071,7 @@ class TestYamlErrorFormattingAdvanced:
 
         # context 属性付きの ScannerError をシミュレート
         mark = yaml.Mark("test", 0, 0, 0, None, 0)
-        error = yaml.scanner.ScannerError(
+        error = yaml.scanner.ScannerError(  # type: ignore[attr-defined]
             context="while parsing a block mapping",
             context_mark=mark,
             problem="test problem",
@@ -1089,7 +1089,7 @@ class TestYamlErrorFormattingAdvanced:
 
         # context 属性付きの ParserError をシミュレート
         mark = yaml.Mark("test", 0, 0, 0, None, 0)
-        error = yaml.parser.ParserError(
+        error = yaml.parser.ParserError(  # type: ignore[attr-defined]
             context="while parsing a flow mapping",
             context_mark=mark,
             problem="test problem",
@@ -1106,7 +1106,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         mark = yaml.Mark("test", 0, 10, 0, None, 0)  # 行10（存在しない行）
-        error = yaml.scanner.ScannerError(
+        error = yaml.scanner.ScannerError(  # type: ignore[attr-defined]
             context=None,
             context_mark=None,
             problem="test problem",
@@ -1122,7 +1122,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         mark = yaml.Mark("test", 0, 10, 0, None, 0)  # 行10（存在しない行）
-        error = yaml.parser.ParserError(
+        error = yaml.parser.ParserError(  # type: ignore[attr-defined]
             context=None,
             context_mark=None,
             problem="test problem",
