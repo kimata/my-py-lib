@@ -17,15 +17,18 @@ import logging
 import pathlib
 import tempfile
 import time
-import urllib
+import urllib.request
 
 import PIL.Image
 import pydub
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
+import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
 import selenium.webdriver.support.wait
 import slack_sdk
+import slack_sdk.errors
 
 import my_lib.notify.mail
 import my_lib.notify.slack
@@ -53,7 +56,7 @@ def recognize_audio(audio_url: str) -> str:
         with recaptcha_audio as source:
             audio = recognizer.record(source)
 
-        return recognizer.recognize_google(audio, language="en-US")
+        return recognizer.recognize_google(audio, language="en-US")  # type: ignore[attr-defined]
     except Exception:
         logging.exception("Failed to recognize audio")
         raise
@@ -234,8 +237,14 @@ def recv_response_text_slack(
         thread_ts: str | None = None
         while True:
             resp = client.conversations_history(channel=ch_id, limit=3)
+            if resp is None:
+                raise RuntimeError("Failed to get conversations history")
 
-            for message in resp["messages"]:
+            messages = resp["messages"]
+            if messages is None:
+                raise RuntimeError("Failed to get messages from conversations history")
+
+            for message in messages:
                 if ("thread_ts" in message) and (message["ts"] == ts):
                     thread_ts = message["thread_ts"]
                     break
@@ -251,8 +260,14 @@ def recv_response_text_slack(
             return None
 
         resp = client.conversations_replies(channel=ch_id, ts=thread_ts)
+        if resp is None:
+            raise RuntimeError("Failed to get conversations replies")
 
-        return resp["messages"][-1]["text"].strip()
+        messages = resp["messages"]
+        if messages is None:
+            raise RuntimeError("Failed to get messages from conversations replies")
+
+        return messages[-1]["text"].strip()
     except slack_sdk.errors.SlackApiError:
         logging.exception("Failed to receive response")
         return None
@@ -287,8 +302,14 @@ def recv_response_image_slack(
         thread_ts: str | None = None
         while True:
             resp = client.conversations_history(channel=ch_id, limit=3)
+            if resp is None:
+                raise RuntimeError("Failed to get conversations history")
 
-            for message in resp["messages"]:
+            messages = resp["messages"]
+            if messages is None:
+                raise RuntimeError("Failed to get messages from conversations history")
+
+            for message in messages:
                 if (
                     ("thread_ts" in message)
                     and ("files" in message)
@@ -308,8 +329,14 @@ def recv_response_image_slack(
             return None
 
         resp = client.conversations_replies(channel=ch_id, ts=thread_ts)
+        if resp is None:
+            raise RuntimeError("Failed to get conversations replies")
 
-        text = resp["messages"][-1]["text"].strip()
+        messages = resp["messages"]
+        if messages is None:
+            raise RuntimeError("Failed to get messages from conversations replies")
+
+        text = messages[-1]["text"].strip()
 
         logging.info("CAPTCHA: receive %s", text)
 

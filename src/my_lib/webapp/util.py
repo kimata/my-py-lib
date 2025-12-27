@@ -55,11 +55,13 @@ def api_sysinfo() -> flask.Response:
     with contextlib.suppress(FileNotFoundError, ValueError, PermissionError):
         cpu_temp = float(Path("/sys/class/thermal/thermal_zone0/temp").read_text().strip()) / 1000.0
 
+    boottime = uptime.boottime()
+
     result: dict[str, Any] = {
         "date": my_lib.time.now().isoformat(),
         "timezone": my_lib.time.get_tz(),
         "image_build_date": os.environ.get("IMAGE_BUILD_DATE", ""),
-        "uptime": uptime.boottime().isoformat(),
+        "uptime": boottime.isoformat() if boottime else "?",
         "load_average": "{:.2f}, {:.2f}, {:.2f}".format(*os.getloadavg()),
         "cpu_usage": psutil.cpu_percent(interval=1),
         "memory_usage_percent": memory_info.percent,
