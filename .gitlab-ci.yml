@@ -57,14 +57,14 @@ test-walk-through:
         - apt update
         - apt install --no-install-recommends --assume-yes smem
 
-        - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/unit/
+        - uv run pytest --numprocesses=auto --junit-xml=reports/junit-report.xml tests/unit/
 
     artifacts:
         when: always
         paths:
-            - tests/evidence/**
+            - reports/**
         reports:
-            junit: tests/evidence/junit-report.xml
+            junit: reports/junit-report.xml
 
 renovate:
     stage: renovate
