@@ -63,7 +63,7 @@ class TestTextSize:
         img = PIL.Image.new("RGBA", (100, 100))
         font = PIL.ImageFont.load_default()
 
-        result = text_size(img, font, "test")
+        result = text_size(img, font, "test")  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -81,7 +81,7 @@ class TestDrawText:
         img = PIL.Image.new("RGBA", (200, 100), (255, 255, 255, 255))
         font = PIL.ImageFont.load_default()
 
-        result = draw_text(img, "Hello", (10, 10), font)
+        result = draw_text(img, "Hello", (10, 10), font)  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -93,7 +93,7 @@ class TestDrawText:
         img = PIL.Image.new("RGBA", (200, 200), (255, 255, 255, 255))
         font = PIL.ImageFont.load_default()
 
-        result = draw_text(img, "Line 1\nLine 2", (10, 10), font)
+        result = draw_text(img, "Line 1\nLine 2", (10, 10), font)  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
 
@@ -108,7 +108,7 @@ class TestDrawTextLine:
         img = PIL.Image.new("RGBA", (200, 100), (255, 255, 255, 255))
         font = PIL.ImageFont.load_default()
 
-        result = draw_text_line(img, "Hello", (10, 10), font, align="left")
+        result = draw_text_line(img, "Hello", (10, 10), font, align="left")  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
 
@@ -119,7 +119,7 @@ class TestDrawTextLine:
         img = PIL.Image.new("RGBA", (200, 100), (255, 255, 255, 255))
         font = PIL.ImageFont.load_default()
 
-        result = draw_text_line(img, "Hello", (100, 10), font, align="center")
+        result = draw_text_line(img, "Hello", (100, 10), font, align="center")  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
 
@@ -130,7 +130,7 @@ class TestDrawTextLine:
         img = PIL.Image.new("RGBA", (200, 100), (255, 255, 255, 255))
         font = PIL.ImageFont.load_default()
 
-        result = draw_text_line(img, "Hello", (190, 10), font, align="right")
+        result = draw_text_line(img, "Hello", (190, 10), font, align="right")  # type: ignore[arg-type]
 
         assert isinstance(result, tuple)
 
@@ -142,7 +142,7 @@ class TestDrawTextLine:
         font = PIL.ImageFont.load_default()
 
         result = draw_text_line(
-            img, "Hello", (10, 10), font, stroke_width=2, stroke_fill="#FF0000"
+            img, "Hello", (10, 10), font, stroke_width=2, stroke_fill="#FF0000"  # type: ignore[arg-type]
         )
 
         assert isinstance(result, tuple)
@@ -221,6 +221,7 @@ class TestAlphaPaste:
         # 貼り付け位置のピクセルが変更されていることを確認
         pixel = base_img.getpixel((20, 20))
         # アルファ合成されているため、赤みがかった色になるはず
+        assert isinstance(pixel, tuple)
         assert pixel[0] > 128  # 赤成分がある
 
 

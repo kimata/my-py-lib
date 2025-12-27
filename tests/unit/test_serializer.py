@@ -100,7 +100,7 @@ class TestLoad:
         data = [1, 2, 3, 4, 5]
 
         store(file_path, data)
-        result = load(file_path, [])
+        result: list[int] = load(file_path, [])
 
         assert result == data
 

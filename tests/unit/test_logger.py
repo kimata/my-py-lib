@@ -28,6 +28,7 @@ class TestLogFormatter:
 
         formatter = _log_formatter("myapp")
         # フォーマット文字列に名前が含まれていることを確認
+        assert formatter._fmt is not None
         assert "myapp" in formatter._fmt
 
 

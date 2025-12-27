@@ -64,7 +64,7 @@ def create_error_image(
         "#666",
     )
 
-    next_pos_y = 110
+    next_pos_y: float = 110
     for line in textwrap.wrap(message, 90):
         next_pos_y = (
             my_lib.pil_util.draw_text(

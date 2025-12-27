@@ -741,7 +741,7 @@ class TestCacheControlBranches:
         from my_lib.flask_util import etag_conditional
 
         @app.route("/no-cache-control")
-        @etag_conditional(cache_control=None)
+        @etag_conditional(cache_control="")
         def no_cache_route():
             return flask.jsonify({"data": "test"})
 
@@ -763,7 +763,7 @@ class TestCacheControlBranches:
             return data
 
         @app.route("/304-no-cache")
-        @etag_conditional(etag_func=get_etag, cache_control=None)
+        @etag_conditional(etag_func=get_etag, cache_control="")
         def route_304_no_cache():
             return flask.jsonify({"data": "test"})
 
@@ -800,7 +800,7 @@ class TestCacheControlBranches:
             return file_path
 
         @app.route("/file-no-cache")
-        @file_etag(filename_func=get_file_path, cache_control=None)
+        @file_etag(filename_func=get_file_path, cache_control="")
         def file_no_cache_route():
             return flask.jsonify({"data": "test"})
 
@@ -820,7 +820,7 @@ class TestCacheControlBranches:
             return file_path
 
         @app.route("/file-304-no-cache")
-        @file_etag(filename_func=get_file_path, cache_control=None)
+        @file_etag(filename_func=get_file_path, cache_control="")
         def file_304_no_cache_route():
             return flask.jsonify({"data": "test"})
 

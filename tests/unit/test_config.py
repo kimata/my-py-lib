@@ -1070,7 +1070,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         # context 属性付きの ScannerError をシミュレート
-        mark = yaml.Mark("test", 0, 0, 0, None, None)
+        mark = yaml.Mark("test", 0, 0, 0, None, 0)
         error = yaml.scanner.ScannerError(
             context="while parsing a block mapping",
             context_mark=mark,
@@ -1088,7 +1088,7 @@ class TestYamlErrorFormattingAdvanced:
         from my_lib.config import _format_yaml_error
 
         # context 属性付きの ParserError をシミュレート
-        mark = yaml.Mark("test", 0, 0, 0, None, None)
+        mark = yaml.Mark("test", 0, 0, 0, None, 0)
         error = yaml.parser.ParserError(
             context="while parsing a flow mapping",
             context_mark=mark,
@@ -1105,7 +1105,7 @@ class TestYamlErrorFormattingAdvanced:
 
         from my_lib.config import _format_yaml_error
 
-        mark = yaml.Mark("test", 0, 10, 0, None, None)  # 行10（存在しない行）
+        mark = yaml.Mark("test", 0, 10, 0, None, 0)  # 行10（存在しない行）
         error = yaml.scanner.ScannerError(
             context=None,
             context_mark=None,
@@ -1121,7 +1121,7 @@ class TestYamlErrorFormattingAdvanced:
 
         from my_lib.config import _format_yaml_error
 
-        mark = yaml.Mark("test", 0, 10, 0, None, None)  # 行10（存在しない行）
+        mark = yaml.Mark("test", 0, 10, 0, None, 0)  # 行10（存在しない行）
         error = yaml.parser.ParserError(
             context=None,
             context_mark=None,
