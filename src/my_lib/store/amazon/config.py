@@ -102,3 +102,11 @@ class AmazonItem:
         if self.stock is not None:
             result["stock"] = self.stock
         return result
+
+
+DUMMY_AMAZON_ITEM: AmazonItem = AmazonItem(
+    asin="B0G3SXHCLJ",
+    url="https://www.amazon.co.jp/dp/B0G3SXHCLJ",
+    price=69980,
+    category="ゲーム",
+)
