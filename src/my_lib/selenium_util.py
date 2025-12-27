@@ -558,7 +558,7 @@ def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
             item.unlink(missing_ok=True)
 
 
-def get_memory_info(driver: WebDriver) -> dict[str, int]:
+def get_memory_info(driver: WebDriver) -> dict[str, Any]:
     """ブラウザのメモリ使用量を取得（単位: KB）"""
     total_bytes = subprocess.Popen(  # noqa: S602
         "smem -t -c pss -P chrome | tail -n 1",  # noqa: S607
@@ -799,8 +799,8 @@ def _get_chrome_related_processes(driver: WebDriver) -> list[int]:
 
     # 1. driver.service.process の子プロセスを検索
     try:
-        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):
-            process = driver.service.process
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):  # type: ignore[attr-defined]
+            process = driver.service.process  # type: ignore[attr-defined]
             if process and hasattr(process, "pid"):
                 chromedriver_pid = process.pid
 
@@ -1023,8 +1023,8 @@ def quit_driver_gracefully(
 
     # ChromeDriverサービスの停止を試行
     try:
-        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):
-            driver.service.stop()
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):  # type: ignore[attr-defined]
+            driver.service.stop()  # type: ignore[attr-defined]
     except Exception:
         logging.warning("Failed to stop Chrome service", exc_info=True)
 
@@ -1085,6 +1085,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
+    assert __doc__ is not None
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

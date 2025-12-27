@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import paapi5_python_sdk.api.default_api
 import paapi5_python_sdk.condition
@@ -65,7 +65,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
         if i != 0:
             time.sleep(10)
 
-        resp = default_api.get_items(
+        resp: Any = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
                 partner_tag=config.associate,
                 partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
@@ -136,7 +136,7 @@ def fetch_price_new(  # noqa: C901
         if i != 0:
             time.sleep(10)
 
-        resp = default_api.get_items(
+        resp: Any = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
                 partner_tag=config.associate,
                 partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,

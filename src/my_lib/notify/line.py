@@ -41,7 +41,9 @@ def send_impl(
     with linebot.v3.messaging.ApiClient(msg_config) as client:
         api = linebot.v3.messaging.MessagingApi(client)
         try:
-            api.broadcast(linebot.v3.messaging.BroadcastRequest(messages=[message]))
+            api.broadcast(
+                linebot.v3.messaging.BroadcastRequest(messages=[message], notificationDisabled=False)
+            )
         except Exception:
             logging.exception("Failed to send message")
 

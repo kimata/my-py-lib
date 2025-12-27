@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Protocol, TypedDict, Union
 
 import slack_sdk
+import slack_sdk.errors
 import slack_sdk.web.slack_response
 from PIL import Image
 
@@ -489,7 +490,7 @@ def _upload_image(  # noqa: PLR0913
             if thread_ts:
                 kwargs["thread_ts"] = thread_ts
 
-            resp = client.files_upload_v2(**kwargs)
+            resp: Any = client.files_upload_v2(**kwargs)
 
             return resp["files"][0]["id"]
         except slack_sdk.errors.SlackApiError:

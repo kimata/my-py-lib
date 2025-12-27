@@ -19,13 +19,14 @@ import io
 import json
 import logging
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import wave
 from typing import Any
 
 import numpy as np
-import pyaudio
+import pyaudio  # type: ignore[import-untyped]
 import scipy.signal
 
 
@@ -201,6 +202,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
+    assert __doc__ is not None
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

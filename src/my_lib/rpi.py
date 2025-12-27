@@ -36,7 +36,7 @@ if (
     and (os.environ.get("DUMMY_MODE", "false") != "true")
     and (os.environ.get("TEST", "false") != "true")
 ):  # pragma: no cover
-    from RPi import GPIO as gpio  # noqa: N811
+    from RPi import GPIO as gpio  # type: ignore[assignment]  # noqa: N811
 else:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         logging.warning("Using dummy GPIO")
@@ -102,12 +102,12 @@ else:
                     gpio.hist_add(
                         {
                             "pin_num": pin_num,
-                            "state": gpio.level.LOW.name,
+                            "state": gpio.level.LOW.name,  # type: ignore[attr-defined]
                             "high_period": max(int(gpio_time() - gpio.get_state()["time_start"][pin_num]), 1),
                         }
                     )
                 else:
-                    gpio.hist_add({"pin_num": pin_num, "state": gpio.level.LOW.name})
+                    gpio.hist_add({"pin_num": pin_num, "state": gpio.level.LOW.name})  # type: ignore[attr-defined]
                 gpio.get_state()["time_start"][pin_num] = None
                 gpio.get_state()["time_stop"][pin_num] = gpio_time()
             else:
@@ -116,7 +116,7 @@ else:
                 gpio.hist_add(
                     {
                         "pin_num": pin_num,
-                        "state": gpio.level.HIGH.name,
+                        "state": gpio.level.HIGH.name,  # type: ignore[attr-defined]
                     }
                 )
 
