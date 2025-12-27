@@ -109,7 +109,7 @@ class TestParseFontConfig:
         """有効なデータをパースする"""
         from my_lib.panel_config import parse_font_config
 
-        data = {
+        data: dict[str, str | dict[str, str]] = {
             "path": "/fonts",
             "map": {"jp_bold": "Bold.ttf"},
         }
@@ -126,7 +126,7 @@ class TestParseFontConfig:
         data = {"path": 123, "map": {}}
 
         with pytest.raises(TypeError, match="path must be a string"):
-            parse_font_config(data)
+            parse_font_config(data)  # type: ignore[arg-type]
 
     def test_raises_for_non_dict_map(self):
         """map が辞書でない場合は例外"""
@@ -135,13 +135,13 @@ class TestParseFontConfig:
         data = {"path": "/fonts", "map": "not a dict"}
 
         with pytest.raises(TypeError, match="map must be a dict"):
-            parse_font_config(data)
+            parse_font_config(data)  # type: ignore[arg-type]
 
     def test_default_empty_map(self):
         """map がない場合は空辞書"""
         from my_lib.panel_config import parse_font_config
 
-        data = {"path": "/fonts"}
+        data: dict[str, str | dict[str, str]] = {"path": "/fonts"}
 
         config = parse_font_config(data)
         assert config.map == {}
@@ -187,7 +187,7 @@ class TestParseIconConfig:
         """有効なデータをパースする"""
         from my_lib.panel_config import parse_icon_config
 
-        data = {
+        data: dict[str, str | float] = {
             "path": "/icons/icon.png",
             "scale": 1.5,
             "brightness": 0.8,
@@ -206,13 +206,13 @@ class TestParseIconConfig:
         data = {"path": 123}
 
         with pytest.raises(TypeError, match="path must be a string"):
-            parse_icon_config(data)
+            parse_icon_config(data)  # type: ignore[arg-type]
 
     def test_default_values(self):
         """デフォルト値"""
         from my_lib.panel_config import parse_icon_config
 
-        data = {"path": "/icons/icon.png"}
+        data: dict[str, str | float] = {"path": "/icons/icon.png"}
 
         config = parse_icon_config(data)
 

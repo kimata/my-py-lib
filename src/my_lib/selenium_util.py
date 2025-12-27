@@ -1061,7 +1061,7 @@ def quit_driver_gracefully(
 
     # Step 5: SIGKILL 後に sigkill_wait_sec 秒待機してプロセス回収
     time.sleep(sigkill_wait_sec)
-    reap_chrome_processes(chrome_pids_before)
+    _reap_chrome_processes(chrome_pids_before)
 
     # 最終チェック：まだ残っているプロセスがあるか確認
     still_remaining = _get_remaining_chrome_pids(remaining_pids)

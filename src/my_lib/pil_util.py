@@ -66,7 +66,7 @@ def draw_text(  # noqa: PLR0913
     color: str = "#000",
     stroke_width: int = 0,
     stroke_fill: str | tuple[int, int, int, int] | None = None,
-) -> tuple[int, int]:
+) -> tuple[float, float]:
     text_line_list = text.split("\n")
 
     pos_x, next_pos_y = pos
