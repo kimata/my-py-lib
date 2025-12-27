@@ -21,6 +21,7 @@ import random
 import re
 import time
 import traceback
+from typing import TYPE_CHECKING
 
 import PIL.Image
 import selenium.webdriver.common.by
@@ -31,7 +32,10 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
-from my_lib.store.amazon.config import AmazonItem, AmazonItemResult
+from my_lib.store.amazon.config import AmazonItem
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 def fetch_price_impl(
@@ -39,7 +43,13 @@ def fetch_price_impl(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasErrorConfig | None,
     item: AmazonItem,
-) -> AmazonItemResult | None:  # noqa: C901, PLR0912
+) -> bool:  # noqa: C901, PLR0912
+    """価格情報を取得して item を更新する.
+
+    Returns:
+        True: 正常に処理完了（価格取得成功または在庫切れ）
+        False: ページ読み込み失敗
+    """
     PRICE_ELEM_LIST: list[dict[str, str]] = [
         {
             "xpath": '//span[contains(@class, "apexPriceToPay")]/span[@aria-hidden]',
@@ -65,7 +75,7 @@ def fetch_price_impl(
     ):
         logging.warning("Failed to load page: %s", item.url)
         time.sleep(5)
-        return None
+        return False
 
     my_lib.selenium_util.click_xpath(driver, '//span[@id="black-curtain-yes-button"]', is_warn=False)
     my_lib.selenium_util.click_xpath(
@@ -76,13 +86,11 @@ def fetch_price_impl(
 
     # my_lib.store.amazon.captcha.resolve(driver, wait, config)
 
-    category: str | None = None
     try:
         breadcrumb_list = driver.find_elements(
             selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
         )
-        category = next(x.text for x in breadcrumb_list)
-
+        item.category = next(x.text for x in breadcrumb_list)
     except Exception:
         logging.exception("Failed to fetch category")
 
@@ -117,7 +125,8 @@ def fetch_price_impl(
             ).text
             if price_text in {"現在在庫切れです。", "この商品は現在お取り扱いできません。"}:
                 logging.warning("Price is NOT displayed: %s", item.url)
-                return AmazonItemResult(price=0, category=category)
+                item.price = 0
+                return True
         elif (
             len(
                 driver.find_elements(
@@ -130,7 +139,8 @@ def fetch_price_impl(
             )
             != 0
         ):
-            return AmazonItemResult(price=0, category=category)
+            item.price = 0
+            return True
         else:
             logging.warning("Unable to fetch price: %s", item.url)
 
@@ -144,13 +154,14 @@ def fetch_price_impl(
                         "text": "スクリーンショット",
                     },
                 )
-            return AmazonItemResult(price=0, category=category)
+            item.price = 0
+            return True
 
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", re.sub(r"[^0-9][0-9]+個", "", price_text))
         if m is None:
             raise ValueError(f"Failed to parse price: {price_text}")
-        price = int(m.group(1).replace(",", ""))
+        item.price = int(m.group(1).replace(",", ""))
     except Exception:
         logging.warning('Unable to parse "%s": %s.', price_text, item.url)
 
@@ -164,9 +175,10 @@ def fetch_price_impl(
                     "text": "スクリーンショット",
                 },
             )
-        return AmazonItemResult(price=0, category=category)
+        item.price = 0
+        return True
 
-    return AmazonItemResult(price=price, category=category)
+    return True
 
 
 def fetch_price(
@@ -177,10 +189,6 @@ def fetch_price(
     dump_path: pathlib.Path | None = None,
 ) -> AmazonItem:
     try:
-        if item.url is None:
-            logging.warning("URL is not set for item: %s", item.asin)
-            return item
-
         with my_lib.selenium_util.browser_tab(driver, item.url):
             wait.until(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
@@ -191,11 +199,7 @@ def fetch_price(
                 )
             )
 
-            result = fetch_price_impl(driver, wait, slack_config, item)
-
-            if result is not None:
-                item.price = result.price
-                item.category = result.category
+            fetch_price_impl(driver, wait, slack_config, item)
 
             if dump_path is not None and (item.price is None or item.price == 0):
                 my_lib.selenium_util.dump_page(
@@ -211,8 +215,6 @@ def fetch_price(
 
 if __name__ == "__main__":
     # TEST Code
-    from typing import Any
-
     import docopt
     import selenium.webdriver.support.wait
 
@@ -251,5 +253,5 @@ if __name__ == "__main__":
 
     dump_path = pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
 
-    item = AmazonItem(asin=asin, url=f"https://www.amazon.co.jp/dp/{asin}")
+    item = AmazonItem.from_asin(asin)
     logging.info(my_lib.pretty.format(fetch_price(driver, wait, item, slack_config, dump_path).to_dict()))

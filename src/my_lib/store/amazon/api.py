@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from typing import TYPE_CHECKING
 
 import paapi5_python_sdk.api.default_api
 import paapi5_python_sdk.condition
@@ -24,7 +25,10 @@ import paapi5_python_sdk.get_items_resource
 import paapi5_python_sdk.merchant
 import paapi5_python_sdk.partner_type
 
-from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem, AmazonItemResult
+from my_lib.store.amazon.config import AMAZON_URL_BASE, AmazonApiConfig, AmazonItem
+
+if TYPE_CHECKING:
+    from typing import Any
 
 PAAPI_SPLIT: int = 10
 
@@ -38,14 +42,14 @@ def get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.Defa
     )
 
 
-def item_prop(item: AmazonItemResult, data: paapi5_python_sdk.get_items_resource.GetItemsResource) -> None:
+def set_item_category(item: AmazonItem, data: Any) -> None:
     try:
         item.category = data.item_info.classifications.product_group.display_value
     except Exception:
         logging.warning("Unable to get category.")
 
 
-def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItemResult]:
+def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
@@ -53,7 +57,7 @@ def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[st
 
     default_api = get_paapi(config)
 
-    price_map: dict[str, AmazonItemResult] = {}
+    price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : (i + PAAPI_SPLIT)] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -101,20 +105,22 @@ def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[st
                 if price is None:
                     continue
 
-                item_result = AmazonItemResult(
+                item = AmazonItem(
+                    asin=item_data.asin,
+                    url=f"{AMAZON_URL_BASE}{item_data.asin}",
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
-                item_prop(item_result, item_data)
+                set_item_category(item, item_data)
 
-                price_map[item_data.asin] = item_result
+                price_map[item_data.asin] = item
 
     return price_map
 
 
 def fetch_price_new(  # noqa: C901
     config: AmazonApiConfig, asin_list: list[str]
-) -> dict[str, AmazonItemResult]:
+) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
@@ -122,7 +128,7 @@ def fetch_price_new(  # noqa: C901
 
     default_api = get_paapi(config)
 
-    price_map: dict[str, AmazonItemResult] = {}
+    price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : i + PAAPI_SPLIT] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -171,18 +177,20 @@ def fetch_price_new(  # noqa: C901
                 if price is None:
                     continue
 
-                item_result = AmazonItemResult(
+                item = AmazonItem(
+                    asin=item_data.asin,
+                    url=f"{AMAZON_URL_BASE}{item_data.asin}",
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
-                item_prop(item_result, item_data)
+                set_item_category(item, item_data)
 
-                price_map[item_data.asin] = item_result
+                price_map[item_data.asin] = item
 
     return price_map
 
 
-def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItemResult]:
+def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     price_map = fetch_price_outlet(config, asin_list)
     price_map |= fetch_price_new(config, list(set(asin_list) - set(price_map.keys())))
 
@@ -207,8 +215,6 @@ def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> lis
 
 if __name__ == "__main__":
     # TEST Code
-    from typing import Any
-
     import docopt
 
     import my_lib.config
