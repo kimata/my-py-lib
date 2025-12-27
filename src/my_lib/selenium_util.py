@@ -25,10 +25,12 @@ import signal
 import sqlite3
 import subprocess
 import time
+import io
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import PIL.Image
 import psutil
 import selenium
 import selenium.common.exceptions
@@ -655,13 +657,13 @@ class error_handler:  # noqa: N801
     Args:
         driver: WebDriver インスタンス
         message: ログに出力するエラーメッセージ
-        on_error: エラー時に呼ばれるコールバック関数 (exception, screenshot) -> None
+        on_error: エラー時に呼ばれるコールバック関数 (exception, screenshot: PIL.Image.Image | None) -> None
         capture_screenshot: スクリーンショットを自動取得するか（デフォルト: True）
         reraise: 例外を再送出するか（デフォルト: True）
 
     Attributes:
         exception: 発生した例外（エラーがなければ None）
-        screenshot: 取得したスクリーンショット（PNG バイナリ、取得失敗時は None）
+        screenshot: 取得したスクリーンショット（PIL.Image.Image、取得失敗時は None）
 
     Examples:
         基本的な使用方法::
@@ -695,7 +697,7 @@ class error_handler:  # noqa: N801
         self,
         driver: WebDriver,
         message: str = "Selenium operation failed",
-        on_error: Callable[[Exception, bytes | None], None] | None = None,
+        on_error: Callable[[Exception, PIL.Image.Image | None], None] | None = None,
         capture_screenshot: bool = True,
         reraise: bool = True,
     ) -> None:
@@ -705,7 +707,7 @@ class error_handler:  # noqa: N801
         self.capture_screenshot = capture_screenshot
         self.reraise = reraise
         self.exception: Exception | None = None
-        self.screenshot: bytes | None = None
+        self.screenshot: PIL.Image.Image | None = None
 
     def __enter__(self) -> "error_handler":
         return self
@@ -732,7 +734,8 @@ class error_handler:  # noqa: N801
         # スクリーンショット取得
         if self.capture_screenshot:
             try:
-                self.screenshot = self.driver.get_screenshot_as_png()
+                screenshot_bytes = self.driver.get_screenshot_as_png()
+                self.screenshot = PIL.Image.open(io.BytesIO(screenshot_bytes))
             except Exception:
                 logging.debug("Failed to capture screenshot for error handling")
 
