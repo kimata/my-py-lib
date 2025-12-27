@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
 
 import paapi5_python_sdk.api.default_api
 import paapi5_python_sdk.condition
@@ -25,28 +24,28 @@ import paapi5_python_sdk.get_items_resource
 import paapi5_python_sdk.merchant
 import paapi5_python_sdk.partner_type
 
+from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem, AmazonItemResult
+
 PAAPI_SPLIT: int = 10
 
 
-def get_paapi(config: dict[str, Any]) -> paapi5_python_sdk.api.default_api.DefaultApi:
+def get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.DefaultApi:
     return paapi5_python_sdk.api.default_api.DefaultApi(
-        access_key=config["store"]["amazon"]["access_key"],
-        secret_key=config["store"]["amazon"]["secret_key"],
-        host=config["store"]["amazon"]["host"],
-        region=config["store"]["amazon"]["region"],
+        access_key=config.access_key,
+        secret_key=config.secret_key,
+        host=config.host,
+        region=config.region,
     )
 
 
-def item_prop(item: dict[str, Any], data: Any) -> None:
+def item_prop(item: AmazonItemResult, data: paapi5_python_sdk.get_items_resource.GetItemsResource) -> None:
     try:
-        item["category"] = data.item_info.classifications.product_group.display_value
+        item.category = data.item_info.classifications.product_group.display_value
     except Exception:
-        logging.warning("Unable to get category of %s.", item["asin"])
-
-    item["thumb_url"] = data.images.primary.medium.url
+        logging.warning("Unable to get category.")
 
 
-def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:
+def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItemResult]:
     if len(asin_list) == 0:
         return {}
 
@@ -54,7 +53,7 @@ def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str
 
     default_api = get_paapi(config)
 
-    price_map: dict[str, dict[str, Any]] = {}
+    price_map: dict[str, AmazonItemResult] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : (i + PAAPI_SPLIT)] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -63,7 +62,7 @@ def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str
 
         resp = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
-                partner_tag=config["store"]["amazon"]["associate"],
+                partner_tag=config.associate,
                 partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
                 marketplace="www.amazon.co.jp",
                 # NOTE: listings にアウトレットが表示されるようにする
@@ -88,7 +87,7 @@ def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str
                 if item_data.offers is None:
                     continue
 
-                item: dict[str, Any] = {}
+                price: int | None = None
 
                 # NOTE: Amazonアウトレットのみ対象にする
                 for listing in item_data.offers.listings:
@@ -96,33 +95,34 @@ def fetch_price_outlet(config: dict[str, Any], asin_list: list[str]) -> dict[str
                         listing.merchant_info.name
                     ):
                         continue
-                    item["price"] = int(listing.price.amount)
+                    price = int(listing.price.amount)
                     break
 
-                if "price" not in item:
+                if price is None:
                     continue
 
-                item_prop(item, item_data)
+                item_result = AmazonItemResult(
+                    price=price,
+                    thumb_url=item_data.images.primary.medium.url,
+                )
+                item_prop(item_result, item_data)
 
-                price_map[item_data.asin] = item
+                price_map[item_data.asin] = item_result
 
     return price_map
 
 
-def fetch_price_new(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:  # noqa: C901
+def fetch_price_new(  # noqa: C901
+    config: AmazonApiConfig, asin_list: list[str]
+) -> dict[str, AmazonItemResult]:
     if len(asin_list) == 0:
         return {}
 
     logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
 
-    default_api = paapi5_python_sdk.api.default_api.DefaultApi(
-        access_key=config["store"]["amazon"]["access_key"],
-        secret_key=config["store"]["amazon"]["secret_key"],
-        host=config["store"]["amazon"]["host"],
-        region=config["store"]["amazon"]["region"],
-    )
+    default_api = get_paapi(config)
 
-    price_map: dict[str, dict[str, Any]] = {}
+    price_map: dict[str, AmazonItemResult] = {}
     for i, asin_sub_list in enumerate(
         [asin_list[i : i + PAAPI_SPLIT] for i in range(0, len(asin_list), PAAPI_SPLIT)]
     ):
@@ -131,7 +131,7 @@ def fetch_price_new(config: dict[str, Any], asin_list: list[str]) -> dict[str, d
 
         resp = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
-                partner_tag=config["store"]["amazon"]["associate"],
+                partner_tag=config.associate,
                 partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
                 marketplace="www.amazon.co.jp",
                 condition=paapi5_python_sdk.condition.Condition.NEW,
@@ -154,51 +154,51 @@ def fetch_price_new(config: dict[str, Any], asin_list: list[str]) -> dict[str, d
                 if item_data.offers is None:
                     continue
 
-                item: dict[str, Any] = {}
+                price: int | None = None
 
                 for offer in item_data.offers.summaries:
                     if offer.condition.value != "New":
                         continue
 
                     try:
-                        price = int(offer.lowest_price.amount)
-                        if ("price" not in item) or (price < item["price"]):
-                            item["price"] = price
+                        fetched_price = int(offer.lowest_price.amount)
+                        if (price is None) or (fetched_price < price):
+                            price = fetched_price
                         break
                     except Exception:
                         logging.exception("Failed to fetch price: %s", item_data.asin)
 
-                if "price" not in item:
+                if price is None:
                     continue
 
-                item_prop(item, item_data)
+                item_result = AmazonItemResult(
+                    price=price,
+                    thumb_url=item_data.images.primary.medium.url,
+                )
+                item_prop(item_result, item_data)
 
-                item["thumb_url"] = item_data.images.primary.medium.url
-
-                price_map[item_data.asin] = item
+                price_map[item_data.asin] = item_result
 
     return price_map
 
 
-def fetch_price(config: dict[str, Any], asin_list: list[str]) -> dict[str, dict[str, Any]]:
+def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItemResult]:
     price_map = fetch_price_outlet(config, asin_list)
     price_map |= fetch_price_new(config, list(set(asin_list) - set(price_map.keys())))
 
     return price_map
 
 
-def check_item_list(
-    config: dict[str, Any], item_list: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> list[AmazonItem]:
     try:
-        price_map = fetch_price(config, [item["asin"] for item in item_list])
+        price_map = fetch_price(config, [item.asin for item in item_list])
         for item in item_list:
-            if item["asin"] in price_map:
-                item["stock"] = 1
-                item["price"] = price_map[item["asin"]]["price"]
-                item["thumb_url"] = price_map[item["asin"]]["thumb_url"]
+            if item.asin in price_map:
+                item.stock = 1
+                item.price = price_map[item.asin].price
+                item.thumb_url = price_map[item.asin].thumb_url
             else:
-                item["stock"] = 0
+                item.stock = 0
         return item_list
     except Exception:
         logging.exception("Failed to fetch price")
@@ -207,6 +207,8 @@ def check_item_list(
 
 if __name__ == "__main__":
     # TEST Code
+    from typing import Any
+
     import docopt
 
     import my_lib.config
@@ -220,11 +222,11 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    config = my_lib.config.load(config_file)
+    config: dict[str, Any] = my_lib.config.load(config_file)
 
     logging.info(
         fetch_price(
-            config,
+            AmazonApiConfig.from_dict(config["store"]["amazon"]),
             asin_list,
         )
     )

@@ -21,7 +21,6 @@ import random
 import re
 import time
 import traceback
-from typing import Any
 
 import PIL.Image
 import selenium.webdriver.common.by
@@ -32,14 +31,15 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
+from my_lib.store.amazon.config import AmazonItem, AmazonItemResult
 
 
 def fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasErrorConfig | None,
-    item: dict[str, Any],
-) -> dict[str, Any]:  # noqa: C901, PLR0912
+    item: AmazonItem,
+) -> AmazonItemResult | None:  # noqa: C901, PLR0912
     PRICE_ELEM_LIST: list[dict[str, str]] = [
         {
             "xpath": '//span[contains(@class, "apexPriceToPay")]/span[@aria-hidden]',
@@ -63,9 +63,9 @@ def fetch_price_impl(
         )
         != 0
     ):
-        logging.warning("Failed to load page: %s", item["url"])
+        logging.warning("Failed to load page: %s", item.url)
         time.sleep(5)
-        return {}
+        return None
 
     my_lib.selenium_util.click_xpath(driver, '//span[@id="black-curtain-yes-button"]', is_warn=False)
     my_lib.selenium_util.click_xpath(
@@ -116,8 +116,8 @@ def fetch_price_impl(
                 selenium.webdriver.common.by.By.XPATH, '//span[contains(@class, "a-color-price")]'
             ).text
             if price_text in {"現在在庫切れです。", "この商品は現在お取り扱いできません。"}:
-                logging.warning("Price is NOT displayed: %s", item["url"])
-                return {"price": 0, "category": category}
+                logging.warning("Price is NOT displayed: %s", item.url)
+                return AmazonItemResult(price=0, category=category)
         elif (
             len(
                 driver.find_elements(
@@ -130,21 +130,21 @@ def fetch_price_impl(
             )
             != 0
         ):
-            return {"price": 0, "category": category}
+            return AmazonItemResult(price=0, category=category)
         else:
-            logging.warning("Unable to fetch price: %s", item["url"])
+            logging.warning("Unable to fetch price: %s", item.url)
 
             if slack_config is not None:
                 my_lib.notify.slack.error_with_image(
                     slack_config,
                     "価格取得に失敗",
-                    "{url}\nprice_text='{price_text}'".format(url=item["url"], price_text=price_text),
+                    "{url}\nprice_text='{price_text}'".format(url=item.url, price_text=price_text),
                     {
                         "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
                         "text": "スクリーンショット",
                     },
                 )
-            return {"price": 0, "category": category}
+            return AmazonItemResult(price=0, category=category)
 
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", re.sub(r"[^0-9][0-9]+個", "", price_text))
@@ -152,31 +152,36 @@ def fetch_price_impl(
             raise ValueError(f"Failed to parse price: {price_text}")
         price = int(m.group(1).replace(",", ""))
     except Exception:
-        logging.warning('Unable to parse "%s": %s.', price_text, item["url"])
+        logging.warning('Unable to parse "%s": %s.', price_text, item.url)
 
         if slack_config is not None:
             my_lib.notify.slack.error_with_image(
                 slack_config,
                 "価格取得に失敗",
-                "{url}\n{traceback}".format(url=item["url"], traceback=traceback.format_exc()),
+                "{url}\n{traceback}".format(url=item.url, traceback=traceback.format_exc()),
                 {
                     "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
                     "text": "スクリーンショット",
                 },
             )
-        return {"price": 0, "category": category}
+        return AmazonItemResult(price=0, category=category)
 
-    return {"price": price, "category": category}
+    return AmazonItemResult(price=price, category=category)
 
 
 def fetch_price(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: dict[str, Any],
-    item: dict[str, Any],
-) -> dict[str, Any]:
+    item: AmazonItem,
+    slack_config: my_lib.notify.slack.HasErrorConfig | None = None,
+    dump_path: pathlib.Path | None = None,
+) -> AmazonItem:
     try:
-        with my_lib.selenium_util.browser_tab(driver, item["url"]):
+        if item.url is None:
+            logging.warning("URL is not set for item: %s", item.asin)
+            return item
+
+        with my_lib.selenium_util.browser_tab(driver, item.url):
             wait.until(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (
@@ -186,28 +191,17 @@ def fetch_price(
                 )
             )
 
-            slack_config_parsed = (
-                my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
-            )
-            slack_config: my_lib.notify.slack.HasErrorConfig | None = (
-                slack_config_parsed
-                if isinstance(
-                    slack_config_parsed,
-                    (
-                        my_lib.notify.slack.SlackConfig,
-                        my_lib.notify.slack.SlackErrorInfoConfig,
-                        my_lib.notify.slack.SlackErrorOnlyConfig,
-                    ),
-                )
-                else None
-            )
-            item |= fetch_price_impl(driver, wait, slack_config, item)
+            result = fetch_price_impl(driver, wait, slack_config, item)
 
-            if (item["price"] is None) or (item["price"] == 0):
+            if result is not None:
+                item.price = result.price
+                item.category = result.category
+
+            if dump_path is not None and (item.price is None or item.price == 0):
                 my_lib.selenium_util.dump_page(
                     driver,
                     int(random.random() * 100),  # noqa: S311
-                    pathlib.Path(config["data"]["dump"]),
+                    dump_path,
                 )
     except Exception:
         logging.exception("Failed to fetch price")
@@ -217,7 +211,7 @@ def fetch_price(
 
 if __name__ == "__main__":
     # TEST Code
-    import pathlib
+    from typing import Any
 
     import docopt
     import selenium.webdriver.support.wait
@@ -236,13 +230,26 @@ if __name__ == "__main__":
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    config = my_lib.config.load(config_file)
+    config: dict[str, Any] = my_lib.config.load(config_file)
 
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
 
-    logging.info(
-        my_lib.pretty.format(
-            fetch_price(driver, wait, config, {"url": f"https://www.amazon.co.jp/dp/{asin}"})
+    slack_config_parsed = my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
+    slack_config: my_lib.notify.slack.HasErrorConfig | None = (
+        slack_config_parsed
+        if isinstance(
+            slack_config_parsed,
+            (
+                my_lib.notify.slack.SlackConfig,
+                my_lib.notify.slack.SlackErrorInfoConfig,
+                my_lib.notify.slack.SlackErrorOnlyConfig,
+            ),
         )
+        else None
     )
+
+    dump_path = pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
+
+    item = AmazonItem(asin=asin, url=f"https://www.amazon.co.jp/dp/{asin}")
+    logging.info(my_lib.pretty.format(fetch_price(driver, wait, item, slack_config, dump_path).to_dict()))
