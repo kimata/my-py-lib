@@ -217,6 +217,7 @@ if __name__ == "__main__":
 
         logging.info("Finish watch event")
 
+    assert __doc__ is not None
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
