@@ -26,7 +26,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 
 class InfluxDBConfig(TypedDict):
@@ -184,7 +184,9 @@ def _fetch_data_impl(  # noqa: PLR0913
             query += " |> last()"
 
         logging.debug("Flux query = %s", query)
-        client = influxdb_client.InfluxDBClient(url=db_config["url"], token=token, org=db_config["org"])
+        client = influxdb_client.InfluxDBClient(  # type: ignore[attr-defined]
+            url=db_config["url"], token=token, org=db_config["org"]
+        )
         query_api = client.query_api()
 
         return query_api.query(query=query)
@@ -720,7 +722,7 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    db_config = get_config(config, infxlux_db_spec)
+    db_config = cast(InfluxDBConfig, get_config(config, infxlux_db_spec))
     sensor_config = get_config(config, sensor_spec)
 
     logging.info("DB config: %s", my_lib.pretty.format(db_config))

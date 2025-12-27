@@ -51,7 +51,6 @@ __all__ = [
     "ezo_rtd",
     "fd_q10c",
     "grove_tds",
-    "i2cbus",
     "iolink",
     "lp_pyra03",
     "rg_15",

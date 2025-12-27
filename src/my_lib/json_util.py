@@ -20,7 +20,7 @@ from typing import Any
 class DateTimeJSONEncoder(json.JSONEncoder):
     """datetime オブジェクトを ISO format 文字列に変換する JSON エンコーダー"""
 
-    def default(self, obj: Any) -> Any:
+    def default(self, obj: Any) -> Any:  # type: ignore[override]
         if isinstance(obj, datetime.datetime):
             return obj.isoformat()
         return super().default(obj)

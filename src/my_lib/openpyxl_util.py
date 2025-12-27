@@ -87,7 +87,7 @@ def set_header_cell_style(
     width: float | None,
     style: dict[str, Any],
 ) -> None:  # noqa: PLR0913
-    sheet.cell(row, col).value = value
+    sheet.cell(row, col).value = value  # type: ignore[assignment]
     sheet.cell(row, col).style = "Normal"
     sheet.cell(row, col).border = style["border"]
     sheet.cell(row, col).fill = style["fill"]
@@ -140,7 +140,7 @@ def set_item_cell_style(
     value: Any,
     style: dict[str, Any],
 ) -> None:
-    sheet.cell(row, col).value = value
+    sheet.cell(row, col).value = value  # type: ignore[assignment]
     sheet.cell(row, col).style = "Normal"
     sheet.cell(row, col).border = style["border"]
     sheet.cell(row, col).alignment = openpyxl.styles.Alignment(wrap_text=style["text_wrap"], vertical="top")
@@ -256,8 +256,8 @@ def insert_table_cell_image(  # noqa: PLR0913
             # NOTE: 画像の高さをセルの高さに合わせる
             scale = content_height_pix / img.height
 
-        img.width *= scale
-        img.height *= scale
+        img.width = int(img.width * scale)
+        img.height = int(img.height * scale)
 
     image_width_emu = openpyxl.utils.units.pixels_to_EMU(img.width)
     image_height_emu = openpyxl.utils.units.pixels_to_EMU(img.height)

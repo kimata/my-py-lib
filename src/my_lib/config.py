@@ -21,7 +21,10 @@ from typing import Any
 
 import genson
 import jsonschema
+import jsonschema.exceptions
 import yaml
+import yaml.parser
+import yaml.scanner
 
 CONFIG_PATH: str = "config.yaml"
 
@@ -192,12 +195,13 @@ def _format_required_error(
     error: jsonschema.exceptions.ValidationError, lines: list[str]
 ) -> None:
     """Format required error."""
-    required_props = error.validator_value
+    required_props: Any = error.validator_value
     if isinstance(required_props, str):
         required_props = [required_props]
 
     # 実際に不足しているプロパティを計算
-    existing_keys = set(error.instance.keys()) if isinstance(error.instance, dict) else set()
+    instance: Any = error.instance
+    existing_keys = set(instance.keys()) if isinstance(instance, dict) else set()
     missing = [p for p in required_props if p not in existing_keys]
 
     # 不足がない場合は早期リターン（論理的にはあり得ないが防御的に）
@@ -218,7 +222,8 @@ def _format_additional_properties_error(
     error: jsonschema.exceptions.ValidationError, lines: list[str]
 ) -> None:
     """Format additionalProperties error."""
-    allowed = set(error.schema.get("properties", {}))
+    schema: Any = error.schema
+    allowed = set(schema.get("properties", {}))
     if isinstance(error.instance, dict):
         extra = [k for k in error.instance if k not in allowed]
         extra_str = ", ".join(f'"{k}"' for k in extra)
@@ -235,7 +240,7 @@ def _format_type_error(
     error: jsonschema.exceptions.ValidationError, lines: list[str]
 ) -> None:
     """Format type error."""
-    expected = error.validator_value
+    expected: Any = error.validator_value
     expected_str = (
         " または ".join(_get_type_name_jp(t) for t in expected)
         if isinstance(expected, list)
@@ -252,7 +257,8 @@ def _format_enum_error(
     error: jsonschema.exceptions.ValidationError, lines: list[str]
 ) -> None:
     """Format enum error."""
-    allowed_str = ", ".join(_format_value(v) for v in error.validator_value)
+    validator_value: Any = error.validator_value
+    allowed_str = ", ".join(_format_value(v) for v in validator_value)
     lines.append("  問題: 許可されていない値です")
     lines.append(f"  指定値: {_format_value(error.instance)}")
     lines.append(f"  許可される値: {allowed_str}")
@@ -603,6 +609,7 @@ if __name__ == "__main__":
     import my_lib.logger
     import my_lib.pretty
 
+    assert __doc__ is not None
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
