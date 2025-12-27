@@ -57,7 +57,7 @@ test-walk-through:
         - apt update
         - apt install --no-install-recommends --assume-yes smem
 
-        - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/test_basic.py
+        - uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit-report.xml tests/unit/
 
     artifacts:
         when: always
