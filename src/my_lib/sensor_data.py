@@ -152,7 +152,7 @@ def _process_query_results(
     return SensorDataResult(value=data_list, time=time_list, valid=len(time_list) != 0)
 
 
-def fetch_data_impl(  # noqa: PLR0913
+def _fetch_data_impl(  # noqa: PLR0913
     db_config: InfluxDBConfig,
     template: str,
     measure: str,
@@ -196,7 +196,7 @@ def fetch_data_impl(  # noqa: PLR0913
             client.close()
 
 
-async def fetch_data_impl_async(  # noqa: PLR0913
+async def _fetch_data_impl_async(  # noqa: PLR0913
     db_config: InfluxDBConfig,
     template: str,
     measure: str,
@@ -213,7 +213,7 @@ async def fetch_data_impl_async(  # noqa: PLR0913
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         None,
-        fetch_data_impl,
+        _fetch_data_impl,
         db_config,
         template,
         measure,
@@ -261,7 +261,7 @@ def fetch_data(  # noqa: PLR0913
     try:
         template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
 
-        table_list = fetch_data_impl(
+        table_list = _fetch_data_impl(
             db_config,
             template,
             measure,
@@ -327,7 +327,7 @@ async def fetch_data_async(  # noqa: PLR0913
     try:
         template = FLUX_QUERY_WITHOUT_AGGREGATION if window_min == 0 else FLUX_QUERY
 
-        table_list = await fetch_data_impl_async(
+        table_list = await _fetch_data_impl_async(
             db_config,
             template,
             measure,
@@ -424,7 +424,7 @@ def get_equip_on_minutes(  # noqa: PLR0913
     )
 
     try:
-        table_list = fetch_data_impl(
+        table_list = _fetch_data_impl(
             config,
             FLUX_QUERY,
             measure,
@@ -493,7 +493,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
     )
 
     try:
-        table_list = fetch_data_impl(
+        table_list = _fetch_data_impl(
             config,
             FLUX_QUERY,
             measure,
@@ -582,7 +582,7 @@ def get_sum(  # noqa: PLR0913
     window_min: int = 3,
 ) -> float:
     try:
-        table_list = fetch_data_impl(
+        table_list = _fetch_data_impl(
             config, FLUX_SUM_QUERY, measure, hostname, field, start, stop, every_min, window_min, True
         )
 
@@ -660,7 +660,7 @@ def get_last_event(
     config: InfluxDBConfig, measure: str, hostname: str, field: str, start: str = "-7d"
 ) -> datetime.datetime | None:
     try:
-        table_list = fetch_data_impl(
+        table_list = _fetch_data_impl(
             config, FLUX_EVENT_QUERY, measure, hostname, field, start, "now()", 0, 0, False
         )
 

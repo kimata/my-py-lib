@@ -26,25 +26,25 @@ import yaml
 CONFIG_PATH: str = "config.yaml"
 
 
-class ConfigError(Exception):
+class _ConfigError(Exception):
     """設定関連エラーの基底クラス"""
 
     pass
 
 
-class ConfigValidationError(ConfigError):
+class ConfigValidationError(_ConfigError):
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
-class ConfigParseError(ConfigError):
+class ConfigParseError(_ConfigError):
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
-class ConfigFileNotFoundError(ConfigError):
+class ConfigFileNotFoundError(_ConfigError):
     pass
 
 
@@ -487,7 +487,7 @@ def _extract_yaml_lines_around(yaml_lines: list[str], line_num: int, context: in
     return "\n".join(lines_output)
 
 
-def validate_config(
+def _validate_config(
     yaml_data: dict[str, Any],
     schema: dict[str, Any],
     yaml_lines: list[str],
@@ -542,7 +542,7 @@ def get_path(
     return pathlib.Path(get_data(config, conf_path, suffix_path))
 
 
-def abs_path(config_path: str | pathlib.Path = CONFIG_PATH) -> pathlib.Path:
+def _abs_path(config_path: str | pathlib.Path = CONFIG_PATH) -> pathlib.Path:
     return pathlib.Path(pathlib.Path.cwd(), config_path)
 
 
@@ -579,10 +579,10 @@ def load(
     if schema_path_obj is not None:
         with schema_path_obj.open() as file:
             schema: dict[str, Any] = json.load(file)
-            validate_config(yaml_data, schema, yaml_lines)
+            _validate_config(yaml_data, schema, yaml_lines)
 
     if isinstance(yaml_data, dict):
-        yaml_data["base_dir"] = abs_path(config_path).parent
+        yaml_data["base_dir"] = _abs_path(config_path).parent
 
     return yaml_data
 

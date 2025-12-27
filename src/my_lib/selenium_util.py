@@ -49,7 +49,7 @@ if TYPE_CHECKING:
 WAIT_RETRY_COUNT: int = 1
 
 
-def get_chrome_version() -> int | None:
+def _get_chrome_version() -> int | None:
     try:
         result = subprocess.run(
             ["google-chrome", "--version"],
@@ -65,7 +65,7 @@ def get_chrome_version() -> int | None:
     return None
 
 
-def create_driver_impl(
+def _create_driver_impl(
     profile_name: str,
     data_path: pathlib.Path,
     is_headless: bool,
@@ -117,7 +117,7 @@ def create_driver_impl(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
 
-    chrome_version = get_chrome_version()
+    chrome_version = _get_chrome_version()
 
     # NOTE: user_multi_procs=True は既存の chromedriver ファイルが存在することを前提としているため、
     # ファイルが存在しない場合（CI環境の初回実行など）は False にする
@@ -138,7 +138,7 @@ def create_driver_impl(
 
 
 @dataclass
-class ProfileHealthResult:
+class _ProfileHealthResult:
     """プロファイル健全性チェックの結果"""
 
     is_healthy: bool
@@ -189,7 +189,7 @@ def _check_sqlite_db(db_path: pathlib.Path) -> str | None:
         return f"{db_path.name} check error: {e}"
 
 
-def check_profile_health(profile_path: pathlib.Path) -> ProfileHealthResult:
+def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
     """Chrome プロファイルの健全性をチェック
 
     Args:
@@ -205,7 +205,7 @@ def check_profile_health(profile_path: pathlib.Path) -> ProfileHealthResult:
 
     if not profile_path.exists():
         # プロファイルが存在しない場合は健全（新規作成される）
-        return ProfileHealthResult(is_healthy=True, errors=[])
+        return _ProfileHealthResult(is_healthy=True, errors=[])
 
     default_path = profile_path / "Default"
 
@@ -239,7 +239,7 @@ def check_profile_health(profile_path: pathlib.Path) -> ProfileHealthResult:
 
     is_healthy = len(errors) == 0
 
-    return ProfileHealthResult(
+    return _ProfileHealthResult(
         is_healthy=is_healthy,
         errors=errors,
         has_lock_files=has_lock_files,
@@ -248,7 +248,7 @@ def check_profile_health(profile_path: pathlib.Path) -> ProfileHealthResult:
     )
 
 
-def recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
+def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
     """破損したプロファイルをバックアップして新規作成を可能にする
 
     Args:
@@ -348,7 +348,7 @@ def create_driver(
     profile_path = data_path / "chrome" / actual_profile_name
 
     # プロファイル健全性チェック
-    health = check_profile_health(profile_path)
+    health = _check_profile_health(profile_path)
     if not health.is_healthy:
         logging.warning("Profile health check failed: %s", health.errors)
 
@@ -359,7 +359,7 @@ def create_driver(
         elif auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
             # JSON または DB が破損している場合はプロファイルをリカバリ
             logging.warning("Profile is corrupted, attempting recovery")
-            if recover_corrupted_profile(profile_path):
+            if _recover_corrupted_profile(profile_path):
                 logging.info("Profile recovery successful, will create new profile")
             else:
                 logging.error("Profile recovery failed")
@@ -369,7 +369,7 @@ def create_driver(
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
+        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
 
@@ -380,12 +380,12 @@ def create_driver(
         _cleanup_profile_lock(profile_path)
 
         # 再度健全性チェック
-        health = check_profile_health(profile_path)
+        health = _check_profile_health(profile_path)
         if not health.is_healthy and auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
             logging.warning("Profile still corrupted after first attempt, recovering")
-            recover_corrupted_profile(profile_path)
+            _recover_corrupted_profile(profile_path)
 
-        return create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
+        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
 
 
 def xpath_exists(driver: WebDriver, xpath: str) -> bool:
@@ -597,7 +597,7 @@ def log_memory_usage(driver: WebDriver) -> None:
     )
 
 
-def warmup(
+def _warmup(
     driver: WebDriver,
     keyword: str,
     url_pattern: str,
@@ -789,7 +789,7 @@ def _get_chrome_processes_by_pgid(chromedriver_pid: int, existing_pids: set[int]
     return additional_pids
 
 
-def get_chrome_related_processes(driver: WebDriver) -> list[int]:
+def _get_chrome_related_processes(driver: WebDriver) -> list[int]:
     """Chrome関連の全子プロセスを取得
 
     undetected_chromedriver 使用時、Chrome プロセスは chromedriver の子ではなく
@@ -868,7 +868,7 @@ def _send_signal_to_processes(pids: list[int], sig: signal.Signals, signal_name:
         logging.debug("Failed to send %s to some processes: %s", signal_name, errors)
 
 
-def terminate_chrome_processes(chrome_pids: list[int], timeout: float = 5.0) -> None:
+def _terminate_chrome_processes(chrome_pids: list[int], timeout: float = 5.0) -> None:
     """Chrome関連プロセスを段階的に終了
 
     Args:
@@ -931,7 +931,7 @@ def _reap_single_process(pid: int) -> None:
         pass
 
 
-def reap_chrome_processes(chrome_pids: list[int]) -> None:
+def _reap_chrome_processes(chrome_pids: list[int]) -> None:
     """Chrome関連プロセスを明示的に回収してゾンビ化を防ぐ"""
     for pid in chrome_pids:
         _reap_single_process(pid)
@@ -1012,7 +1012,7 @@ def quit_driver_gracefully(
         return
 
     # quit前にChrome関連プロセスを記録
-    chrome_pids_before = get_chrome_related_processes(driver)
+    chrome_pids_before = _get_chrome_related_processes(driver)
 
     try:
         # WebDriverの正常終了を試行（これがタブのクローズも含む）
@@ -1048,7 +1048,7 @@ def quit_driver_gracefully(
 
     if not remaining_pids:
         logging.info("All Chrome processes exited after SIGTERM")
-        reap_chrome_processes(chrome_pids_before)
+        _reap_chrome_processes(chrome_pids_before)
         return
 
     # Step 4: 残存プロセスに SIGKILL を送信

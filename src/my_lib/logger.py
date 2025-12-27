@@ -20,11 +20,11 @@ ROTATE_COUNT: int = 10
 LOG_FORMAT: str = "{name} %(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
 
 
-def log_formatter(name: str) -> logging.Formatter:
+def _log_formatter(name: str) -> logging.Formatter:
     return logging.Formatter(fmt=LOG_FORMAT.format(name=name), datefmt="%Y-%m-%d %H:%M:%S")
 
 
-class GZipRotator:
+class _GZipRotator:
     @staticmethod
     def namer(name: str) -> str:
         return name + ".bz2"
@@ -76,9 +76,9 @@ def init(
             maxBytes=MAX_SIZE,
             backupCount=ROTATE_COUNT,
         )
-        log_handler.formatter = log_formatter(name)
-        log_handler.namer = GZipRotator.namer
-        log_handler.rotator = GZipRotator.rotator  # type: ignore[assignment]
+        log_handler.formatter = _log_formatter(name)
+        log_handler.namer = _GZipRotator.namer
+        log_handler.rotator = _GZipRotator.rotator  # type: ignore[assignment]
 
         logger.addHandler(log_handler)
 
@@ -89,7 +89,7 @@ def init(
     if is_str_log:
         str_io = io.StringIO()
         stream_handler = logging.StreamHandler(str_io)
-        stream_handler.formatter = log_formatter(name)
+        stream_handler.formatter = _log_formatter(name)
         logging.getLogger().addHandler(stream_handler)
 
         return str_io
