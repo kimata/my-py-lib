@@ -8,6 +8,7 @@ from __future__ import annotations
 import pathlib
 
 import PIL.Image
+import PIL.ImageFont
 import pytest
 
 
