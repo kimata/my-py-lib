@@ -1,101 +1,222 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは Claude Code がこのリポジトリで作業する際のガイダンスを提供します。
 
-## Development Commands
+## 重要な注意事項
 
-### Dependency Management
+### プロジェクト設定ファイルの管理
 
-- **Install dependencies**: `rye sync` (installs both main and dev dependencies)
-- **Add new dependency**: `rye add <package-name>`
-- **Add dev dependency**: `rye add --dev <package-name>`
-- **Update lockfiles**: `rye lock`
+**pyproject.toml をはじめとする一般的なプロジェクト管理ファイルは `../py-project` で一元管理しています。**
 
-### Testing
+- プロジェクト設定ファイル（pyproject.toml、.gitlab-ci.yml、.pre-commit-config.yaml 等）を直接編集しないでください
+- 設定を変更したい場合は、`../py-project` のテンプレートを更新し、このリポジトリに適用してください
+- 変更を行う前に、何を変更したいのかを説明し、ユーザーの確認を取ってください
 
-- **Run all tests**: `rye run pytest` or `pytest`
-- **Run single test**: `pytest tests/test_specific.py::test_function`
-- **Run with coverage**: Tests automatically generate HTML coverage reports in `tests/evidence/coverage/`
-- **Test output**: HTML test reports generated in `tests/evidence/index.htm`
+### ドキュメントの更新
 
-### Code Quality
+コードを更新した際は、以下のドキュメントの更新が必要かどうか検討してください：
 
-- **Format code**: `rye fmt`
-- **Lint code**: `rye lint`
+- **README.md**: 機能追加・変更、使用方法の変更、依存関係の変更があった場合
+- **CLAUDE.md**: アーキテクチャの変更、開発コマンドの変更、重要なパターンの追加があった場合
 
-### Building
+## 開発コマンド
 
-- **Build package**: `rye build`
+### 依存関係の管理
 
-## Architecture Overview
+- **依存関係のインストール**: `uv sync`（本番・開発両方の依存関係をインストール）
+- **新しい依存関係の追加**: `uv add <パッケージ名>`
+- **開発用依存関係の追加**: `uv add --dev <パッケージ名>`
+- **ロックファイルの更新**: `uv lock`
 
-This is a personal utility library focused on IoT, automation, and data collection applications, particularly for Raspberry Pi environments.
+### テスト
 
-### Core Module Structure
+- **全テストの実行**: `uv run pytest`
+- **特定テストの実行**: `uv run pytest tests/unit/test_xxx.py::TestClass::test_method`
+- **並列実行**: `uv run pytest --numprocesses=auto`
+- **カバレッジレポート**: テスト実行時に自動生成 → `tests/evidence/coverage/`
+- **HTMLレポート**: `tests/evidence/index.htm`
 
-#### Sensor Management (`src/my_lib/sensor/`)
+### コード品質
 
-- 19+ hardware sensor drivers with standardized interfaces
-- I2C bus management and GPIO integration
-- Environmental, analog, and specialized sensor support
-- Object-oriented design with consistent error handling
+- **型チェック（pyright）**: `uv run pyright`
+- **型チェック（mypy）**: `uv run mypy src/`
+- **フォーマット**: `rye fmt`
+- **リント**: `rye lint`
 
-#### Data Pipeline (`src/my_lib/sensor_data.py`)
+### ビルド
 
-- InfluxDB time-series database integration
-- Complex Flux query generation for data aggregation
-- Time-windowed analysis and equipment monitoring
-- Handles sensor data validation and error recovery
+- **パッケージビルド**: `rye build`
 
-#### Notification System (`src/my_lib/notify/`)
+## アーキテクチャ概要
 
-- Unified interface for Slack, LINE, and email notifications
-- Rate limiting and footprint-based throttling
-- Rich formatting and template support
+IoT、自動化、データ収集アプリケーション向けの個人用ユーティリティライブラリです。
+特に Raspberry Pi 環境での利用に最適化されています。
 
-#### Web Framework (`src/my_lib/webapp/`)
+### ディレクトリ構造
 
-- Flask-based utilities for dashboards and APIs
-- Configuration management with YAML + JSON schema validation
-- Event handling, logging, and request compression
+```
+src/my_lib/
+├── sensor/              # ハードウェアセンサードライバ（19種類以上）
+│   ├── base.py          # SensorBase, I2CSensorBase 抽象クラス
+│   ├── exceptions.py    # SensorError, SensorCommunicationError
+│   ├── i2cbus.py        # I2C バスラッパー（SMBus2）
+│   ├── sht35.py         # 温湿度センサー
+│   ├── scd4x.py         # CO2センサー
+│   ├── ads1115.py       # 16bit ADC
+│   └── ...
+│
+├── notify/              # 通知システム
+│   ├── slack.py         # Slack 通知（WebClient、画像アップロード対応）
+│   ├── line.py          # LINE Bot 通知
+│   └── mail.py          # メール通知
+│
+├── webapp/              # Web フレームワークユーティリティ
+│   ├── config.py        # グローバル設定
+│   ├── base.py          # Flask ブループリント
+│   └── log.py           # ロギング
+│
+├── store/               # E コマーススクレイピング
+│   ├── amazon/          # Amazon（API、ログイン、CAPTCHA）
+│   └── mercari/         # メルカリ
+│
+├── config.py            # YAML + JSON Schema 設定管理
+├── sensor_data.py       # InfluxDB 時系列データ統合
+├── flask_util.py        # Flask デコレータ（gzip、ETag）
+├── logger.py            # 構造化ロギング（ローテーション、圧縮）
+├── healthz.py           # ヘルスチェックエンドポイント
+├── selenium_util.py     # Selenium ヘルパー
+├── sqlite_util.py       # SQLite ユーティリティ
+├── rpi.py               # Raspberry Pi GPIO ユーティリティ
+├── footprint.py         # タイムスタンプベースのマーカー
+├── serializer.py        # pickle ベースの状態永続化
+└── pytest_util.py       # pytest-xdist 並列実行サポート
+```
 
-#### Web Automation (`src/my_lib/store/`, `selenium_util.py`)
+### テスト構造
 
-- E-commerce scraping (Amazon, Mercari) with CAPTCHA handling
-- Template-driven automation with Selenium WebDriver
-- Chrome profile management for persistent sessions
+```
+tests/
+├── conftest.py          # 共有フィクスチャ、モック設定
+├── unit/                # ユニットテスト（20以上のテストファイル）
+├── integration/         # 統合テスト
+├── data/
+│   ├── config.example.yaml  # テスト用設定例
+│   └── chrome/test/     # Selenium プロファイル
+└── evidence/
+    ├── index.htm        # HTML テストレポート
+    └── coverage/        # カバレッジレポート
+```
 
-### Key Patterns
+## 主要パターン
 
-#### Configuration-Driven Design
+### センサー管理
 
-- Centralized YAML configuration (`config.py`) with schema validation
-- Environment variable integration for sensitive data
-- Modular configuration sections for different subsystems
+統一されたインターフェースを持つ抽象基底クラス：
 
-#### Hardware Integration
+```python
+class SensorBase(ABC):
+    def ping(self) -> bool:          # センサー応答確認
+    def get_value_map(self) -> dict: # 測定値取得
+    def _ping_impl(self) -> bool:    # サブクラス実装
+```
 
-- Deep I2C sensor integration with SMBus2
-- Raspberry Pi GPIO utilities (`rpi.py`)
-- Serial communication support
+### 設定駆動設計
 
-#### Production Features
+YAML 設定 + JSON Schema バリデーション：
 
-- Health check endpoints (`healthz.py`)
-- Structured logging with compression (`logger.py`)
-- Thread-safe operations and process management
-- Data compression and caching
+```python
+config = my_lib.config.load("config.yaml")  # 読み込み＋検証
+slack_config = my_lib.notify.slack.parse_config(config["slack"])
+```
 
-### Testing Setup
+環境変数の展開をサポート：
+```yaml
+influxdb:
+    token: "${INFLUXDB_TOKEN}"
+```
 
-- Pytest with comprehensive coverage reporting
-- Playwright integration for web testing (see `conftest.py`)
-- Test evidence collection with video recording
-- Custom fixtures for host/port configuration
+### 通知システム
 
-### Development Notes
+レート制限とスロットリング：
+- `/dev/shm/notify/` にフットプリントを使用
+- 通知間隔の制限（デフォルト60秒）
+- 複数チャンネル対応（Slack、LINE、メール）
 
-- Uses Rye for modern Python dependency management
-- InfluxDB required for sensor data functionality
-- Selenium Chrome profiles stored in `tests/data/chrome/`
-- Configuration examples in `tests/data/config.yaml`
+### Flask デコレータ
+
+```python
+@my_lib.flask_util.gzipped              # レスポンス圧縮
+@my_lib.flask_util.file_etag(...)       # ETag キャッシュ
+@my_lib.flask_util.support_jsonp()      # JSONP サポート
+```
+
+### pytest-xdist 対応
+
+並列テスト実行時のファイルパス衝突を回避：
+
+```python
+# footprint.py, serializer.py で使用
+path = my_lib.pytest_util.get_path(path_str)
+# PYTEST_XDIST_WORKER 環境変数でサフィックスを付与
+```
+
+テストでファイル存在確認時は `my_lib.footprint.exists()` または
+`my_lib.pytest_util.get_path()` を使用すること。
+
+## 例外クラス
+
+### センサー関連
+- `SensorError` - 基底例外
+- `SensorCommunicationError` - 通信エラー
+- `SensorCRCError` - CRC チェックエラー
+
+### 設定関連
+- `ConfigValidationError` - スキーマ検証エラー（details 属性あり）
+- `ConfigParseError` - YAML パースエラー
+- `ConfigFileNotFoundError` - ファイル未発見
+
+### 画像関連（pil_util.py）
+- `FontNotFoundError` - フォントファイル未発見
+- `ImageNotFoundError` - 画像ファイル未発見
+
+## 開発時の注意
+
+### 型チェック
+
+- mypy と pyright の両方でチェック
+- `tests/data/` は除外設定済み
+- 型スタブがないモジュール（yaml.scanner 等）は `# type: ignore[attr-defined]` を使用
+
+### テスト作成
+
+- `@pytest.mark.web` - Web テスト用マーカー（`--run-web` で実行）
+- `@pytest.mark.mercari` - メルカリテスト用マーカー
+- 一時ファイルは `temp_dir` フィクスチャを使用
+- Slack 通知確認は `slack_checker` フィクスチャを使用
+
+### ロギング規約
+
+```python
+import logging
+logging.debug("詳細情報: %s", value)
+logging.info("通常の操作情報")
+logging.warning("警告")
+logging.error("エラー")
+```
+
+## 外部依存
+
+### 主要な依存関係
+- **pyyaml** - YAML 設定ファイル
+- **jsonschema** - 設定バリデーション
+- **slack-sdk** - Slack API
+- **line-bot-sdk** - LINE API
+- **influxdb-client** - 時系列データベース
+- **smbus2** - I2C 通信（Raspberry Pi）
+- **selenium** - Web 自動化
+
+### 開発用依存関係
+- **pytest**, **pytest-cov**, **pytest-xdist** - テスト
+- **mypy**, **pyright** - 型チェック
+- **flask** - Web テスト用
+- **pillow** - 画像処理テスト用
