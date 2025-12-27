@@ -31,8 +31,8 @@ import my_lib.notify.mail
 import my_lib.notify.slack
 import my_lib.selenium_util
 
-RESPONSE_WAIT_SEC: int = 5
-RESPONSE_TIMEOUT_SEC: int = 300
+_RESPONSE_WAIT_SEC: int = 5
+_RESPONSE_TIMEOUT_SEC: int = 300
 
 
 def recognize_audio(audio_url: str) -> str:
@@ -219,7 +219,7 @@ def send_request_text_slack(config: my_lib.notify.slack.HasCaptchaConfig, title:
 
 
 def recv_response_text_slack(
-    config: my_lib.notify.slack.HasCaptchaConfig, ts: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.HasCaptchaConfig, ts: str, timeout_sec: int = _RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [text]")
 
@@ -227,7 +227,7 @@ def recv_response_text_slack(
     if ch_id is None:
         raise ValueError("captcha channel id is not configured")
 
-    time.sleep(RESPONSE_WAIT_SEC)
+    time.sleep(_RESPONSE_WAIT_SEC)
     try:
         client = slack_sdk.WebClient(token=config.bot_token)
         count = 0
@@ -241,9 +241,9 @@ def recv_response_text_slack(
                     break
             else:
                 count += 1
-                if count > (timeout_sec / RESPONSE_WAIT_SEC):
+                if count > (timeout_sec / _RESPONSE_WAIT_SEC):
                     return None
-                time.sleep(RESPONSE_WAIT_SEC)
+                time.sleep(_RESPONSE_WAIT_SEC)
                 continue
             break
 
@@ -271,7 +271,7 @@ def send_challenge_image_slack(
 
 
 def recv_response_image_slack(
-    config: my_lib.notify.slack.HasCaptchaConfig, file_id: str, timeout_sec: int = RESPONSE_TIMEOUT_SEC
+    config: my_lib.notify.slack.HasCaptchaConfig, file_id: str, timeout_sec: int = _RESPONSE_TIMEOUT_SEC
 ) -> str | None:
     logging.info("CAPTCHA: receive response [image]")
 
@@ -279,7 +279,7 @@ def recv_response_image_slack(
     if ch_id is None:
         raise ValueError("captcha channel id is not configured")
 
-    time.sleep(RESPONSE_WAIT_SEC)
+    time.sleep(_RESPONSE_WAIT_SEC)
     try:
         client = slack_sdk.WebClient(token=config.bot_token)
 
@@ -298,9 +298,9 @@ def recv_response_image_slack(
                     break
             else:
                 count += 1
-                if count > (timeout_sec / RESPONSE_WAIT_SEC):
+                if count > (timeout_sec / _RESPONSE_WAIT_SEC):
                     return None
-                time.sleep(RESPONSE_WAIT_SEC)
+                time.sleep(_RESPONSE_WAIT_SEC)
                 continue
             break
 

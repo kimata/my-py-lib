@@ -30,13 +30,13 @@ import my_lib.store.amazon.captcha
 import my_lib.store.captcha
 from my_lib.store.amazon.config import AmazonLoginConfig
 
-LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
+_LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
-LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
-WAIT_COUNT: int = 40
+_LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
+_WAIT_COUNT: int = 40
 
 
-def resolve_puzzle(
+def _resolve_puzzle(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
@@ -65,7 +65,7 @@ def resolve_puzzle(
     time.sleep(0.1)
 
 
-def handle_email_input(
+def _handle_email_input(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     login_config: AmazonLoginConfig,
 ) -> None:
@@ -83,7 +83,7 @@ def handle_email_input(
             time.sleep(3)
 
 
-def handle_password_input(
+def _handle_password_input(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
@@ -142,7 +142,7 @@ def handle_password_input(
     )
 
 
-def handle_quiz(
+def _handle_quiz(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     dump_path: pathlib.Path,
@@ -189,7 +189,7 @@ def handle_quiz(
     time.sleep(2)
 
 
-def handle_security_check(
+def _handle_security_check(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     dump_path: pathlib.Path,
 ) -> None:
@@ -201,7 +201,7 @@ def handle_security_check(
     if not my_lib.selenium_util.xpath_exists(driver, security_xpath):
         return
 
-    for i in range(WAIT_COUNT):
+    for i in range(_WAIT_COUNT):
         security_check_xpath = '//span[contains(@class, "a-size-base-plus") and contains(., "セキュリティ")]'
         if not my_lib.selenium_util.xpath_exists(driver, security_check_xpath):
             my_lib.selenium_util.dump_page(
@@ -212,10 +212,10 @@ def handle_security_check(
             logging.info("Security check finished!")
             break
 
-        logging.info("Waiting for security check... (%d/%d)", i + 1, WAIT_COUNT)
+        logging.info("Waiting for security check... (%d/%d)", i + 1, _WAIT_COUNT)
         time.sleep(2)
 
-    for i in range(WAIT_COUNT):
+    for i in range(_WAIT_COUNT):
         wait_xpath = '//span[contains(@class, "a-size-base") and contains(., "少しお待ちください")]'
         if not my_lib.selenium_util.xpath_exists(driver, wait_xpath):
             my_lib.selenium_util.dump_page(
@@ -226,11 +226,11 @@ def handle_security_check(
             logging.info("Acknowledged!")
             break
 
-        logging.info("Waiting for acknowledge... (%d/%d)", i + 1, WAIT_COUNT)
+        logging.info("Waiting for acknowledge... (%d/%d)", i + 1, _WAIT_COUNT)
         time.sleep(2)
 
 
-def execute_impl(
+def _execute_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
@@ -253,14 +253,14 @@ def execute_impl(
     if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
         if slack_config is None:
             raise ValueError("captcha 設定がありません")
-        resolve_puzzle(driver, wait, slack_config)
+        _resolve_puzzle(driver, wait, slack_config)
 
-    handle_email_input(driver, login_config)
-    handle_password_input(driver, wait, login_config, slack_config)
+    _handle_email_input(driver, login_config)
+    _handle_password_input(driver, wait, login_config, slack_config)
 
     if slack_config is not None:
-        handle_quiz(driver, slack_config, login_config.dump_path)
-    handle_security_check(driver, login_config.dump_path)
+        _handle_quiz(driver, slack_config, login_config.dump_path)
+    _handle_security_check(driver, login_config.dump_path)
 
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
@@ -278,8 +278,8 @@ def execute(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | None = None,
-    login_url: str = LOGIN_URL,
-    login_mark_xpath: str = LOGIN_MARK_XPATH,
+    login_url: str = _LOGIN_URL,
+    login_mark_xpath: str = _LOGIN_MARK_XPATH,
     retry: int = 2,
 ) -> bool:  # noqa: PLR0913
     logging.info("Login start")
@@ -287,7 +287,7 @@ def execute(
     driver.get(login_url)
 
     for i in range(retry):
-        execute_impl(driver, wait, login_config, slack_config, login_mark_xpath)
+        _execute_impl(driver, wait, login_config, slack_config, login_mark_xpath)
 
         if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
             logging.info("Login sccessful!")

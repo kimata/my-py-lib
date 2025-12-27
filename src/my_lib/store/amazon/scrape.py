@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def fetch_price_impl(
+def _fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasErrorConfig | None,
@@ -199,7 +199,7 @@ def fetch_price(
                 )
             )
 
-            fetch_price_impl(driver, wait, slack_config, item)
+            _fetch_price_impl(driver, wait, slack_config, item)
 
             if dump_path is not None and (item.price is None or item.price == 0):
                 my_lib.selenium_util.dump_page(

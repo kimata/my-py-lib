@@ -31,7 +31,7 @@ import selenium.webdriver.support.wait
 import my_lib.selenium_util
 import my_lib.store.captcha
 
-TIMEOUT_SEC: int = 4
+_TIMEOUT_SEC: int = 4
 
 
 # === Action 型定義 ===
@@ -106,7 +106,7 @@ def parse_action_list(data_list: list[dict[str, Any]]) -> list[Action]:
     return [parse_action(data) for data in data_list]
 
 
-def resolve_template(template: str, item: dict[str, Any]) -> str:
+def _resolve_template(template: str, item: dict[str, Any]) -> str:
     tmpl = string.Template(template)
     return tmpl.safe_substitute(item_name=item["name"])
 
@@ -125,14 +125,14 @@ def process_action(  # noqa: C901, PLR0913
     for action in action_list:
         logging.debug("action: %s.", action.type)
         if isinstance(action, InputAction):
-            xpath = resolve_template(action.xpath, item)
+            xpath = _resolve_template(action.xpath, item)
             if not my_lib.selenium_util.xpath_exists(driver, xpath):
                 logging.debug("Element not found. Interrupted.")
                 return
-            value = resolve_template(action.value, item)
+            value = _resolve_template(action.value, item)
             driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).send_keys(value)
         elif isinstance(action, ClickAction):
-            xpath = resolve_template(action.xpath, item)
+            xpath = _resolve_template(action.xpath, item)
             if not my_lib.selenium_util.xpath_exists(driver, xpath):
                 logging.debug("Element not found. Interrupted.")
                 return
@@ -164,7 +164,7 @@ def process_action(  # noqa: C901, PLR0913
         time.sleep(4)
 
 
-def process_preload(
+def _process_preload(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     item: dict[str, Any],
@@ -188,16 +188,16 @@ def process_preload(
     process_action(driver, wait, item, actions, "preload action", dump_path=dump_path)
 
 
-def fetch_price_impl(  # noqa: C901, PLR0912
+def _fetch_price_impl(  # noqa: C901, PLR0912
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     item: dict[str, Any],
     loop: int,
     *,
     dump_path: pathlib.Path,
 ) -> dict[str, Any] | bool:
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, TIMEOUT_SEC)
+    wait = selenium.webdriver.support.wait.WebDriverWait(driver, _TIMEOUT_SEC)
 
-    process_preload(driver, wait, item, loop, dump_path=dump_path)
+    _process_preload(driver, wait, item, loop, dump_path=dump_path)
 
     logging.info("Fetch: %s", item["url"])
 
@@ -283,7 +283,7 @@ def fetch_price(
     try:
         logging.info("Check %s", item["name"])
 
-        return fetch_price_impl(driver, item, loop, dump_path=dump_path)
+        return _fetch_price_impl(driver, item, loop, dump_path=dump_path)
     except Exception:
         logging.exception("Failed to check %s", driver.current_url)
         my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
