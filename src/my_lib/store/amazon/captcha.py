@@ -8,6 +8,7 @@ import PIL.Image
 import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack

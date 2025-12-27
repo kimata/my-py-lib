@@ -27,6 +27,7 @@ import PIL.Image
 import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
 import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
@@ -223,6 +224,7 @@ if __name__ == "__main__":
     import my_lib.pretty
     import my_lib.selenium_util
 
+    assert __doc__ is not None
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
