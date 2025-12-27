@@ -13,6 +13,7 @@ import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.remote.webelement
 import selenium.webdriver.support
+import selenium.webdriver.support.expected_conditions
 import selenium.webdriver.support.ui
 import selenium.webdriver.support.wait
 
@@ -266,7 +267,10 @@ def _parse_item(
         return _parse_item(driver, index)
 
     # キャッシュした要素から値を抽出
-    item_url: str = elements_cache["link"].get_attribute("href")
+    item_url_raw = elements_cache["link"].get_attribute("href")
+    if item_url_raw is None:
+        raise RuntimeError("Failed to get item URL")
+    item_url: str = item_url_raw
     item_id = item_url.split("/")[-1]
     name: str = elements_cache["name"].text
     price = int(elements_cache["price"].text.replace(",", ""))
