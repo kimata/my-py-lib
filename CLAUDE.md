@@ -30,11 +30,10 @@
 
 ### テスト
 
-- **全テストの実行**: `uv run pytest`
+- **全テストの実行**: `uv run pytest`（並列実行はデフォルトで有効）
 - **特定テストの実行**: `uv run pytest tests/unit/test_xxx.py::TestClass::test_method`
-- **並列実行**: `uv run pytest --numprocesses=auto`
-- **カバレッジレポート**: テスト実行時に自動生成 → `tests/evidence/coverage/`
-- **HTMLレポート**: `tests/evidence/index.htm`
+- **カバレッジレポート**: テスト実行時に自動生成 → `reports/coverage/`
+- **HTMLレポート**: `reports/pytest.html`
 
 ### コード品質
 
@@ -99,12 +98,13 @@ tests/
 ├── conftest.py          # 共有フィクスチャ、モック設定
 ├── unit/                # ユニットテスト（20以上のテストファイル）
 ├── integration/         # 統合テスト
-├── data/
-│   ├── config.example.yaml  # テスト用設定例
-│   └── chrome/test/     # Selenium プロファイル
-└── evidence/
-    ├── index.htm        # HTML テストレポート
-    └── coverage/        # カバレッジレポート
+└── data/
+    ├── config.example.yaml  # テスト用設定例
+    └── chrome/test/     # Selenium プロファイル
+
+reports/                 # テスト実行時に自動生成（.gitignore 対象）
+├── pytest.html          # HTML テストレポート
+└── coverage/            # カバレッジレポート
 ```
 
 ## 主要パターン
@@ -185,7 +185,51 @@ path = my_lib.pytest_util.get_path(path_str)
 
 - mypy と pyright の両方でチェック
 - `tests/data/` は除外設定済み
-- 型スタブがないモジュール（yaml.scanner 等）は `# type: ignore[attr-defined]` を使用
+
+#### 型スタブがないライブラリへの対処
+
+型スタブが提供されていないライブラリを使用する場合、`# type: ignore` コメントを大量に記述するのではなく、
+戻り値を受け取る変数に `Any` 型注釈を付けて対処する：
+
+```python
+from typing import Any
+
+# Good: Any 型注釈で型チェッカーに「このライブラリには型情報がない」ことを明示
+resp: Any = api.get_items(request)
+if resp.items_result is not None:
+    for item in resp.items_result.items:
+        ...
+
+# Bad: 各行に type: ignore を記述
+resp = api.get_items(request)
+if resp.items_result is not None:  # type: ignore[union-attr]
+    for item in resp.items_result.items:  # type: ignore[union-attr]
+        ...
+```
+
+#### import 文の書き方
+
+サブモジュールへのアクセスは、明示的な import を使用する：
+
+```python
+# Good: 明示的な import
+import selenium.webdriver.support.expected_conditions
+import urllib.parse
+import urllib.error
+
+# Bad: 暗黙的なサブモジュールアクセス
+import selenium
+selenium.webdriver.support.expected_conditions  # pyright エラー
+```
+
+#### docopt の `__doc__` 対応
+
+`docopt` を使用する場合、`__doc__` が `str | None` のため assert で型を絞り込む：
+
+```python
+assert __doc__ is not None
+args = docopt.docopt(__doc__)
+```
 
 ### テスト作成
 

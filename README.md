@@ -233,14 +233,11 @@ webapp:
 ### テストの実行
 
 ```bash
-# 全テストを実行
+# 全テストを実行（並列実行・カバレッジはデフォルトで有効）
 uv run pytest
 
-# カバレッジ付きで実行
-uv run pytest --cov
-
 # 特定のテストを実行
-uv run pytest tests/test_sensor.py::test_sht35
+uv run pytest tests/unit/test_sensor.py::test_sht35
 ```
 
 ### プロジェクト構成
