@@ -77,6 +77,8 @@ class ADS1015:
             mvolt = raw * 7.8125 / 1000
         elif self.pga == self.REG_CONFIG_FSR_2048:
             mvolt = raw * 62.5 / 1000
+        else:
+            raise ValueError(f"Unsupported PGA value: {self.pga}")
 
         return [round(mvolt, 3)]
 

@@ -98,6 +98,7 @@ class FD_Q10C:  # noqa: N801
 
     def get_state(self) -> bool:
         with Lock():
+            spi = None
             try:
                 spi = driver.com_open()
                 # NOTE: 電源 ON なら True
@@ -106,10 +107,12 @@ class FD_Q10C:  # noqa: N801
                 logging.exception("Failed to get power status")
                 return False
             finally:
-                driver.com_close(spi)
+                if spi is not None:
+                    driver.com_close(spi)
 
     def read_param(self, index: int, data_type: int, force_power_on: bool = True) -> Any:
         with Lock():
+            spi = None
             try:
                 spi = driver.com_open()
 
@@ -124,7 +127,8 @@ class FD_Q10C:  # noqa: N801
                     value = None
                 return value
             finally:
-                driver.com_close(spi)
+                if spi is not None:
+                    driver.com_close(spi)
 
     def stop(self) -> None:
         with Lock():

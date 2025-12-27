@@ -7,6 +7,7 @@ import logging
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
 import time
 
@@ -127,9 +128,6 @@ def cleanup_orphaned_chrome_processes():
 def _cleanup_chrome_process_groups():
     """Chromeプロセスグループの強制終了"""
     try:
-        import shutil
-        import subprocess
-
         # pkillが利用可能かチェック
         if not shutil.which("pkill"):
             logging.warning("pkill not available, skipping process group cleanup")
