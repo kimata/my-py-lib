@@ -37,10 +37,10 @@ class TestUpdate:
         import my_lib.footprint
 
         path = temp_dir / "footprint"
-        assert not path.exists()
+        assert not my_lib.footprint.exists(path)
 
         my_lib.footprint.update(path)
-        assert path.exists()
+        assert my_lib.footprint.exists(path)
 
     def test_creates_parent_directories(self, temp_dir):
         """親ディレクトリも作成する"""
@@ -48,7 +48,7 @@ class TestUpdate:
 
         path = temp_dir / "subdir" / "footprint"
         my_lib.footprint.update(path)
-        assert path.exists()
+        assert my_lib.footprint.exists(path)
 
     def test_updates_mtime(self, temp_dir):
         """mtime を更新する"""
@@ -147,10 +147,10 @@ class TestClear:
 
         path = temp_dir / "footprint"
         my_lib.footprint.update(path)
-        assert path.exists()
+        assert my_lib.footprint.exists(path)
 
         my_lib.footprint.clear(path)
-        assert not path.exists()
+        assert not my_lib.footprint.exists(path)
 
     def test_does_not_raise_for_nonexistent_file(self, temp_dir):
         """存在しないファイルに対してエラーを発生させない"""

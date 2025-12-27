@@ -15,6 +15,7 @@ class TestStore:
 
     def test_stores_data(self, temp_dir):
         """データを保存する"""
+        import my_lib.pytest_util
         from my_lib.serializer import load, store
 
         file_path = temp_dir / "test.pkl"
@@ -22,20 +23,22 @@ class TestStore:
 
         store(file_path, data)
 
-        assert file_path.exists()
+        assert my_lib.pytest_util.get_path(file_path).exists()
 
     def test_creates_parent_directories(self, temp_dir):
         """親ディレクトリを作成する"""
+        import my_lib.pytest_util
         from my_lib.serializer import store
 
         file_path = temp_dir / "subdir" / "test.pkl"
 
         store(file_path, {"key": "value"})
 
-        assert file_path.exists()
+        assert my_lib.pytest_util.get_path(file_path).exists()
 
     def test_creates_backup_on_overwrite(self, temp_dir):
         """上書き時にバックアップを作成する"""
+        import my_lib.pytest_util
         from my_lib.serializer import store
 
         file_path = temp_dir / "test.pkl"
@@ -43,7 +46,9 @@ class TestStore:
         store(file_path, {"first": 1})
         store(file_path, {"second": 2})
 
-        old_path = file_path.with_suffix(".old")
+        # pytest_util.get_path でサフィックスが付く場合を考慮
+        actual_path = my_lib.pytest_util.get_path(file_path)
+        old_path = actual_path.with_suffix(".old")
         assert old_path.exists()
 
 
