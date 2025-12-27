@@ -57,9 +57,6 @@ class AmazonLoginConfig:
         )
 
 
-AMAZON_URL_BASE: str = "https://www.amazon.co.jp/dp/"
-
-
 @dataclass
 class AmazonItem:
     """Amazon 商品情報."""
@@ -74,15 +71,19 @@ class AmazonItem:
     @classmethod
     def from_asin(cls, asin: str) -> AmazonItem:
         """ASIN から AmazonItem を生成する."""
-        return cls(asin=asin, url=f"{AMAZON_URL_BASE}{asin}")
+        from my_lib.store.amazon.util import get_item_url
+
+        return cls(asin=asin, url=get_item_url(asin))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AmazonItem:
         """dict から AmazonItem を生成する."""
+        from my_lib.store.amazon.util import get_item_url
+
         asin = data["asin"]
         return cls(
             asin=asin,
-            url=data.get("url", f"{AMAZON_URL_BASE}{asin}"),
+            url=data.get("url", get_item_url(asin)),
             price=data.get("price"),
             thumb_url=data.get("thumb_url"),
             category=data.get("category"),
@@ -101,5 +102,3 @@ class AmazonItem:
         if self.stock is not None:
             result["stock"] = self.stock
         return result
-
-
