@@ -25,7 +25,8 @@ import paapi5_python_sdk.get_items_resource
 import paapi5_python_sdk.merchant
 import paapi5_python_sdk.partner_type
 
-from my_lib.store.amazon.config import AMAZON_URL_BASE, AmazonApiConfig, AmazonItem
+from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem
+from my_lib.store.amazon.util import get_item_url
 
 if TYPE_CHECKING:
     from typing import Any
@@ -107,7 +108,7 @@ def fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[st
 
                 item = AmazonItem(
                     asin=item_data.asin,
-                    url=f"{AMAZON_URL_BASE}{item_data.asin}",
+                    url=get_item_url(item_data.asin),
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
@@ -179,7 +180,7 @@ def fetch_price_new(  # noqa: C901
 
                 item = AmazonItem(
                     asin=item_data.asin,
-                    url=f"{AMAZON_URL_BASE}{item_data.asin}",
+                    url=get_item_url(item_data.asin),
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
