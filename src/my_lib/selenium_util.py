@@ -1019,14 +1019,14 @@ def quit_driver_gracefully(
         driver.quit()
         logging.info("WebDriver quit successfully")
     except Exception:
-        logging.exception("Failed to quit driver normally")
+        logging.warning("Failed to quit driver normally", exc_info=True)
 
     # ChromeDriverサービスの停止を試行
     try:
         if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):
             driver.service.stop()
     except Exception:
-        logging.exception("Failed to stop Chrome service")
+        logging.warning("Failed to stop Chrome service", exc_info=True)
 
     # Step 1: quit 後に wait_sec 秒待機しつつプロセス終了をチェック
     remaining_pids = _wait_for_processes_with_check(chrome_pids_before, wait_sec)
