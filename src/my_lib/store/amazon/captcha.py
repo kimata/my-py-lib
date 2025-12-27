@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-from typing import Any
 
 import PIL.Image
 import selenium.webdriver.common.by
