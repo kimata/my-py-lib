@@ -57,23 +57,32 @@ class AmazonLoginConfig:
         )
 
 
+AMAZON_URL_BASE: str = "https://www.amazon.co.jp/dp/"
+
+
 @dataclass
 class AmazonItem:
     """Amazon 商品情報."""
 
     asin: str
-    url: str | None = None
+    url: str
     price: int | None = None
     thumb_url: str | None = None
     category: str | None = None
     stock: int | None = None
 
     @classmethod
+    def from_asin(cls, asin: str) -> AmazonItem:
+        """ASIN から AmazonItem を生成する."""
+        return cls(asin=asin, url=f"{AMAZON_URL_BASE}{asin}")
+
+    @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AmazonItem:
         """dict から AmazonItem を生成する."""
+        asin = data["asin"]
         return cls(
-            asin=data["asin"],
-            url=data.get("url"),
+            asin=asin,
+            url=data.get("url", f"{AMAZON_URL_BASE}{asin}"),
             price=data.get("price"),
             thumb_url=data.get("thumb_url"),
             category=data.get("category"),
@@ -82,9 +91,7 @@ class AmazonItem:
 
     def to_dict(self) -> dict[str, Any]:
         """dict に変換する."""
-        result: dict[str, Any] = {"asin": self.asin}
-        if self.url is not None:
-            result["url"] = self.url
+        result: dict[str, Any] = {"asin": self.asin, "url": self.url}
         if self.price is not None:
             result["price"] = self.price
         if self.thumb_url is not None:
@@ -96,10 +103,3 @@ class AmazonItem:
         return result
 
 
-@dataclass
-class AmazonItemResult:
-    """Amazon から取得した商品価格情報（API/スクレイピング共通）."""
-
-    price: int
-    category: str | None = None
-    thumb_url: str | None = None
