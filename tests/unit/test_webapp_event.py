@@ -155,42 +155,73 @@ class TestApiEvent:
 
     def test_returns_response(self):
         """レスポンスを返す"""
+        import threading
+        import time
+
         import flask
 
         import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import EVENT_TYPE
 
         app = flask.Flask(__name__)
         app.register_blueprint(event_module.blueprint)
 
+        # リクエスト中にイベントを発生させるスレッド
+        def trigger_event():
+            time.sleep(0.1)
+            event_module.notify_event(EVENT_TYPE.LOG)
+
+        threading.Thread(target=trigger_event).start()
+
         with app.test_client() as client:
-            response = client.get("/api/event?count=0")
+            response = client.get("/api/event?count=1")
             assert response.status_code == 200
             assert response.content_type == "text/event-stream; charset=utf-8"
 
     def test_has_cors_headers(self):
         """CORS ヘッダーを持つ"""
+        import threading
+        import time
+
         import flask
 
         import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import EVENT_TYPE
 
         app = flask.Flask(__name__)
         app.register_blueprint(event_module.blueprint)
 
+        def trigger_event():
+            time.sleep(0.1)
+            event_module.notify_event(EVENT_TYPE.LOG)
+
+        threading.Thread(target=trigger_event).start()
+
         with app.test_client() as client:
-            response = client.get("/api/event?count=0")
+            response = client.get("/api/event?count=1")
             assert "Access-Control-Allow-Origin" in response.headers
             assert response.headers["Access-Control-Allow-Origin"] == "*"
 
     def test_has_cache_control(self):
         """Cache-Control ヘッダーを持つ"""
+        import threading
+        import time
+
         import flask
 
         import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import EVENT_TYPE
 
         app = flask.Flask(__name__)
         app.register_blueprint(event_module.blueprint)
 
+        def trigger_event():
+            time.sleep(0.1)
+            event_module.notify_event(EVENT_TYPE.LOG)
+
+        threading.Thread(target=trigger_event).start()
+
         with app.test_client() as client:
-            response = client.get("/api/event?count=0")
+            response = client.get("/api/event?count=1")
             assert "Cache-Control" in response.headers
             assert "no-cache" in response.headers["Cache-Control"]
