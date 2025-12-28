@@ -1020,11 +1020,18 @@ def quit_driver_gracefully(
         logging.info("WebDriver quit successfully")
     except Exception:
         logging.warning("Failed to quit driver normally", exc_info=True)
+    finally:
+        # undetected_chromedriver の __del__ がシャットダウン時に再度呼ばれるのを防ぐ
+        if hasattr(driver, "_has_quit"):
+            driver._has_quit = True  # type: ignore[attr-defined]
 
     # ChromeDriverサービスの停止を試行
     try:
         if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):  # type: ignore[attr-defined]
             driver.service.stop()  # type: ignore[attr-defined]
+    except (ConnectionResetError, OSError):
+        # Chrome が既に終了している場合は無視
+        logging.debug("Chrome service already stopped")
     except Exception:
         logging.warning("Failed to stop Chrome service", exc_info=True)
 
