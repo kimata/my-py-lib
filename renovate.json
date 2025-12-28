@@ -3,7 +3,7 @@
     "extends": ["config:best-practices", ":timezone(Asia/Tokyo)"],
     "hostRules": [
         {
-            "matchHost": "registry.green-rabbit.net:5000",
+            "matchHost": "https://registry.green-rabbit.net:5000",
             "insecureRegistry": true
         }
     ],
