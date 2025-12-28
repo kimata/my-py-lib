@@ -211,11 +211,14 @@ def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
 
     # 1. ロックファイルのチェック
     lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    existing_locks = []
     for lock_file in lock_files:
         lock_path = profile_path / lock_file
         if lock_path.exists() or lock_path.is_symlink():
-            errors.append(f"Lock file exists: {lock_file}")
+            existing_locks.append(lock_file)
             has_lock_files = True
+    if existing_locks:
+        errors.append(f"Lock files exist: {', '.join(existing_locks)}")
 
     # 2. Local State の JSON チェック
     local_state_error = _check_json_file(profile_path / "Local State")
@@ -350,7 +353,7 @@ def create_driver(
     # プロファイル健全性チェック
     health = _check_profile_health(profile_path)
     if not health.is_healthy:
-        logging.warning("Profile health check failed: %s", health.errors)
+        logging.warning("Profile health check failed: %s", ", ".join(health.errors))
 
         if health.has_lock_files and not (health.has_corrupted_json or health.has_corrupted_db):
             # ロックファイルのみの問題なら削除して続行
