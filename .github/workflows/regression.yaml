@@ -56,7 +56,14 @@ jobs:
                   sudo apt install --assume-yes smem
 
             - name: Run Tests
-              run: uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit.xml tests/test_basic.py
+              run: uv run pytest --numprocesses=auto --junit-xml=tests/evidence/junit.xml --cov=src --cov-report=lcov:tests/evidence/coverage.lcov tests/unit/
+
+            - name: Upload coverage to Coveralls
+              uses: coverallsapp/github-action@v2
+              if: matrix.python-version == '3.12'
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  path-to-lcov: tests/evidence/coverage.lcov
 
             - name: Publish Test Results
               uses: dorny/test-reporter@v1
