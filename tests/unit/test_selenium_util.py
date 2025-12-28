@@ -416,12 +416,15 @@ class TestErrorHandler:
         mock_driver = unittest.mock.MagicMock()
         mock_driver.get_screenshot_as_png.return_value = b""
 
+        captured_handler = None
         with pytest.raises(ValueError):
             with my_lib.selenium_util.error_handler(mock_driver) as handler:
+                captured_handler = handler
                 raise ValueError("Test error")
 
-        assert handler.exception is not None
-        assert isinstance(handler.exception, ValueError)
+        assert captured_handler is not None
+        assert captured_handler.exception is not None
+        assert isinstance(captured_handler.exception, ValueError)
 
     def test_suppresses_exception_when_reraise_false(self):
         """reraise=False で例外を抑制する"""
@@ -457,15 +460,18 @@ class TestErrorHandler:
         """capture_screenshot=False でスクリーンショットをスキップする"""
         mock_driver = unittest.mock.MagicMock()
 
+        captured_handler = None
         with pytest.raises(ValueError):
             with my_lib.selenium_util.error_handler(
                 mock_driver,
                 capture_screenshot=False,
             ) as handler:
+                captured_handler = handler
                 raise ValueError("Test error")
 
         mock_driver.get_screenshot_as_png.assert_not_called()
-        assert handler.screenshot is None
+        assert captured_handler is not None
+        assert captured_handler.screenshot is None
 
 
 class TestQuitDriverGracefully:
