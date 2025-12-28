@@ -9,10 +9,18 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import sys
 import tempfile
 import unittest.mock
 
 import pytest
+
+# === オプショナル依存関係のモック ===
+# smbus2 がインストールされていない場合はモックする（センサーテスト用）
+if "smbus2" not in sys.modules:
+    mock_smbus2 = unittest.mock.MagicMock()
+    mock_smbus2.smbus2.I2C_M_RD = 0x0001
+    sys.modules["smbus2"] = mock_smbus2
 
 # === 定数 ===
 CONFIG_FILE = pathlib.Path("tests/data/config.example.yaml")
