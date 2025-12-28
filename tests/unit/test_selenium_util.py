@@ -1,0 +1,498 @@
+#!/usr/bin/env python3
+# ruff: noqa: S101
+"""selenium_util.py のテスト"""
+from __future__ import annotations
+
+import json
+import pathlib
+import sqlite3
+import time
+import unittest.mock
+
+import pytest
+
+import my_lib.selenium_util
+
+
+class TestGetChromeVersion:
+    """_get_chrome_version 関数のテスト"""
+
+    def test_returns_version_number(self):
+        """バージョン番号を返す"""
+        mock_result = unittest.mock.MagicMock()
+        mock_result.stdout = "Google Chrome 120.0.6099.109"
+
+        with unittest.mock.patch("subprocess.run", return_value=mock_result):
+            result = my_lib.selenium_util._get_chrome_version()
+
+            assert result == 120
+
+    def test_returns_none_on_error(self):
+        """エラー時は None を返す"""
+        with unittest.mock.patch("subprocess.run", side_effect=Exception("Not found")):
+            result = my_lib.selenium_util._get_chrome_version()
+
+            assert result is None
+
+    def test_returns_none_for_invalid_output(self):
+        """無効な出力では None を返す"""
+        mock_result = unittest.mock.MagicMock()
+        mock_result.stdout = "Invalid output"
+
+        with unittest.mock.patch("subprocess.run", return_value=mock_result):
+            result = my_lib.selenium_util._get_chrome_version()
+
+            assert result is None
+
+
+class TestProfileHealthResult:
+    """_ProfileHealthResult データクラスのテスト"""
+
+    def test_creates_instance(self):
+        """インスタンスを作成する"""
+        result = my_lib.selenium_util._ProfileHealthResult(
+            is_healthy=True,
+            errors=[],
+        )
+
+        assert result.is_healthy is True
+        assert result.errors == []
+        assert result.has_lock_files is False
+
+    def test_creates_instance_with_errors(self):
+        """エラー付きでインスタンスを作成する"""
+        result = my_lib.selenium_util._ProfileHealthResult(
+            is_healthy=False,
+            errors=["Error 1", "Error 2"],
+            has_lock_files=True,
+            has_corrupted_json=True,
+        )
+
+        assert result.is_healthy is False
+        assert len(result.errors) == 2
+        assert result.has_lock_files is True
+        assert result.has_corrupted_json is True
+
+
+class TestCheckJsonFile:
+    """_check_json_file 関数のテスト"""
+
+    def test_returns_none_for_valid_json(self, temp_dir):
+        """有効な JSON では None を返す"""
+        json_file = temp_dir / "test.json"
+        json_file.write_text('{"key": "value"}')
+
+        result = my_lib.selenium_util._check_json_file(json_file)
+
+        assert result is None
+
+    def test_returns_none_for_nonexistent_file(self, temp_dir):
+        """存在しないファイルでは None を返す"""
+        json_file = temp_dir / "nonexistent.json"
+
+        result = my_lib.selenium_util._check_json_file(json_file)
+
+        assert result is None
+
+    def test_returns_error_for_invalid_json(self, temp_dir):
+        """無効な JSON ではエラーを返す"""
+        json_file = temp_dir / "invalid.json"
+        json_file.write_text("{invalid json}")
+
+        result = my_lib.selenium_util._check_json_file(json_file)
+
+        assert result is not None
+        assert "corrupted" in result
+
+
+class TestCheckSqliteDb:
+    """_check_sqlite_db 関数のテスト"""
+
+    def test_returns_none_for_valid_db(self, temp_dir):
+        """有効な DB では None を返す"""
+        db_file = temp_dir / "test.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.execute("CREATE TABLE test (id INTEGER)")
+        conn.close()
+
+        result = my_lib.selenium_util._check_sqlite_db(db_file)
+
+        assert result is None
+
+    def test_returns_none_for_nonexistent_db(self, temp_dir):
+        """存在しない DB では None を返す"""
+        db_file = temp_dir / "nonexistent.db"
+
+        result = my_lib.selenium_util._check_sqlite_db(db_file)
+
+        assert result is None
+
+    def test_returns_error_for_corrupted_db(self, temp_dir):
+        """破損した DB ではエラーを返す"""
+        db_file = temp_dir / "corrupted.db"
+        db_file.write_bytes(b"This is not a valid SQLite database")
+
+        result = my_lib.selenium_util._check_sqlite_db(db_file)
+
+        assert result is not None
+        assert "database" in result.lower()
+
+
+class TestCheckProfileHealth:
+    """_check_profile_health 関数のテスト"""
+
+    def test_returns_healthy_for_nonexistent_profile(self, temp_dir):
+        """存在しないプロファイルは健全"""
+        profile_path = temp_dir / "nonexistent_profile"
+
+        result = my_lib.selenium_util._check_profile_health(profile_path)
+
+        assert result.is_healthy is True
+        assert result.errors == []
+
+    def test_detects_lock_files(self, temp_dir):
+        """ロックファイルを検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        profile_path.mkdir(parents=True)
+        (profile_path / "SingletonLock").touch()
+
+        result = my_lib.selenium_util._check_profile_health(profile_path)
+
+        assert result.has_lock_files is True
+        assert any("Lock file" in error for error in result.errors)
+
+    def test_detects_corrupted_json(self, temp_dir):
+        """破損した JSON を検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        profile_path.mkdir(parents=True)
+        (profile_path / "Local State").write_text("{invalid json")
+
+        result = my_lib.selenium_util._check_profile_health(profile_path)
+
+        assert result.has_corrupted_json is True
+        assert not result.is_healthy
+
+    def test_detects_corrupted_db(self, temp_dir):
+        """破損した DB を検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        default_path = profile_path / "Default"
+        default_path.mkdir(parents=True)
+        (default_path / "Cookies").write_bytes(b"corrupted data")
+
+        result = my_lib.selenium_util._check_profile_health(profile_path)
+
+        assert result.has_corrupted_db is True
+        assert not result.is_healthy
+
+
+class TestRecoverCorruptedProfile:
+    """_recover_corrupted_profile 関数のテスト"""
+
+    def test_returns_true_for_nonexistent_profile(self, temp_dir):
+        """存在しないプロファイルでは True を返す"""
+        profile_path = temp_dir / "nonexistent_profile"
+
+        result = my_lib.selenium_util._recover_corrupted_profile(profile_path)
+
+        assert result is True
+
+    def test_moves_corrupted_profile(self, temp_dir):
+        """破損したプロファイルを移動する"""
+        profile_path = temp_dir / "corrupted_profile"
+        profile_path.mkdir()
+        (profile_path / "test_file.txt").write_text("test")
+
+        result = my_lib.selenium_util._recover_corrupted_profile(profile_path)
+
+        assert result is True
+        assert not profile_path.exists()
+        # バックアップが作成されていることを確認
+        backup_dirs = list(temp_dir.glob("*corrupted*"))
+        assert len(backup_dirs) == 1
+
+
+class TestCleanupProfileLock:
+    """_cleanup_profile_lock 関数のテスト"""
+
+    def test_removes_lock_files(self, temp_dir):
+        """ロックファイルを削除する"""
+        profile_path = temp_dir / "test_profile"
+        profile_path.mkdir()
+        lock_file = profile_path / "SingletonLock"
+        lock_file.touch()
+
+        my_lib.selenium_util._cleanup_profile_lock(profile_path)
+
+        assert not lock_file.exists()
+
+    def test_handles_nonexistent_locks(self, temp_dir):
+        """存在しないロックファイルでも動作する"""
+        profile_path = temp_dir / "test_profile"
+        profile_path.mkdir()
+
+        # エラーが発生しないことを確認
+        my_lib.selenium_util._cleanup_profile_lock(profile_path)
+
+
+class TestIsRunningInContainer:
+    """_is_running_in_container 関数のテスト"""
+
+    def test_returns_false_when_not_in_container(self):
+        """コンテナ外では False を返す"""
+        with unittest.mock.patch("os.path.exists", return_value=False):
+            result = my_lib.selenium_util._is_running_in_container()
+
+            assert result is False
+
+    def test_returns_true_when_in_container(self):
+        """コンテナ内では True を返す"""
+        with unittest.mock.patch("os.path.exists", return_value=True):
+            result = my_lib.selenium_util._is_running_in_container()
+
+            assert result is True
+
+
+class TestRandomSleep:
+    """random_sleep 関数のテスト"""
+
+    def test_sleeps_for_some_time(self):
+        """一定時間スリープする"""
+        with unittest.mock.patch("time.sleep") as mock_sleep:
+            my_lib.selenium_util.random_sleep(1.0)
+
+            mock_sleep.assert_called_once()
+            # RATIO=0.8 なので、0.8 〜 1.2 の範囲
+            sleep_time = mock_sleep.call_args[0][0]
+            assert 0.8 <= sleep_time <= 1.2
+
+
+class TestCleanDump:
+    """clean_dump 関数のテスト"""
+
+    def test_does_nothing_when_path_not_exists(self, temp_dir):
+        """パスが存在しない場合は何もしない"""
+        dump_path = temp_dir / "nonexistent"
+
+        my_lib.selenium_util.clean_dump(dump_path)
+
+    def test_removes_old_files(self, temp_dir):
+        """古いファイルを削除する"""
+        import os
+
+        dump_path = temp_dir / "dump"
+        dump_path.mkdir()
+
+        old_file = dump_path / "old.png"
+        old_file.touch()
+
+        # 2日前の時刻を設定
+        old_time = time.time() - (2 * 24 * 3600)
+        os.utime(old_file, (old_time, old_time))
+
+        my_lib.selenium_util.clean_dump(dump_path, keep_days=1)
+
+        assert not old_file.exists()
+
+    def test_keeps_recent_files(self, temp_dir):
+        """新しいファイルは保持する"""
+        dump_path = temp_dir / "dump"
+        dump_path.mkdir()
+
+        new_file = dump_path / "new.png"
+        new_file.touch()
+
+        my_lib.selenium_util.clean_dump(dump_path, keep_days=1)
+
+        assert new_file.exists()
+
+    def test_skips_directories(self, temp_dir):
+        """ディレクトリはスキップする"""
+        dump_path = temp_dir / "dump"
+        dump_path.mkdir()
+
+        sub_dir = dump_path / "subdir"
+        sub_dir.mkdir()
+
+        my_lib.selenium_util.clean_dump(dump_path)
+
+        assert sub_dir.exists()
+
+
+class TestIsChromeRelatedProcess:
+    """_is_chrome_related_process 関数のテスト"""
+
+    def test_returns_true_for_chrome(self):
+        """chrome プロセスで True を返す"""
+        mock_process = unittest.mock.MagicMock()
+        mock_process.name.return_value = "chrome"
+
+        result = my_lib.selenium_util._is_chrome_related_process(mock_process)
+
+        assert result is True
+
+    def test_returns_true_for_chromium(self):
+        """chromium プロセスで True を返す"""
+        mock_process = unittest.mock.MagicMock()
+        mock_process.name.return_value = "chromium-browser"
+
+        result = my_lib.selenium_util._is_chrome_related_process(mock_process)
+
+        assert result is True
+
+    def test_returns_false_for_chromedriver(self):
+        """chromedriver プロセスで False を返す"""
+        mock_process = unittest.mock.MagicMock()
+        mock_process.name.return_value = "chromedriver"
+
+        result = my_lib.selenium_util._is_chrome_related_process(mock_process)
+
+        assert result is False
+
+    def test_returns_false_for_unrelated(self):
+        """無関係なプロセスで False を返す"""
+        mock_process = unittest.mock.MagicMock()
+        mock_process.name.return_value = "python"
+
+        result = my_lib.selenium_util._is_chrome_related_process(mock_process)
+
+        assert result is False
+
+    def test_handles_nosuchprocess(self):
+        """NoSuchProcess を処理する"""
+        import psutil
+
+        mock_process = unittest.mock.MagicMock()
+        mock_process.name.side_effect = psutil.NoSuchProcess(1234)
+
+        result = my_lib.selenium_util._is_chrome_related_process(mock_process)
+
+        assert result is False
+
+
+class TestBrowserTab:
+    """browser_tab クラスのテスト"""
+
+    def test_opens_and_closes_tab(self):
+        """タブを開いて閉じる"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.current_window_handle = "original"
+        mock_driver.window_handles = ["original", "new"]
+
+        with my_lib.selenium_util.browser_tab(mock_driver, "http://example.com"):
+            mock_driver.execute_script.assert_called_with("window.open('');")
+            mock_driver.switch_to.window.assert_called()
+            mock_driver.get.assert_called_with("http://example.com")
+
+        mock_driver.close.assert_called_once()
+
+    def test_handles_exception_on_close(self):
+        """close でエラーが発生しても例外を発生させない"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.current_window_handle = "original"
+        mock_driver.window_handles = ["original", "new"]
+        mock_driver.close.side_effect = Exception("Browser crashed")
+
+        with my_lib.selenium_util.browser_tab(mock_driver, "http://example.com"):
+            pass
+
+        # 例外が発生しないことを確認
+
+
+class TestErrorHandler:
+    """error_handler クラスのテスト"""
+
+    def test_no_error_case(self):
+        """エラーがない場合"""
+        mock_driver = unittest.mock.MagicMock()
+
+        with my_lib.selenium_util.error_handler(mock_driver) as handler:
+            pass
+
+        assert handler.exception is None
+        assert handler.screenshot is None
+
+    def test_captures_exception(self):
+        """例外をキャプチャする"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.get_screenshot_as_png.return_value = b""
+
+        with pytest.raises(ValueError):
+            with my_lib.selenium_util.error_handler(mock_driver) as handler:
+                raise ValueError("Test error")
+
+        assert handler.exception is not None
+        assert isinstance(handler.exception, ValueError)
+
+    def test_suppresses_exception_when_reraise_false(self):
+        """reraise=False で例外を抑制する"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.get_screenshot_as_png.return_value = b""
+
+        with my_lib.selenium_util.error_handler(mock_driver, reraise=False) as handler:
+            raise ValueError("Test error")
+
+        assert handler.exception is not None
+
+    def test_calls_on_error_callback(self):
+        """on_error コールバックを呼び出す"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.get_screenshot_as_png.return_value = b""
+
+        callback_called = []
+
+        def on_error(exc, screenshot):
+            callback_called.append((exc, screenshot))
+
+        with pytest.raises(ValueError):
+            with my_lib.selenium_util.error_handler(
+                mock_driver,
+                on_error=on_error,
+            ):
+                raise ValueError("Test error")
+
+        assert len(callback_called) == 1
+        assert isinstance(callback_called[0][0], ValueError)
+
+    def test_skips_screenshot_when_disabled(self):
+        """capture_screenshot=False でスクリーンショットをスキップする"""
+        mock_driver = unittest.mock.MagicMock()
+
+        with pytest.raises(ValueError):
+            with my_lib.selenium_util.error_handler(
+                mock_driver,
+                capture_screenshot=False,
+            ) as handler:
+                raise ValueError("Test error")
+
+        mock_driver.get_screenshot_as_png.assert_not_called()
+        assert handler.screenshot is None
+
+
+class TestQuitDriverGracefully:
+    """quit_driver_gracefully 関数のテスト"""
+
+    def test_handles_none_driver(self):
+        """None ドライバを処理する"""
+        my_lib.selenium_util.quit_driver_gracefully(None)
+
+    def test_calls_driver_quit(self):
+        """driver.quit を呼び出す"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.service = None
+
+        with unittest.mock.patch.object(my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]):
+            with unittest.mock.patch.object(my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]):
+                my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
+
+        mock_driver.quit.assert_called_once()
+
+    def test_handles_quit_exception(self):
+        """quit 例外を処理する"""
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.quit.side_effect = Exception("Quit failed")
+        mock_driver.service = None
+
+        with unittest.mock.patch.object(my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]):
+            with unittest.mock.patch.object(my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]):
+                # 例外が発生しないことを確認
+                my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
