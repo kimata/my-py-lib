@@ -37,7 +37,7 @@ test-typecheck:
         - test-prepare
 
     script:
-        - uv run pyright
+        - uv run python -m pyright
         - uv run mypy src/
 
     cache:
