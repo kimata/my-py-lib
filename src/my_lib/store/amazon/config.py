@@ -104,6 +104,10 @@ class AmazonItem:
         return result
 
 
+# NOTE: 下記の関数を Mock してテストをする際、返り値として以下の DUMMY_AMAZON_ITEM を使ってください。
+# my_lib.store.amazon.api.fetch_price
+# my_lib.store.amazon.api.fetch_price_new
+# my_lib.store.amazon.scrape.fetch_price
 DUMMY_AMAZON_ITEM: AmazonItem = AmazonItem(
     asin="B0G3SXHCLJ",
     url="https://www.amazon.co.jp/dp/B0G3SXHCLJ",
