@@ -18,9 +18,14 @@ import pathlib
 import tempfile
 import time
 import urllib.request
+import warnings
 
 import PIL.Image
-import pydub
+
+# pydub の正規表現で SyntaxWarning が出る問題を抑制（Python 3.12+）
+# https://github.com/jiaaro/pydub/issues/795
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub")
+import pydub  # noqa: E402
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
 import selenium.webdriver.remote.webdriver
