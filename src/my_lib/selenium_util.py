@@ -3,11 +3,11 @@
 Selenium を Chrome Driver を使って動かします。
 
 Usage:
-  selenium_util.py [-c CONFIG] [-d]
+  selenium_util.py [-c CONFIG] [-D]
 
 Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
-  -d                : デバッグモードで動作します。
+  -D                : デバッグモードで動作します。
 """
 
 from __future__ import annotations
@@ -1102,7 +1102,7 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
-    debug_mode = args["-d"]
+    debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
