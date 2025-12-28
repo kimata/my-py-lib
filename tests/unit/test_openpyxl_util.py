@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pathlib
 import unittest.mock
+from typing import Any
 
 import pytest
 
@@ -272,7 +273,7 @@ class TestGenerateListSheet:
             },
         }
 
-        item_list = [{"name": "Item1", "price": 100}]
+        item_list: list[Any] = [{"name": "Item1", "price": 100}]
 
         def thumb_path_func(item):
             return None
