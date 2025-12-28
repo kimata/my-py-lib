@@ -3,6 +3,7 @@
 IoT、自動化、データ収集アプリケーション向けの包括的なPythonユーティリティライブラリ。特にRaspberry Pi環境に最適化されています。
 
 [![Test Status](https://github.com/kimata/my-py-lib/actions/workflows/regression.yaml/badge.svg)](https://github.com/kimata/my-py-lib/actions/workflows/regression.yaml)
+[![Test Report](https://img.shields.io/badge/Test_Report-pytest.html-blue)](https://kimata.github.io/my-py-lib/pytest.html)
 [![Coverage Status](https://coveralls.io/repos/github/kimata/my-py-lib/badge.svg?branch=main)](https://coveralls.io/github/kimata/my-py-lib?branch=main)
 
 ## 概要
