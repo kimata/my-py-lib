@@ -56,7 +56,7 @@ jobs:
                   sudo apt install --assume-yes smem
 
             - name: Run Tests
-              run: uv run pytest --numprocesses=auto --cov-report=lcov:reports/coverage.lcov tests/unit/
+              run: uv run pytest tests/unit/
 
             - name: Upload coverage to Coveralls
               uses: coverallsapp/github-action@v2
