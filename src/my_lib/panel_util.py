@@ -17,6 +17,8 @@ import my_lib.pil_util
 
 # Panel描画関数のオプション設定用TypeVar
 OptConfigT = TypeVar("OptConfigT")
+# Panel設定用TypeVar（PanelConfigProtocolを継承した具体型を保持）
+PanelConfigT = TypeVar("PanelConfigT", bound=my_lib.panel_config.PanelConfigProtocol)
 
 
 def notify_error(
@@ -84,13 +86,13 @@ def create_error_image(
 def draw_panel_patiently(
     func: Callable[
         [
-            my_lib.panel_config.PanelConfigProtocol,
+            PanelConfigT,
             my_lib.panel_config.NormalPanelContext,
             OptConfigT,
         ],
         PIL.Image.Image,
     ],
-    panel_config: my_lib.panel_config.PanelConfigProtocol,
+    panel_config: PanelConfigT,
     context: my_lib.panel_config.NormalPanelContext,
     opt_config: OptConfigT = None,  # type: ignore[assignment]
     error_image: bool = True,
