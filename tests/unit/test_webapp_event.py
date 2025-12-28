@@ -74,3 +74,123 @@ class TestTerm:
 
         # 例外が発生しなければ OK
         term()
+
+    def test_sets_should_terminate(self):
+        """should_terminate フラグを設定する"""
+        import threading
+        import unittest.mock
+
+        import my_lib.webapp.event as event_module
+
+        mock_thread = unittest.mock.MagicMock(spec=threading.Thread)
+        event_module.watch_thread = mock_thread
+        event_module.should_terminate = False
+
+        event_module.term()
+
+        assert event_module.should_terminate is True
+        assert event_module.watch_thread is None
+
+
+class TestStart:
+    """start 関数のテスト"""
+
+    def test_starts_watch_thread(self):
+        """ウォッチスレッドを開始する"""
+        import multiprocessing
+        import time
+        import unittest.mock
+
+        import my_lib.webapp.event as event_module
+
+        queue = multiprocessing.Queue()
+
+        event_module.start(queue)
+
+        assert event_module.watch_thread is not None
+        assert event_module.should_terminate is False
+
+        event_module.term()
+        time.sleep(0.2)
+
+
+class TestWorker:
+    """worker 関数のテスト"""
+
+    def test_processes_events(self):
+        """イベントを処理する"""
+        import multiprocessing
+        import threading
+        import time
+
+        import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import EVENT_TYPE
+
+        queue = multiprocessing.Queue()
+        queue.put(EVENT_TYPE.LOG)
+
+        event_module.should_terminate = False
+
+        def run_worker():
+            time.sleep(0.2)
+            event_module.should_terminate = True
+
+        threading.Thread(target=run_worker).start()
+        event_module.worker(queue)
+
+    def test_stops_on_terminate(self):
+        """終了フラグで停止する"""
+        import multiprocessing
+
+        import my_lib.webapp.event as event_module
+
+        queue = multiprocessing.Queue()
+        event_module.should_terminate = True
+
+        event_module.worker(queue)
+
+
+class TestApiEvent:
+    """api_event 関数のテスト"""
+
+    def test_returns_response(self):
+        """レスポンスを返す"""
+        import flask
+
+        import my_lib.webapp.event as event_module
+
+        app = flask.Flask(__name__)
+        app.register_blueprint(event_module.blueprint)
+
+        with app.test_client() as client:
+            response = client.get("/api/event?count=0")
+            assert response.status_code == 200
+            assert response.content_type == "text/event-stream; charset=utf-8"
+
+    def test_has_cors_headers(self):
+        """CORS ヘッダーを持つ"""
+        import flask
+
+        import my_lib.webapp.event as event_module
+
+        app = flask.Flask(__name__)
+        app.register_blueprint(event_module.blueprint)
+
+        with app.test_client() as client:
+            response = client.get("/api/event?count=0")
+            assert "Access-Control-Allow-Origin" in response.headers
+            assert response.headers["Access-Control-Allow-Origin"] == "*"
+
+    def test_has_cache_control(self):
+        """Cache-Control ヘッダーを持つ"""
+        import flask
+
+        import my_lib.webapp.event as event_module
+
+        app = flask.Flask(__name__)
+        app.register_blueprint(event_module.blueprint)
+
+        with app.test_client() as client:
+            response = client.get("/api/event?count=0")
+            assert "Cache-Control" in response.headers
+            assert "no-cache" in response.headers["Cache-Control"]

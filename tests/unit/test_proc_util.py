@@ -137,6 +137,145 @@ class TestKillChild:
         # 例外が発生しなければ OK
         kill_child(timeout=1)
 
+    def test_terminates_child_processes(self):
+        """子プロセスを終了させる"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "test_process"
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", return_value=([], [])):
+                kill_child(timeout=1)
+
+        mock_child.terminate.assert_called_once()
+
+    def test_kills_stubborn_processes(self):
+        """終了しないプロセスを強制終了する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "stubborn_process"
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", side_effect=[
+                ([], [mock_child]),  # 最初の wait で生存
+                ([], []),  # SIGKILL 後に終了
+            ]):
+                kill_child(timeout=1)
+
+        mock_child.kill.assert_called_once()
+
+    def test_handles_nosuchprocess(self):
+        """既に終了したプロセスを処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "gone_process"
+        mock_child.terminate.side_effect = psutil.NoSuchProcess(12345)
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", return_value=([], [])):
+                kill_child(timeout=1)
+
+    def test_handles_accessdenied(self):
+        """アクセス拒否を処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "protected_process"
+        mock_child.terminate.side_effect = psutil.AccessDenied(12345)
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", return_value=([], [])):
+                kill_child(timeout=1)
+
+    def test_handles_generic_exception(self):
+        """一般的な例外を処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "error_process"
+        mock_child.terminate.side_effect = RuntimeError("Test error")
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", return_value=([], [])):
+                kill_child(timeout=1)
+
+    def test_logs_unkillable_processes(self):
+        """終了しないプロセスをログに記録する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        mock_child = unittest.mock.MagicMock()
+        mock_child.pid = 12345
+        mock_child.name.return_value = "unkillable_process"
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.return_value = [mock_child]
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            with unittest.mock.patch("psutil.wait_procs", return_value=([], [mock_child])):
+                kill_child(timeout=1)
+
+    def test_handles_process_error(self):
+        """psutil エラーを処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import kill_child
+
+        with unittest.mock.patch("psutil.Process", side_effect=psutil.Error("Test error")):
+            kill_child(timeout=1)
+
+
+class TestGetChildPidMapErrors:
+    """get_child_pid_map 関数のエラーハンドリングテスト"""
+
+    def test_handles_psutil_error(self):
+        """psutil エラーを処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import get_child_pid_map
+
+        mock_parent = unittest.mock.MagicMock()
+        mock_parent.children.side_effect = psutil.Error("Test error")
+
+        with unittest.mock.patch("psutil.Process", return_value=mock_parent):
+            result = get_child_pid_map()
+
+        assert result == {}
+
 
 class TestReapZombie:
     """reap_zombie 関数のテスト"""
@@ -147,3 +286,23 @@ class TestReapZombie:
 
         # 例外が発生しなければ OK
         reap_zombie()
+
+    def test_reaps_zombie_process(self):
+        """ゾンビプロセスを回収する"""
+        import unittest.mock
+
+        from my_lib.proc_util import reap_zombie
+
+        with unittest.mock.patch("my_lib.proc_util.get_child_pid_map", return_value={123: "zombie"}):
+            with unittest.mock.patch("os.waitpid", side_effect=[(123, 0), (0, 0)]):
+                reap_zombie()
+
+    def test_handles_no_children(self):
+        """子プロセスがない場合を処理する"""
+        import unittest.mock
+
+        from my_lib.proc_util import reap_zombie
+
+        with unittest.mock.patch("my_lib.proc_util.get_child_pid_map", return_value={}):
+            with unittest.mock.patch("os.waitpid", side_effect=ChildProcessError):
+                reap_zombie()
