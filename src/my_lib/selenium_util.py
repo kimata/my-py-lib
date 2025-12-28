@@ -958,7 +958,8 @@ def _get_remaining_chrome_pids(chrome_pids: list[int]) -> list[int]:
 def _wait_for_processes_with_check(
     chrome_pids: list[int],
     timeout: float,
-    poll_interval: float = 0.5,
+    poll_interval: float = 0.2,
+    log_interval: float = 1.0,
 ) -> list[int]:
     """プロセスの終了を待機しつつ、残存プロセスをチェック
 
@@ -966,11 +967,13 @@ def _wait_for_processes_with_check(
         chrome_pids: 監視対象のプロセスIDリスト
         timeout: 最大待機時間（秒）
         poll_interval: チェック間隔（秒）
+        log_interval: ログ出力間隔（秒）
 
     Returns:
         タイムアウト後も残存しているプロセスIDのリスト
     """
     elapsed = 0.0
+    last_log_time = 0.0
     remaining_pids = list(chrome_pids)
 
     while remaining_pids and elapsed < timeout:
@@ -978,13 +981,13 @@ def _wait_for_processes_with_check(
         elapsed += poll_interval
         remaining_pids = _get_remaining_chrome_pids(remaining_pids)
 
-        if remaining_pids:
-            logging.debug(
-                "Still waiting for %d Chrome processes to exit (%.1fs / %.1fs)",
+        if remaining_pids and (elapsed - last_log_time) >= log_interval:
+            logging.info(
+                "Found %d remaining Chrome processes after %.0fs",
                 len(remaining_pids),
                 elapsed,
-                timeout,
             )
+            last_log_time = elapsed
 
     return remaining_pids
 
@@ -1047,7 +1050,7 @@ def quit_driver_gracefully(
 
     # Step 2: 残存プロセスに SIGTERM を送信
     logging.info(
-        "Found %d remaining Chrome processes after %.1fs, sending SIGTERM",
+        "Found %d remaining Chrome processes after %.0fs, sending SIGTERM",
         len(remaining_pids),
         wait_sec,
     )
