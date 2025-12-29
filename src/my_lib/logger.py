@@ -18,6 +18,7 @@ MAX_SIZE: int = 10 * 1024 * 1024
 ROTATE_COUNT: int = 10
 
 LOG_FORMAT: str = "{name} %(asctime)s %(levelname)s [%(filename)s:%(lineno)s %(funcName)s] %(message)s"
+SIMPLE_FORMAT: str = "%(asctime)s %(levelname)s %(message)s"
 
 
 def _log_formatter(name: str) -> logging.Formatter:
@@ -42,9 +43,13 @@ def init(
     log_dir_path: str | pathlib.Path | None = None,
     log_queue: queue.Queue[logging.LogRecord] | None = None,
     is_str_log: bool = False,
+    log_format: str | None = None,
 ) -> io.StringIO | None:
     # ルートロガーを取得
     root_logger = logging.getLogger()
+
+    # ログフォーマットを決定
+    actual_format = log_format if log_format is not None else LOG_FORMAT.format(name=name)
 
     if os.environ.get("NO_COLORED_LOGS", "false") != "true":
         # docker compose の TTY 環境での二重出力を防ぐため、
@@ -55,7 +60,7 @@ def init(
         ]
         # isatty=None で自動検出を有効にしつつ、reconfigure で既存のハンドラーを適切に処理
         coloredlogs.install(
-            fmt=LOG_FORMAT.format(name=name),
+            fmt=actual_format,
             level=level,
             reconfigure=True,
             isatty=None,  # 自動検出
