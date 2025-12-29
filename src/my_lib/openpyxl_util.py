@@ -17,7 +17,7 @@ import openpyxl.worksheet.worksheet
 class RowData(Protocol):
     """行データを表す型（dict や dataclass など __getitem__ をサポートする型）"""
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str, /) -> Any:
         """キーに対応する値を取得する。
 
         Args:
@@ -28,7 +28,7 @@ class RowData(Protocol):
         """
         ...
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object, /) -> bool:
         """キーが存在するかを確認する。
 
         Args:
