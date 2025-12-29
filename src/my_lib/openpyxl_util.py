@@ -306,17 +306,17 @@ def _setting_table_view(
         hidden=is_hidden,
     )
 
-    sheet.freeze_panes = gen_text_pos(
+    sheet.freeze_panes = _gen_text_pos(
         sheet_def["TABLE_HEADER"]["row"]["pos"] + 1,
         sheet_def["TABLE_HEADER"]["col"]["price"]["pos"] + 1,
     )
 
     sheet.auto_filter.ref = "{start}:{end}".format(
-        start=gen_text_pos(
+        start=_gen_text_pos(
             sheet_def["TABLE_HEADER"]["row"]["pos"],
             min([x["pos"] for x in sheet_def["TABLE_HEADER"]["col"].values()]),
         ),
-        end=gen_text_pos(row_last, max([x["pos"] for x in sheet_def["TABLE_HEADER"]["col"].values()])),
+        end=_gen_text_pos(row_last, max([x["pos"] for x in sheet_def["TABLE_HEADER"]["col"].values()])),
     )
     sheet.sheet_view.showGridLines = False
 
@@ -344,7 +344,7 @@ def generate_list_sheet(  # noqa: PLR0913
     row = sheet_def["TABLE_HEADER"]["row"]["pos"]
 
     set_status_func("テーブルのヘッダを設定しています...")
-    insert_table_header(sheet, row, sheet_def, base_style)
+    _insert_table_header(sheet, row, sheet_def, base_style)
 
     update_seq_func()
 
@@ -359,7 +359,7 @@ def generate_list_sheet(  # noqa: PLR0913
     row += 1
     for item in item_list:
         sheet.row_dimensions[row].height = cell_height
-        insert_table_item(
+        _insert_table_item(
             sheet, row, item, is_need_thumb, thumb_path_func(item), sheet_def, base_style, warning_handler
         )
         update_item_func()
@@ -372,7 +372,7 @@ def generate_list_sheet(  # noqa: PLR0913
     update_seq_func()
 
     set_status_func("テーブルの表示設定しています...")
-    setting_table_view(sheet, sheet_def, row_last, not is_need_thumb)
+    _setting_table_view(sheet, sheet_def, row_last, not is_need_thumb)
 
     update_seq_func()
 
