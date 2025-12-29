@@ -131,6 +131,8 @@ def _execute_impl(
     driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="code"]').send_keys(code)
     my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "認証して完了する")]', wait)
 
+    time.sleep(0.5)
+
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
             (
@@ -139,6 +141,8 @@ def _execute_impl(
             )
         )
     )
+
+    time.sleep(0.5)
 
     wait.until(
         selenium.webdriver.support.expected_conditions.element_to_be_clickable(
