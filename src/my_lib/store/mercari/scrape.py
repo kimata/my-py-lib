@@ -6,7 +6,7 @@ import contextlib
 import logging
 import re
 import time
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
@@ -20,6 +20,9 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.captcha
+
+if TYPE_CHECKING:
+    import my_lib.store.mercari.progress
 
 _TRY_COUNT: int = 3
 _ITEM_LIST_XPATH: str = '//ul[@data-testid="listed-item-list"]//li'
@@ -36,6 +39,7 @@ def iter_items_on_display(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     debug_mode: bool,
     item_func_list: list[Callable[..., Any]],
+    progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
 ) -> None:
     my_lib.selenium_util.click_xpath(
         driver,
@@ -69,10 +73,17 @@ def iter_items_on_display(
 
     logging.info("%d 個の出品があります。", item_count)
 
+    if progress_observer is not None:
+        progress_observer.on_total_count(item_count)
+
     for i in range(1, item_count + 1):
         for retry in range(_TRY_COUNT):
             try:
-                _execute_item(driver, wait, debug_mode, item_count, i, item_func_list)
+                item = _execute_item(
+                    driver, wait, debug_mode, item_count, i, item_func_list, progress_observer
+                )
+                if progress_observer is not None and item is not None:
+                    progress_observer.on_item_complete(i, item_count, item)
                 break
             except Exception:
                 logging.exception("エラーが発生しました。")
@@ -140,7 +151,8 @@ def _execute_item(
     item_count: int,
     index: int,
     item_func_list: list[Callable[..., Any]],
-) -> None:
+    progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
+) -> dict[str, Any]:
     item, item_element, item_link = _parse_item(driver, index)
 
     logging.info(
@@ -153,6 +165,9 @@ def _execute_item(
         f"{item['view']:,}",
         f"{item['favorite']:,}",
     )
+
+    if progress_observer is not None:
+        progress_observer.on_item_start(index, item_count, item)
 
     # NOTE: ポップアップがリンクを覆い隠す場合があるため、先に閉じる
     _close_popup(driver)
@@ -202,6 +217,8 @@ def _execute_item(
                 my_lib.selenium_util.random_sleep(10)
 
         time.sleep(10)
+
+    return item
 
 
 def _auto_reload(
