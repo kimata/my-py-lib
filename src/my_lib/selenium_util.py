@@ -49,6 +49,10 @@ if TYPE_CHECKING:
 WAIT_RETRY_COUNT: int = 1
 
 
+class SeleniumError(Exception):
+    """Selenium 関連エラーの基底クラス"""
+
+
 def _get_chrome_version() -> int | None:
     try:
         result = subprocess.run(
