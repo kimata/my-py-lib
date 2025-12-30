@@ -378,7 +378,7 @@ if __name__ == "__main__":
 
     img = PIL.Image.open(captcha_file)
 
-    file_id = send_challenge_image_slack(slack_config, "Amazon Login", img, "画像 CAPTCHA")
+    file_id = send_challenge_image_slack(slack_config, "Amazon Login", img, "🔐 画像 CAPTCHA")
 
     if file_id is None:
         raise RuntimeError("Failed to send challenge image")
@@ -387,7 +387,7 @@ if __name__ == "__main__":
 
     logging.info('CAPTCHA is "%s"', captcha)
 
-    ts = send_request_text_slack(slack_config, "CAPTCHA", "SMS で送られてきた数字を入力してください")
+    ts = send_request_text_slack(slack_config, "CAPTCHA", "📱 SMS で送られてきた数字を入力してください")
 
     if ts is None:
         raise RuntimeError("Failed to send request text")

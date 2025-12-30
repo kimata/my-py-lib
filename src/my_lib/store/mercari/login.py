@@ -118,7 +118,7 @@ def _execute_impl(
         ts = my_lib.store.captcha.send_request_text_slack(
             slack_config,
             "Mercari",
-            "SMS で送られてきた認証番号を入力してください",
+            "📱 SMS で送られてきた認証番号を入力してください",
         )
         if ts is None:
             raise RuntimeError("Failed to send request text to Slack")
@@ -157,7 +157,7 @@ def _execute_impl(
         my_lib.notify.slack.send(
             slack_config,
             slack_config.captcha.channel.name,
-            my_lib.notify.slack.format_simple("CAPTCHA", "成功しました"),
+            my_lib.notify.slack.format_simple("CAPTCHA", "🎉 成功しました"),
             thread_ts=ts,
         )
 
@@ -194,7 +194,7 @@ def _login_via_line(
             my_lib.store.captcha.send_request_text_slack(
                 slack_config,
                 "LINE",
-                f"LINE アプリで認証番号「{code}」を入力してください。",
+                f"📱 LINE アプリで認証番号「{code}」を入力してください。",
             )
         logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
 
