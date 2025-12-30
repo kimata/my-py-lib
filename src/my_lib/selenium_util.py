@@ -326,6 +326,38 @@ def _cleanup_orphaned_chrome_processes_in_container() -> None:
     time.sleep(1)
 
 
+def _get_actual_profile_name(profile_name: str) -> str:
+    """PYTEST_XDIST_WORKER を考慮した実際のプロファイル名を取得"""
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    return profile_name + ("." + suffix if suffix is not None else "")
+
+
+def delete_profile(profile_name: str, data_path: pathlib.Path) -> bool:
+    """Chrome プロファイルを削除する
+
+    Args:
+        profile_name: プロファイル名
+        data_path: データディレクトリのパス
+
+    Returns:
+        bool: 削除が成功したかどうか
+    """
+    actual_profile_name = _get_actual_profile_name(profile_name)
+    profile_path = data_path / "chrome" / actual_profile_name
+
+    if not profile_path.exists():
+        logging.info("Profile does not exist: %s", profile_path)
+        return True
+
+    try:
+        shutil.rmtree(profile_path)
+        logging.warning("Deleted Chrome profile: %s", profile_path)
+        return True
+    except Exception:
+        logging.exception("Failed to delete Chrome profile: %s", profile_path)
+        return False
+
+
 def create_driver(
     profile_name: str,
     data_path: pathlib.Path,
@@ -349,9 +381,7 @@ def create_driver(
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.remote.remote_connection").setLevel(logging.WARNING)
 
-    # NOTE: Pytest を並列実行できるようにする
-    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
-    actual_profile_name = profile_name + ("." + suffix if suffix is not None else "")
+    actual_profile_name = _get_actual_profile_name(profile_name)
     profile_path = data_path / "chrome" / actual_profile_name
 
     # プロファイル健全性チェック
