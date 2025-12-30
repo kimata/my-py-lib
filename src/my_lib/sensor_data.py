@@ -46,11 +46,38 @@ import my_lib.time
 
 @dataclass(frozen=True)
 class SensorDataResult:
-    """センサーデータ取得結果"""
+    """センサーデータ取得結果
+
+    Attributes:
+        value: センサー値のリスト
+        time: タイムスタンプのリスト
+        valid: データが有効かどうか
+        raw_record_count: 取得した生レコード数（処理前）
+        null_count: None だったレコード数
+        error_message: エラー発生時のメッセージ
+    """
 
     value: list[float] = field(default_factory=list)
     time: list[datetime.datetime] = field(default_factory=list)
     valid: bool = False
+    raw_record_count: int = 0
+    null_count: int = 0
+    error_message: str | None = None
+
+    def get_diagnostic_message(self) -> str:
+        """診断メッセージを生成"""
+        if self.error_message:
+            return f"接続エラー: {self.error_message}"
+        if self.raw_record_count == 0:
+            return "データなし: クエリ結果が空でした"
+        if self.null_count == self.raw_record_count:
+            return f"全データがNone: {self.raw_record_count}件すべてがNoneでした"
+        if self.null_count > 0:
+            return (
+                f"一部データがNone: {self.raw_record_count}件中{self.null_count}件がNone、"
+                f"有効データ{len(self.value)}件"
+            )
+        return f"データ取得成功: {len(self.value)}件"
 
 
 @dataclass(frozen=True)
@@ -128,12 +155,18 @@ def _process_query_results(
     time_list = []
     localtime_offset = datetime.timedelta(hours=9)
 
+    # 診断情報
+    raw_record_count = 0
+    null_count = 0
+
     if len(table_list) != 0:
+        raw_record_count = len(table_list[0].records)
         for record in table_list[0].records:
             # NOTE: aggregateWindow(createEmpty: true) と fill(usePrevious: true) の組み合わせ
             # だとタイミングによって、先頭に None が入る
             if record.get_value() is None:
                 logging.debug("DELETE %s", record.get_time() + localtime_offset)
+                null_count += 1
                 continue
 
             data_list.append(record.get_value())
@@ -145,11 +178,26 @@ def _process_query_results(
         every_min = int(every_min)
         window_min = int(window_min)
         if window_min > every_min:
-            data_list = data_list[: (every_min - window_min)]
-            time_list = time_list[: (every_min - window_min)]
+            trim_count = window_min - every_min
+            # データが十分にある場合のみ切り詰め
+            if len(data_list) > trim_count:
+                data_list = data_list[:-trim_count]
+                time_list = time_list[:-trim_count]
+            else:
+                logging.warning(
+                    "Insufficient data to trim: data_count=%d, trim_count=%d",
+                    len(data_list),
+                    trim_count,
+                )
 
     logging.debug("data count = %s", len(time_list))
-    return SensorDataResult(value=data_list, time=time_list, valid=len(time_list) != 0)
+    return SensorDataResult(
+        value=data_list,
+        time=time_list,
+        valid=len(time_list) != 0,
+        raw_record_count=raw_record_count,
+        null_count=null_count,
+    )
 
 
 def _fetch_data_impl(  # noqa: PLR0913
@@ -289,10 +337,10 @@ def fetch_data(  # noqa: PLR0913
             )
 
         return result
-    except Exception:
+    except Exception as e:
         logging.exception("Failed to fetch data")
 
-        return SensorDataResult()
+        return SensorDataResult(error_message=str(e))
 
 
 async def fetch_data_async(  # noqa: PLR0913
@@ -355,10 +403,10 @@ async def fetch_data_async(  # noqa: PLR0913
             )
 
         return result
-    except Exception:
+    except Exception as e:
         logging.exception("Failed to fetch data")
 
-        return SensorDataResult()
+        return SensorDataResult(error_message=str(e))
 
 
 async def fetch_data_parallel(
