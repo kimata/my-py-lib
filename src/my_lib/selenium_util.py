@@ -590,7 +590,7 @@ def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
             # ファイルが別プロセスにより削除された場合（SQLiteの一時ファイルなど）
             continue
         if time_diff > time_threshold:
-            logging.info("remove %s [%s day(s) old].", item.absolute(), f"{time_diff.days:,}")
+            logging.warning("remove %s [%s day(s) old].", item.absolute(), f"{time_diff.days:,}")
 
             item.unlink(missing_ok=True)
 
