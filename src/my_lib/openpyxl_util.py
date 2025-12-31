@@ -368,7 +368,6 @@ def generate_list_sheet(  # noqa: PLR0913
 
     row_last = row - 1
 
-    update_item_func()
     update_seq_func()
 
     set_status_func("テーブルの表示設定しています...")
