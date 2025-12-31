@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+from collections.abc import Sequence
 from typing import Any, Protocol
 
 import openpyxl.drawing.image
@@ -323,7 +324,7 @@ def _setting_table_view(
 
 def generate_list_sheet(  # noqa: PLR0913
     book: openpyxl.workbook.Workbook,
-    item_list: list[RowData],
+    item_list: Sequence[RowData],
     sheet_def: dict[str, Any],
     is_need_thumb: bool,
     thumb_path_func: ThumbPathFunc,
