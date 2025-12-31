@@ -689,6 +689,18 @@ class browser_tab:  # noqa: N801
             # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
             logging.exception("タブのクリーンアップに失敗しました（Chromeがクラッシュした可能性があります）")
 
+    def _recover_from_error(self) -> None:
+        """エラー後にブラウザの状態を回復する"""
+        try:
+            # ページロードタイムアウトをリセット（負の値になっている可能性があるため）
+            self.driver.set_page_load_timeout(30)
+
+            # about:blank に移動してレンダラーの状態をリセット
+            self.driver.get("about:blank")
+            time.sleep(0.5)
+        except Exception:
+            logging.warning("ブラウザの回復に失敗しました")
+
     def __exit__(
         self,
         exception_type: type[BaseException] | None,
@@ -696,6 +708,10 @@ class browser_tab:  # noqa: N801
         traceback: Any,
     ) -> None:  # noqa: D105
         self._cleanup()
+
+        # 例外が発生した場合はブラウザの状態を回復
+        if exception_type is not None:
+            self._recover_from_error()
 
 
 class error_handler:  # noqa: N801
