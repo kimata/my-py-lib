@@ -668,7 +668,26 @@ class browser_tab:  # noqa: N801
         self.original_window = self.driver.current_window_handle
         self.driver.execute_script("window.open('');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
-        self.driver.get(self.url)
+        try:
+            self.driver.get(self.url)
+        except Exception:
+            # NOTE: URL読み込みに失敗した場合もクリーンアップしてから例外を再送出
+            self._cleanup()
+            raise
+
+    def _cleanup(self) -> None:
+        """タブを閉じて元のウィンドウに戻る"""
+        try:
+            # 余分なタブを閉じる
+            while len(self.driver.window_handles) > 1:
+                self.driver.switch_to.window(self.driver.window_handles[-1])
+                self.driver.close()
+            if self.original_window is not None:
+                self.driver.switch_to.window(self.original_window)
+            time.sleep(0.1)
+        except Exception:
+            # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
+            logging.exception("タブのクリーンアップに失敗しました（Chromeがクラッシュした可能性があります）")
 
     def __exit__(
         self,
@@ -676,14 +695,7 @@ class browser_tab:  # noqa: N801
         exception_value: BaseException | None,
         traceback: Any,
     ) -> None:  # noqa: D105
-        try:
-            self.driver.close()
-            if self.original_window is not None:
-                self.driver.switch_to.window(self.original_window)
-            time.sleep(0.1)
-        except Exception:
-            # NOTE: Chromeがクラッシュした場合は無視（既に終了しているため操作不可）
-            logging.exception("Failed to close browser tab (Chrome may have crashed)")
+        self._cleanup()
 
 
 class error_handler:  # noqa: N801
