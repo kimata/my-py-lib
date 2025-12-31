@@ -376,7 +376,17 @@ class TestBrowserTab:
         """タブを開いて閉じる"""
         mock_driver = unittest.mock.MagicMock()
         mock_driver.current_window_handle = "original"
-        mock_driver.window_handles = ["original", "new"]
+
+        # window_handles を動的に更新するモック
+        # close() が呼ばれたらリストから1つ減らす
+        window_handles = ["original", "new"]
+
+        def close_side_effect():
+            if len(window_handles) > 1:
+                window_handles.pop()
+
+        type(mock_driver).window_handles = unittest.mock.PropertyMock(side_effect=lambda: window_handles)
+        mock_driver.close.side_effect = close_side_effect
 
         with my_lib.selenium_util.browser_tab(mock_driver, "http://example.com"):
             mock_driver.execute_script.assert_called_with("window.open('');")
@@ -389,8 +399,17 @@ class TestBrowserTab:
         """close でエラーが発生しても例外を発生させない"""
         mock_driver = unittest.mock.MagicMock()
         mock_driver.current_window_handle = "original"
-        mock_driver.window_handles = ["original", "new"]
-        mock_driver.close.side_effect = Exception("Browser crashed")
+
+        # close() で例外が発生した場合でも window_handles は減らす必要がある
+        # ただし実際のコードでは例外後にループを抜けるので、1回だけのアクセスでOK
+        window_handles = ["original", "new"]
+
+        def close_side_effect():
+            window_handles.pop()
+            raise Exception("Browser crashed")
+
+        type(mock_driver).window_handles = unittest.mock.PropertyMock(side_effect=lambda: window_handles)
+        mock_driver.close.side_effect = close_side_effect
 
         with my_lib.selenium_util.browser_tab(mock_driver, "http://example.com"):
             pass
