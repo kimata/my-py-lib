@@ -28,7 +28,9 @@ import time
 import io
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
+
+T = TypeVar("T")
 
 import PIL.Image
 import psutil
@@ -512,6 +514,48 @@ def random_sleep(sec: float) -> None:
     RATIO = 0.8
 
     time.sleep((sec * RATIO) + (sec * (1 - RATIO) * 2) * random.random())  # noqa: S311
+
+
+def with_retry(
+    func: Callable[[], T],
+    max_retries: int = 3,
+    delay: float = 1.0,
+    exceptions: tuple[type[Exception], ...] = (Exception,),
+    on_retry: Callable[[int, Exception], None] | None = None,
+) -> T:
+    """リトライ付きで関数を実行
+
+    全て失敗した場合は最後の例外を再スロー。
+    呼び出し側で try/except してエラー処理を行う。
+
+    Args:
+        func: 実行する関数
+        max_retries: 最大リトライ回数
+        delay: リトライ間の待機秒数
+        exceptions: リトライ対象の例外タプル
+        on_retry: リトライ時のコールバック (attempt, exception)
+
+    Returns:
+        成功時は関数の戻り値
+
+    Raises:
+        最後の例外を再スロー
+    """
+    last_exception: Exception | None = None
+
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except exceptions as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                if on_retry:
+                    on_retry(attempt + 1, e)
+                time.sleep(delay)
+
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("Unexpected state in with_retry")
 
 
 def wait_patiently(
