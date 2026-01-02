@@ -39,25 +39,25 @@ class TestEventType:
 
 
 class TestEventIndex:
-    """event_index 関数のテスト"""
+    """_event_index 関数のテスト"""
 
     def test_control_index(self):
         """CONTROL のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, event_index
+        from my_lib.webapp.event import EVENT_TYPE, _event_index
 
-        assert event_index(EVENT_TYPE.CONTROL) == 0
+        assert _event_index(EVENT_TYPE.CONTROL) == 0
 
     def test_schedule_index(self):
         """SCHEDULE のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, event_index
+        from my_lib.webapp.event import EVENT_TYPE, _event_index
 
-        assert event_index(EVENT_TYPE.SCHEDULE) == 1
+        assert _event_index(EVENT_TYPE.SCHEDULE) == 1
 
     def test_log_index(self):
         """LOG のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, event_index
+        from my_lib.webapp.event import EVENT_TYPE, _event_index
 
-        assert event_index(EVENT_TYPE.LOG) == 2
+        assert _event_index(EVENT_TYPE.LOG) == 2
 
 
 class TestNotifyEvent:
@@ -122,7 +122,7 @@ class TestStart:
 
 
 class TestWorker:
-    """worker 関数のテスト"""
+    """_worker 関数のテスト"""
 
     def test_processes_events(self):
         """イベントを処理する"""
@@ -130,7 +130,7 @@ class TestWorker:
         import threading
         import time
 
-        from my_lib.webapp.event import EVENT_TYPE, _manager, worker
+        from my_lib.webapp.event import EVENT_TYPE, _manager, _worker
 
         queue = multiprocessing.Queue()
         queue.put(EVENT_TYPE.LOG)
@@ -142,18 +142,18 @@ class TestWorker:
             _manager.should_terminate = True
 
         threading.Thread(target=run_worker).start()
-        worker(queue)
+        _worker(queue)
 
     def test_stops_on_terminate(self):
         """終了フラグで停止する"""
         import multiprocessing
 
-        from my_lib.webapp.event import _manager, worker
+        from my_lib.webapp.event import _manager, _worker
 
         queue = multiprocessing.Queue()
         _manager.should_terminate = True
 
-        worker(queue)
+        _worker(queue)
 
 
 class TestEventManager:
