@@ -29,6 +29,14 @@ class TestEventType:
 
         assert EVENT_TYPE.LOG.value == "log"
 
+    def test_index_property(self):
+        """index プロパティが正しい値を返す"""
+        from my_lib.webapp.event import EVENT_TYPE
+
+        assert EVENT_TYPE.CONTROL.index == 0
+        assert EVENT_TYPE.SCHEDULE.index == 1
+        assert EVENT_TYPE.LOG.index == 2
+
 
 class TestEventIndex:
     """event_index 関数のテスト"""
@@ -57,12 +65,12 @@ class TestNotifyEvent:
 
     def test_increments_event_count(self):
         """イベントカウントを増加させる"""
-        from my_lib.webapp.event import EVENT_TYPE, event_count, event_index, notify_event
+        from my_lib.webapp.event import EVENT_TYPE, _manager, notify_event
 
-        initial = event_count[event_index(EVENT_TYPE.LOG)]
+        initial = _manager.event_count[EVENT_TYPE.LOG.index]
         notify_event(EVENT_TYPE.LOG)
 
-        assert event_count[event_index(EVENT_TYPE.LOG)] == initial + 1
+        assert _manager.event_count[EVENT_TYPE.LOG.index] == initial + 1
 
 
 class TestTerm:
@@ -80,16 +88,16 @@ class TestTerm:
         import threading
         import unittest.mock
 
-        import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import _manager, term
 
         mock_thread = unittest.mock.MagicMock(spec=threading.Thread)
-        event_module.watch_thread = mock_thread
-        event_module.should_terminate = False
+        _manager.watch_thread = mock_thread
+        _manager.should_terminate = False
 
-        event_module.term()
+        term()
 
-        assert event_module.should_terminate is True
-        assert event_module.watch_thread is None
+        assert _manager.should_terminate is True
+        assert _manager.watch_thread is None
 
 
 class TestStart:
@@ -99,18 +107,17 @@ class TestStart:
         """ウォッチスレッドを開始する"""
         import multiprocessing
         import time
-        import unittest.mock
 
-        import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import _manager, start, term
 
         queue = multiprocessing.Queue()
 
-        event_module.start(queue)
+        start(queue)
 
-        assert event_module.watch_thread is not None
-        assert event_module.should_terminate is False
+        assert _manager.watch_thread is not None
+        assert _manager.should_terminate is False
 
-        event_module.term()
+        term()
         time.sleep(0.2)
 
 
@@ -123,31 +130,96 @@ class TestWorker:
         import threading
         import time
 
-        import my_lib.webapp.event as event_module
-        from my_lib.webapp.event import EVENT_TYPE
+        from my_lib.webapp.event import EVENT_TYPE, _manager, worker
 
         queue = multiprocessing.Queue()
         queue.put(EVENT_TYPE.LOG)
 
-        event_module.should_terminate = False
+        _manager.should_terminate = False
 
         def run_worker():
             time.sleep(0.2)
-            event_module.should_terminate = True
+            _manager.should_terminate = True
 
         threading.Thread(target=run_worker).start()
-        event_module.worker(queue)
+        worker(queue)
 
     def test_stops_on_terminate(self):
         """終了フラグで停止する"""
         import multiprocessing
 
-        import my_lib.webapp.event as event_module
+        from my_lib.webapp.event import _manager, worker
 
         queue = multiprocessing.Queue()
-        event_module.should_terminate = True
+        _manager.should_terminate = True
 
-        event_module.worker(queue)
+        worker(queue)
+
+
+class TestEventManager:
+    """EventManager クラスのテスト"""
+
+    def test_init(self):
+        """初期化"""
+        from my_lib.webapp.event import EVENT_TYPE, EventManager
+
+        manager = EventManager()
+
+        assert manager.should_terminate is False
+        assert manager.watch_thread is None
+        assert len(manager.event_count) == len(EVENT_TYPE) + 1
+
+    def test_notify_event(self):
+        """イベント通知"""
+        from my_lib.webapp.event import EVENT_TYPE, EventManager
+
+        manager = EventManager()
+        initial = manager.event_count[EVENT_TYPE.CONTROL.index]
+
+        manager.notify_event(EVENT_TYPE.CONTROL)
+
+        assert manager.event_count[EVENT_TYPE.CONTROL.index] == initial + 1
+
+    def test_start_and_term(self):
+        """スレッドの開始と終了"""
+        import multiprocessing
+        import time
+
+        from my_lib.webapp.event import EventManager
+
+        manager = EventManager()
+        queue = multiprocessing.Queue()
+
+        manager.start(queue)
+
+        assert manager.watch_thread is not None
+        assert manager.should_terminate is False
+
+        manager.term()
+        time.sleep(0.2)
+
+        assert manager.watch_thread is None
+        assert manager.should_terminate is True
+
+    def test_get_event_stream(self):
+        """イベントストリーム生成"""
+        import threading
+        import time
+
+        from my_lib.webapp.event import EVENT_TYPE, EventManager
+
+        manager = EventManager()
+
+        def trigger_event():
+            time.sleep(0.1)
+            manager.notify_event(EVENT_TYPE.SCHEDULE)
+
+        threading.Thread(target=trigger_event).start()
+
+        stream = manager.get_event_stream(count=1)
+        result = next(stream)
+
+        assert "data: schedule" in result
 
 
 class TestApiEvent:
