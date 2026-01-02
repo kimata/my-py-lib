@@ -128,7 +128,10 @@ warn_return_any = false
 warn_unused_ignores = false
 check_untyped_defs = true
 no_implicit_optional = true
-exclude = ["tests/data"]
+exclude = [
+    "^tests/",
+    "^.venv/",
+]
 warn_unused_configs = true
 
 [tool.pyright]
