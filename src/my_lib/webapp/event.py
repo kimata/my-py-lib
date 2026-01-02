@@ -161,8 +161,8 @@ should_terminate = property(lambda: _manager.should_terminate)  # type: ignore[a
 watch_thread = property(lambda: _manager.watch_thread)  # type: ignore[assignment]
 
 
-def event_index(event_type: EVENT_TYPE) -> int:
-    """イベントタイプのインデックスを返す（後方互換性のため維持）
+def _event_index(event_type: EVENT_TYPE) -> int:
+    """イベントタイプのインデックスを返す（テスト用）
 
     Args:
         event_type: イベントタイプ
@@ -182,8 +182,8 @@ def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
     _manager.start(event_queue)
 
 
-def worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
-    """イベントキューを監視するワーカー（後方互換性のため維持）
+def _worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
+    """イベントキューを監視するワーカー（テスト用）
 
     Args:
         event_queue: イベントを受信するキュー
