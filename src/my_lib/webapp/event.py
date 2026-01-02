@@ -155,10 +155,8 @@ class EventManager:
 # モジュールレベルのインスタンス
 _manager = EventManager()
 
-# 後方互換性のためのモジュールレベル変数（_manager のプロパティを参照）
+# テスト用のモジュールレベル変数
 event_count = _manager.event_count
-should_terminate = property(lambda: _manager.should_terminate)  # type: ignore[assignment]
-watch_thread = property(lambda: _manager.watch_thread)  # type: ignore[assignment]
 
 
 def _event_index(event_type: EVENT_TYPE) -> int:

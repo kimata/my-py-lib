@@ -380,9 +380,6 @@ class LogManager:
 # モジュールレベルのインスタンス
 _manager = LogManager()
 
-# テスト用のモジュールレベル変数
-config = property(lambda: _manager.config)  # type: ignore[assignment]
-
 
 def _get_worker_id() -> str | None:
     """pytest-xdist のワーカー ID を取得する（テスト用）"""
