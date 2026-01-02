@@ -23,8 +23,8 @@ if "smbus2" not in sys.modules:
     sys.modules["smbus2"] = mock_smbus2
 
 # === 定数 ===
-CONFIG_FILE = pathlib.Path("tests/data/config.example.yaml")
-DATA_DIR = pathlib.Path("tests/data")
+CONFIG_FILE = pathlib.Path("tests/fixtures/config.example.yaml")
+FIXTURES_DIR = pathlib.Path("tests/fixtures")
 EVIDENCE_DIR = pathlib.Path("tests/evidence")
 EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 

@@ -98,7 +98,7 @@ tests/
 ├── conftest.py          # 共有フィクスチャ、モック設定
 ├── unit/                # ユニットテスト（20以上のテストファイル）
 ├── integration/         # 統合テスト
-└── data/
+└── fixtures/
     ├── config.example.yaml  # テスト用設定例
     └── chrome/test/     # Selenium プロファイル
 
@@ -184,7 +184,7 @@ path = my_lib.pytest_util.get_path(path_str)
 ### 型チェック
 
 - mypy と pyright の両方でチェック
-- `tests/data/` は除外設定済み
+- `tests/fixtures/` は除外設定済み
 
 #### 基本方針
 

@@ -6,7 +6,7 @@ Usage:
   scrape.py [-c CONFIG] [-t ASIN] [-s DATA_PATH] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
   -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
   -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
   -D                : デバッグモードで動作します。

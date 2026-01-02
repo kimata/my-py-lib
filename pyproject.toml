@@ -139,5 +139,5 @@ venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
 include = ["src", "tests"]
-exclude = ["tests/data"]
+exclude = ["tests/fixtures"]
 reportMissingImports = false
