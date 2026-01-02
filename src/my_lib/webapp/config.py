@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import pathlib
+from dataclasses import dataclass
 from typing import Any
 
 import flask
@@ -22,22 +23,52 @@ LOG_DIR_PATH: pathlib.Path | None = None
 STAT_DIR_PATH: pathlib.Path | None = None
 
 
-def init(config: dict[str, Any]) -> None:
+@dataclass
+class WebappDataConfig:
+    """webapp.data セクションの設定"""
+
+    schedule_file_path: pathlib.Path | None = None
+    log_file_path: pathlib.Path | None = None
+    stat_dir_path: pathlib.Path | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WebappDataConfig:
+        return cls(
+            schedule_file_path=pathlib.Path(data["schedule_file_path"]).resolve()
+            if "schedule_file_path" in data
+            else None,
+            log_file_path=pathlib.Path(data["log_file_path"]).resolve() if "log_file_path" in data else None,
+            stat_dir_path=pathlib.Path(data["stat_dir_path"]).resolve() if "stat_dir_path" in data else None,
+        )
+
+
+@dataclass
+class WebappConfig:
+    """webapp セクションの設定"""
+
+    static_dir_path: pathlib.Path | None = None
+    data: WebappDataConfig | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WebappConfig:
+        return cls(
+            static_dir_path=pathlib.Path(data["static_dir_path"]).resolve() if "static_dir_path" in data else None,
+            data=WebappDataConfig.from_dict(data["data"]) if "data" in data else None,
+        )
+
+
+def init(config: WebappConfig) -> None:
     global STATIC_DIR_PATH  # noqa: PLW0603
     global SCHEDULE_FILE_PATH  # noqa: PLW0603
     global LOG_DIR_PATH  # noqa: PLW0603
     global STAT_DIR_PATH  # noqa: PLW0603
 
-    if "static_dir_path" in config["webapp"]:
-        STATIC_DIR_PATH = pathlib.Path(config["webapp"]["static_dir_path"]).resolve()
+    STATIC_DIR_PATH = config.static_dir_path
 
-    if "data" in config["webapp"]:
-        if "schedule_file_path" in config["webapp"]["data"]:
-            SCHEDULE_FILE_PATH = pathlib.Path(config["webapp"]["data"]["schedule_file_path"]).resolve()
-        if "log_file_path" in config["webapp"]["data"]:
-            LOG_DIR_PATH = pathlib.Path(config["webapp"]["data"]["log_file_path"]).resolve()
-        if "stat_dir_path" in config["webapp"]["data"]:
-            STAT_DIR_PATH = pathlib.Path(config["webapp"]["data"]["stat_dir_path"]).resolve()
+    if config.data is not None:
+        SCHEDULE_FILE_PATH = config.data.schedule_file_path
+        LOG_DIR_PATH = config.data.log_file_path
+        STAT_DIR_PATH = config.data.stat_dir_path
 
     logging.info("STATIC_DIR_PATH = %s", STATIC_DIR_PATH)
     logging.info("SCHEDULE_FILE_PATH = %s", SCHEDULE_FILE_PATH)
