@@ -6,7 +6,7 @@ Usage:
   selenium_util.py [-c CONFIG] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
   -D                : デバッグモードで動作します。
 """
 

@@ -6,8 +6,8 @@ Usage:
   captcha.py [-c CONFIG] [-i IMAGE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
-  -i IMAGE          : CAPTCA 画像。[default: tests/data/captcha.png]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -i IMAGE          : CAPTCA 画像。[default: tests/fixtures/captcha.png]
   -D                : デバッグモードで動作します。
 """
 
