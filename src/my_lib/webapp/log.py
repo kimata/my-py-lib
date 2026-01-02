@@ -380,12 +380,12 @@ class LogManager:
 # モジュールレベルのインスタンス
 _manager = LogManager()
 
-# 後方互換性のためのモジュールレベル変数
+# テスト用のモジュールレベル変数
 config = property(lambda: _manager.config)  # type: ignore[assignment]
 
 
-def get_worker_id() -> str | None:
-    """pytest-xdist のワーカー ID を取得する（後方互換性のため維持）"""
+def _get_worker_id() -> str | None:
+    """pytest-xdist のワーカー ID を取得する（テスト用）"""
     return _manager.get_worker_id()
 
 
@@ -399,8 +399,8 @@ def init(config_: dict[str, Any], is_read_only: bool = False) -> None:
     _manager.init(config_, is_read_only)
 
 
-def init_impl() -> None:
-    """ワーカースレッドを初期化する（後方互換性のため維持）"""
+def _init_impl() -> None:
+    """ワーカースレッドを初期化する（テスト用）"""
     _manager._init_impl()
 
 
@@ -413,53 +413,53 @@ def term(is_read_only: bool = False) -> None:
     _manager.term(is_read_only)
 
 
-def get_log_thread() -> threading.Thread | None:
-    """現在のワーカーのログスレッドを取得する（後方互換性のため維持）"""
+def _get_log_thread() -> threading.Thread | None:
+    """現在のワーカーのログスレッドを取得する（テスト用）"""
     return _manager.get_log_thread()
 
 
-def get_queue_lock() -> threading.RLock | None:
-    """現在のワーカーのキューロックを取得する（後方互換性のため維持）"""
+def _get_queue_lock() -> threading.RLock | None:
+    """現在のワーカーのキューロックを取得する（テスト用）"""
     return _manager.get_queue_lock()
 
 
-def get_log_manager() -> multiprocessing.managers.SyncManager | None:
-    """現在のワーカーのマネージャーを取得する（後方互換性のため維持）"""
+def _get_log_manager() -> multiprocessing.managers.SyncManager | None:
+    """現在のワーカーのマネージャーを取得する（テスト用）"""
     return _manager.get_log_manager()
 
 
-def get_log_queue() -> Any:
-    """現在のワーカーのログキューを取得する（後方互換性のため維持）"""
+def _get_log_queue() -> Any:
+    """現在のワーカーのログキューを取得する（テスト用）"""
     return _manager.get_log_queue()
 
 
-def get_log_event() -> threading.Event | None:
-    """現在のワーカーのログイベントを取得する（後方互換性のため維持）"""
+def _get_log_event() -> threading.Event | None:
+    """現在のワーカーのログイベントを取得する（テスト用）"""
     return _manager.get_log_event()
 
 
-def get_should_terminate() -> threading.Event | None:
-    """現在のワーカーの終了フラグを取得する（後方互換性のため維持）"""
+def _get_should_terminate() -> threading.Event | None:
+    """現在のワーカーの終了フラグを取得する（テスト用）"""
     return _manager.get_should_terminate()
 
 
-def get_db_path() -> pathlib.Path:
-    """データベースパスを取得する（後方互換性のため維持）"""
+def _get_db_path() -> pathlib.Path:
+    """データベースパスを取得する（テスト用）"""
     return _manager.get_db_path()
 
 
-def execute_with_retry(func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
-    """リトライ機能付きで関数を実行する（後方互換性のため維持）"""
+def _execute_with_retry(func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
+    """リトライ機能付きで関数を実行する（テスト用）"""
     return _manager._execute_with_retry(func, *args, **kwargs)
 
 
-def log_impl(sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None:
-    """ログをデータベースに記録する（後方互換性のため維持）"""
+def _log_impl(sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None:
+    """ログをデータベースに記録する（テスト用）"""
     _manager._log_impl(sqlite, message, level)
 
 
-def worker(log_queue: Any) -> None:
-    """ログキューを監視するワーカー（後方互換性のため維持）"""
+def _worker(log_queue: Any) -> None:
+    """ログキューを監視するワーカー（テスト用）"""
     _manager._worker(log_queue)
 
 
@@ -519,7 +519,7 @@ def api_log_clear() -> flask.Response:
     """ログクリア API エンドポイント"""
     log = flask.request.args.get("log", True, type=json.loads)
 
-    queue_lock = get_queue_lock()
+    queue_lock = _manager.get_queue_lock()
     if queue_lock is None:
         return flask.jsonify({"result": "error", "message": "Log system not initialized"})
 
