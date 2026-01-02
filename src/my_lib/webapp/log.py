@@ -54,300 +54,454 @@ MAX_RETRY_DELAY_SEC = 5.0
 
 blueprint = flask.Blueprint("webapp-log", __name__)
 
-config: dict[str, Any] | None = None
 
-_log_thread: dict[str | None, threading.Thread] = {}
-_queue_lock: dict[str | None, threading.RLock] = {}
-_log_queue: dict[str | None, Any] = {}
-_log_manager: dict[str | None, multiprocessing.managers.SyncManager] = {}
-_log_event: dict[str | None, threading.Event] = {}
-_should_terminate: dict[str | None, threading.Event] = {}
+class LogManager:
+    """ログ管理クラス
+
+    SQLite データベースへのログ記録と、ワーカースレッドによる非同期処理を管理します。
+    pytest-xdist による並列テスト実行に対応するため、ワーカー ID ごとに状態を分離します。
+    """
+
+    def __init__(self) -> None:
+        self._config: dict[str, Any] | None = None
+        self._log_thread: dict[str | None, threading.Thread] = {}
+        self._queue_lock: dict[str | None, threading.RLock] = {}
+        self._log_queue: dict[str | None, Any] = {}
+        self._log_manager: dict[str | None, multiprocessing.managers.SyncManager] = {}
+        self._log_event: dict[str | None, threading.Event] = {}
+        self._should_terminate: dict[str | None, threading.Event] = {}
+
+    @property
+    def config(self) -> dict[str, Any] | None:
+        """設定 dict"""
+        return self._config
+
+    @config.setter
+    def config(self, value: dict[str, Any] | None) -> None:
+        self._config = value
+
+    @staticmethod
+    def get_worker_id() -> str | None:
+        """pytest-xdist のワーカー ID を取得する"""
+        return os.environ.get("PYTEST_XDIST_WORKER", None)
+
+    def get_log_thread(self) -> threading.Thread | None:
+        """現在のワーカーのログスレッドを取得する"""
+        return self._log_thread.get(self.get_worker_id(), None)
+
+    def get_queue_lock(self) -> threading.RLock | None:
+        """現在のワーカーのキューロックを取得する"""
+        return self._queue_lock.get(self.get_worker_id(), None)
+
+    def get_log_manager(self) -> multiprocessing.managers.SyncManager | None:
+        """現在のワーカーのマネージャーを取得する"""
+        return self._log_manager.get(self.get_worker_id(), None)
+
+    def get_log_queue(self) -> Any:
+        """現在のワーカーのログキューを取得する"""
+        return self._log_queue.get(self.get_worker_id(), None)
+
+    def get_log_event(self) -> threading.Event | None:
+        """現在のワーカーのログイベントを取得する"""
+        return self._log_event.get(self.get_worker_id(), None)
+
+    def get_should_terminate(self) -> threading.Event | None:
+        """現在のワーカーの終了フラグを取得する"""
+        return self._should_terminate.get(self.get_worker_id(), None)
+
+    def get_db_path(self) -> pathlib.Path:
+        """データベースパスを取得する（ワーカー ID に応じたパスを返す）"""
+        worker_id = self.get_worker_id()
+        base_path = my_lib.webapp.config.LOG_DIR_PATH
+
+        if base_path is None:
+            raise RuntimeError("LOG_DIR_PATH is not initialized. Call init() first.")
+
+        if worker_id is None:
+            return base_path
+        else:
+            # ワーカー毎に別ディレクトリを作成
+            worker_dir = base_path.parent / f"test_worker_{worker_id}"
+            worker_dir.mkdir(parents=True, exist_ok=True)
+            return worker_dir / base_path.name
+
+    def init(self, config: dict[str, Any], is_read_only: bool = False) -> None:
+        """ログシステムを初期化する
+
+        Args:
+            config: 設定 dict
+            is_read_only: 読み取り専用モード
+        """
+        self._config = config
+
+        db_path = self.get_db_path()
+        # 初回のみsqlite_util.connectを使用してデータベースを初期化
+        with my_lib.sqlite_util.connect(db_path) as sqlite:
+            sqlite.execute(
+                f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
+                "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
+            )
+            sqlite.commit()
+
+        if not is_read_only:
+            self._init_impl()
+
+    def _init_impl(self) -> None:
+        """ワーカースレッドを初期化する"""
+        # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
+        log_manager = self.get_log_manager()
+        if log_manager is not None:
+            log_manager.shutdown()
+
+        worker_id = self.get_worker_id()
+
+        should_terminate = self.get_should_terminate()
+        if should_terminate is not None:
+            should_terminate.clear()
+        else:
+            self._queue_lock[worker_id] = threading.RLock()
+            self._should_terminate[worker_id] = threading.Event()
+            self._log_event[worker_id] = threading.Event()
+
+        manager = multiprocessing.Manager()
+
+        self._log_manager[worker_id] = manager
+        self._log_queue[worker_id] = manager.Queue()
+
+        self._log_thread[worker_id] = threading.Thread(target=self._worker, args=(self.get_log_queue(),))
+        self._log_thread[worker_id].start()
+
+    def term(self, is_read_only: bool = False) -> None:
+        """ログシステムを終了する
+
+        Args:
+            is_read_only: 読み取り専用モード
+        """
+        if is_read_only:
+            return
+
+        log_thread = self.get_log_thread()
+        if log_thread is None:
+            return
+
+        should_terminate = self.get_should_terminate()
+        log_event = self.get_log_event()
+        if should_terminate is not None:
+            should_terminate.set()
+        if log_event is not None:
+            log_event.set()
+
+        time.sleep(1)
+
+        log_thread.join()
+        del self._log_thread[self.get_worker_id()]
+
+    def _execute_with_retry(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
+        """リトライ機能付きで関数を実行する"""
+        retry_count = 0
+        delay = INITIAL_RETRY_DELAY_SEC
+        last_exception = None
+
+        while retry_count < MAX_RETRY_COUNT:
+            try:
+                return func(*args, **kwargs)
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:  # noqa: PERF203
+                last_exception = e
+                error_msg = str(e).lower()
+
+                if "database is locked" in error_msg or "unable to open database file" in error_msg:
+                    retry_count += 1
+
+                    if retry_count >= MAX_RETRY_COUNT:
+                        logging.exception("最大リトライ回数 %d に達しました", MAX_RETRY_COUNT)
+                        # データベースの復旧を試みる
+                        db_path = self.get_db_path()
+                        my_lib.sqlite_util.recover(db_path)
+                        raise
+
+                    logging.warning("データベースエラー (リトライ %d/%d): %s", retry_count, MAX_RETRY_COUNT, e)
+                    time.sleep(delay)
+                    delay = min(delay * 2, MAX_RETRY_DELAY_SEC)  # 指数バックオフ
+                else:
+                    raise
+
+        if last_exception:
+            raise last_exception
+        return None
+
+    def _log_impl(self, sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None:
+        """ログをデータベースに記録する"""
+        logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
+
+        def _execute_log() -> None:
+            sqlite.execute(
+                f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
+                [message],
+            )
+            sqlite.execute(f'DELETE FROM {TABLE_NAME} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
+            sqlite.commit()
+
+        # リトライ機能付きでログを記録
+        self._execute_with_retry(_execute_log)
+
+        my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
+
+        if level == LOG_LEVEL.ERROR:
+            if self._config is not None and "slack" in self._config:
+                slack_config = my_lib.notify.slack.parse_config(self._config["slack"])
+                if isinstance(
+                    slack_config,
+                    (
+                        my_lib.notify.slack.SlackConfig,
+                        my_lib.notify.slack.SlackErrorInfoConfig,
+                        my_lib.notify.slack.SlackErrorOnlyConfig,
+                    ),
+                ):
+                    my_lib.notify.slack.error(slack_config, self._config["slack"]["from"], message)
+
+            if (os.environ.get("DUMMY_MODE", "false") == "true") and (
+                os.environ.get("TEST", "false") != "true"
+            ):  # pragma: no cover
+                logging.error("This application is terminated because it is in dummy mode.")
+                os._exit(-1)
+
+    def _worker(self, log_queue: Any) -> None:
+        """ログキューを監視するワーカー"""
+        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
+            while True:
+                should_terminate = self.get_should_terminate()
+                if should_terminate is not None and should_terminate.is_set():
+                    break
+
+                # NOTE: とりあえず、イベントを待つ
+                log_event = self.get_log_event()
+                if log_event is None or not log_event.wait(CHECK_INTERVAL_SEC):
+                    continue
+
+                try:
+                    queue_lock = self.get_queue_lock()
+                    if queue_lock is None:
+                        continue
+                    with queue_lock:  # NOTE: クリア処理と排他したい
+                        log_event.clear()
+
+                        while not log_queue.empty():
+                            logging.debug("Found %d log message(s)", log_queue.qsize())
+                            log = log_queue.get()
+                            self._log_impl(sqlite, log["message"], log["level"])
+                except OverflowError:  # pragma: no cover
+                    # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
+                    logging.debug(traceback.format_exc())
+                except (ValueError, BrokenPipeError, EOFError, OSError):  # pragma: no cover
+                    # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこれらの例外が
+                    # 発生する。マネージャーがシャットダウンされた場合は BrokenPipeError が発生する。
+                    logging.debug("Queue connection closed, terminating worker")
+                    break
+            logging.info("Terminate worker")
+
+    def add(self, message: str, level: LOG_LEVEL) -> None:
+        """ログを追加する
+
+        Args:
+            message: ログメッセージ
+            level: ログレベル
+        """
+        queue_lock = self.get_queue_lock()
+        log_queue = self.get_log_queue()
+        log_event = self.get_log_event()
+
+        if queue_lock is None or log_queue is None or log_event is None:
+            logging.warning("Log system not initialized, skipping log: %s", message)
+            return
+
+        with queue_lock:  # NOTE: クリア処理と排他したい
+            # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
+            log_queue.put({"message": message, "level": level})
+            log_event.set()
+
+    def error(self, message: str) -> None:
+        """エラーログを記録する"""
+        logging.error(message)
+        self.add(message, LOG_LEVEL.ERROR)
+
+    def warning(self, message: str) -> None:
+        """警告ログを記録する"""
+        logging.warning(message)
+        self.add(message, LOG_LEVEL.WARN)
+
+    def info(self, message: str) -> None:
+        """情報ログを記録する"""
+        logging.info(message)
+        self.add(message, LOG_LEVEL.INFO)
+
+    def get(self, stop_day: int = 0) -> list[dict[str, Any]]:
+        """ログを取得する
+
+        Args:
+            stop_day: 取得を停止する日数前
+
+        Returns:
+            ログのリスト
+        """
+        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
+            sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
+            cur = sqlite.cursor()
+            cur.execute(
+                f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
+                # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
+                [f"-{stop_day} days"],
+            )
+            log_list = [dict(log) for log in cur.fetchall()]
+            for log in log_list:
+                log["date"] = (
+                    datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
+                    .replace(tzinfo=datetime.timezone.utc)
+                    .astimezone(my_lib.time.get_zoneinfo())
+                    .strftime("%Y-%m-%d %H:%M:%S")
+                )
+            return log_list
+
+    def clear(self) -> None:
+        """ログをクリアする"""
+        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
+            cur = sqlite.cursor()
+
+            logging.debug("clear SQLite")
+            cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
+            sqlite.commit()
+
+        logging.debug("clear Queue")
+        log_queue = self.get_log_queue()
+        if log_queue is not None:
+            while not log_queue.empty():  # NOTE: 信用できないけど、許容する
+                log_queue.get_nowait()
 
 
-def init(config_: dict[str, Any], is_read_only: bool = False) -> None:
-    global config  # noqa: PLW0603
+# モジュールレベルのインスタンス
+_manager = LogManager()
 
-    config = config_
-
-    db_path = get_db_path()
-    # 初回のみsqlite_util.connectを使用してデータベースを初期化
-    with my_lib.sqlite_util.connect(db_path) as sqlite:
-        sqlite.execute(
-            f"CREATE TABLE IF NOT EXISTS {TABLE_NAME}"
-            "(id INTEGER primary key autoincrement, date INTEGER, message TEXT)"
-        )
-        sqlite.commit()
-
-    if not is_read_only:
-        init_impl()
-
-
-def term(is_read_only: bool = False) -> None:
-    if is_read_only:
-        return
-
-    log_thread = get_log_thread()
-    if log_thread is None:
-        return
-
-    should_terminate = get_should_terminate()
-    log_event = get_log_event()
-    if should_terminate is not None:
-        should_terminate.set()
-    if log_event is not None:
-        log_event.set()
-
-    time.sleep(1)
-
-    log_thread.join()
-    del _log_thread[get_worker_id()]
+# 後方互換性のためのモジュールレベル変数
+config = property(lambda: _manager.config)  # type: ignore[assignment]
 
 
 def get_worker_id() -> str | None:
-    return os.environ.get("PYTEST_XDIST_WORKER", None)
+    """pytest-xdist のワーカー ID を取得する（後方互換性のため維持）"""
+    return _manager.get_worker_id()
+
+
+def init(config_: dict[str, Any], is_read_only: bool = False) -> None:
+    """ログシステムを初期化する
+
+    Args:
+        config_: 設定 dict
+        is_read_only: 読み取り専用モード
+    """
+    _manager.init(config_, is_read_only)
 
 
 def init_impl() -> None:
-    # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-    log_manager = get_log_manager()
-    if log_manager is not None:
-        log_manager.shutdown()
+    """ワーカースレッドを初期化する（後方互換性のため維持）"""
+    _manager._init_impl()
 
-    worker_id = get_worker_id()
 
-    should_terminate = get_should_terminate()
-    if should_terminate is not None:
-        should_terminate.clear()
-    else:
-        _queue_lock[worker_id] = threading.RLock()
-        _should_terminate[worker_id] = threading.Event()
-        _log_event[worker_id] = threading.Event()
+def term(is_read_only: bool = False) -> None:
+    """ログシステムを終了する
 
-    manager = multiprocessing.Manager()
-
-    _log_manager[worker_id] = manager
-    _log_queue[worker_id] = manager.Queue()
-
-    _log_thread[worker_id] = threading.Thread(target=worker, args=(get_log_queue(),))
-    _log_thread[worker_id].start()
+    Args:
+        is_read_only: 読み取り専用モード
+    """
+    _manager.term(is_read_only)
 
 
 def get_log_thread() -> threading.Thread | None:
-    return _log_thread.get(get_worker_id(), None)
+    """現在のワーカーのログスレッドを取得する（後方互換性のため維持）"""
+    return _manager.get_log_thread()
 
 
 def get_queue_lock() -> threading.RLock | None:
-    return _queue_lock.get(get_worker_id(), None)
+    """現在のワーカーのキューロックを取得する（後方互換性のため維持）"""
+    return _manager.get_queue_lock()
 
 
 def get_log_manager() -> multiprocessing.managers.SyncManager | None:
-    return _log_manager.get(get_worker_id(), None)
+    """現在のワーカーのマネージャーを取得する（後方互換性のため維持）"""
+    return _manager.get_log_manager()
 
 
 def get_log_queue() -> Any:
-    return _log_queue.get(get_worker_id(), None)
+    """現在のワーカーのログキューを取得する（後方互換性のため維持）"""
+    return _manager.get_log_queue()
 
 
 def get_log_event() -> threading.Event | None:
-    return _log_event.get(get_worker_id(), None)
+    """現在のワーカーのログイベントを取得する（後方互換性のため維持）"""
+    return _manager.get_log_event()
 
 
 def get_should_terminate() -> threading.Event | None:
-    return _should_terminate.get(get_worker_id(), None)
+    """現在のワーカーの終了フラグを取得する（後方互換性のため維持）"""
+    return _manager.get_should_terminate()
 
 
 def get_db_path() -> pathlib.Path:
-    # NOTE: Pytest を並列実行できるようにする
-    worker_id = get_worker_id()
-    base_path = my_lib.webapp.config.LOG_DIR_PATH
-
-    if base_path is None:
-        raise RuntimeError("LOG_DIR_PATH is not initialized. Call init() first.")
-
-    if worker_id is None:
-        return base_path
-    else:
-        # ワーカー毎に別ディレクトリを作成
-        worker_dir = base_path.parent / f"test_worker_{worker_id}"
-        worker_dir.mkdir(parents=True, exist_ok=True)
-        return worker_dir / base_path.name
+    """データベースパスを取得する（後方互換性のため維持）"""
+    return _manager.get_db_path()
 
 
 def execute_with_retry(func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
-    """リトライ機能付きで関数を実行する"""
-    retry_count = 0
-    delay = INITIAL_RETRY_DELAY_SEC
-    last_exception = None
-
-    while retry_count < MAX_RETRY_COUNT:
-        try:
-            return func(*args, **kwargs)
-        except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:  # noqa: PERF203
-            last_exception = e
-            error_msg = str(e).lower()
-
-            if "database is locked" in error_msg or "unable to open database file" in error_msg:
-                retry_count += 1
-
-                if retry_count >= MAX_RETRY_COUNT:
-                    logging.exception("最大リトライ回数 %d に達しました", MAX_RETRY_COUNT)
-                    # データベースの復旧を試みる
-                    db_path = get_db_path()
-                    my_lib.sqlite_util.recover(db_path)
-                    raise
-
-                logging.warning("データベースエラー (リトライ %d/%d): %s", retry_count, MAX_RETRY_COUNT, e)
-                time.sleep(delay)
-                delay = min(delay * 2, MAX_RETRY_DELAY_SEC)  # 指数バックオフ
-            else:
-                raise
-
-    if last_exception:
-        raise last_exception
-    return None
+    """リトライ機能付きで関数を実行する（後方互換性のため維持）"""
+    return _manager._execute_with_retry(func, *args, **kwargs)
 
 
 def log_impl(sqlite: sqlite3.Connection, message: str, level: LOG_LEVEL) -> None:
-    global config
-
-    logging.debug("insert: [%s] %s", LOG_LEVEL(level).name, message)
-
-    def _execute_log() -> None:
-        sqlite.execute(
-            f'INSERT INTO {TABLE_NAME} VALUES (NULL, DATETIME("now"), ?)',  # noqa: S608
-            [message],
-        )
-        sqlite.execute(f'DELETE FROM {TABLE_NAME} WHERE date <= DATETIME("now", "-60 days")')  # noqa: S608
-        sqlite.commit()
-
-    # リトライ機能付きでログを記録
-    execute_with_retry(_execute_log)
-
-    my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
-
-    if level == LOG_LEVEL.ERROR:
-        if config is not None and "slack" in config:
-            slack_config = my_lib.notify.slack.parse_config(config["slack"])
-            if isinstance(
-                slack_config,
-                (
-                    my_lib.notify.slack.SlackConfig,
-                    my_lib.notify.slack.SlackErrorInfoConfig,
-                    my_lib.notify.slack.SlackErrorOnlyConfig,
-                ),
-            ):
-                my_lib.notify.slack.error(slack_config, config["slack"]["from"], message)
-
-        if (os.environ.get("DUMMY_MODE", "false") == "true") and (
-            os.environ.get("TEST", "false") != "true"
-        ):  # pragma: no cover
-            logging.error("This application is terminated because it is in dummy mode.")
-            os._exit(-1)
+    """ログをデータベースに記録する（後方互換性のため維持）"""
+    _manager._log_impl(sqlite, message, level)
 
 
 def worker(log_queue: Any) -> None:
-    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
-        while True:
-            should_terminate = get_should_terminate()
-            if should_terminate is not None and should_terminate.is_set():
-                break
-
-            # NOTE: とりあえず、イベントを待つ
-            log_event = get_log_event()
-            if log_event is None or not log_event.wait(CHECK_INTERVAL_SEC):
-                continue
-
-            try:
-                queue_lock = get_queue_lock()
-                if queue_lock is None:
-                    continue
-                with queue_lock:  # NOTE: クリア処理と排他したい
-                    log_event.clear()
-
-                    while not log_queue.empty():
-                        logging.debug("Found %d log message(s)", log_queue.qsize())
-                        log = log_queue.get()
-                        log_impl(sqlite, log["message"], log["level"])
-            except OverflowError:  # pragma: no cover
-                # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
-                logging.debug(traceback.format_exc())
-            except (ValueError, BrokenPipeError, EOFError, OSError):  # pragma: no cover
-                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこれらの例外が
-                # 発生する。マネージャーがシャットダウンされた場合は BrokenPipeError が発生する。
-                logging.debug("Queue connection closed, terminating worker")
-                break
-        logging.info("Terminate worker")
+    """ログキューを監視するワーカー（後方互換性のため維持）"""
+    _manager._worker(log_queue)
 
 
 def add(message: str, level: LOG_LEVEL) -> None:
-    queue_lock = get_queue_lock()
-    log_queue = get_log_queue()
-    log_event = get_log_event()
+    """ログを追加する
 
-    if queue_lock is None or log_queue is None or log_event is None:
-        logging.warning("Log system not initialized, skipping log: %s", message)
-        return
-
-    with queue_lock:  # NOTE: クリア処理と排他したい
-        # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-        log_queue.put({"message": message, "level": level})
-        log_event.set()
+    Args:
+        message: ログメッセージ
+        level: ログレベル
+    """
+    _manager.add(message, level)
 
 
 def error(message: str) -> None:
-    logging.error(message)
-
-    add(message, LOG_LEVEL.ERROR)
+    """エラーログを記録する"""
+    _manager.error(message)
 
 
 def warning(message: str) -> None:
-    logging.warning(message)
-
-    add(message, LOG_LEVEL.WARN)
+    """警告ログを記録する"""
+    _manager.warning(message)
 
 
 def info(message: str) -> None:
-    logging.info(message)
-
-    add(message, LOG_LEVEL.INFO)
+    """情報ログを記録する"""
+    _manager.info(message)
 
 
 def get(stop_day: int = 0) -> list[dict[str, Any]]:
-    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
-        sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
-        cur = sqlite.cursor()
-        cur.execute(
-            f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
-            # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
-            [f"-{stop_day} days"],
-        )
-        log_list = [dict(log) for log in cur.fetchall()]
-        for log in log_list:
-            log["date"] = (
-                datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
-                .replace(tzinfo=datetime.timezone.utc)
-                .astimezone(my_lib.time.get_zoneinfo())
-                .strftime("%Y-%m-%d %H:%M:%S")
-            )
-        return log_list
+    """ログを取得する"""
+    return _manager.get(stop_day)
 
 
 def clear() -> None:
-    with my_lib.sqlite_util.connect(get_db_path()) as sqlite:
-        cur = sqlite.cursor()
-
-        logging.debug("clear SQLite")
-        cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
-        sqlite.commit()
-
-    logging.debug("clear Queue")
-    while not get_log_queue().empty():  # NOTE: 信用できないけど、許容する
-        get_log_queue().get_nowait()
+    """ログをクリアする"""
+    _manager.clear()
 
 
 @blueprint.route("/api/log_add", methods=["POST"])
 @my_lib.flask_util.support_jsonp
 def api_log_add() -> flask.Response:
+    """ログ追加 API エンドポイント"""
     if not flask.current_app.config["TEST"]:
         flask.abort(403)
 
@@ -362,6 +516,7 @@ def api_log_add() -> flask.Response:
 @blueprint.route("/api/log_clear", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def api_log_clear() -> flask.Response:
+    """ログクリア API エンドポイント"""
     log = flask.request.args.get("log", True, type=json.loads)
 
     queue_lock = get_queue_lock()
@@ -381,6 +536,7 @@ def api_log_clear() -> flask.Response:
 @my_lib.flask_util.support_jsonp
 @my_lib.flask_util.gzipped
 def api_log_view() -> flask.Response:
+    """ログ表示 API エンドポイント"""
     stop_day = flask.request.args.get("stop_day", 0, type=int)
 
     # NOTE: @gzipped をつけた場合、キャッシュ用のヘッダを付与しているので、
@@ -407,6 +563,7 @@ def api_log_view() -> flask.Response:
 
 
 def test_run(config: dict[str, Any], port: int, debug_mode: bool) -> None:
+    """テスト用サーバを実行する"""
     import flask_cors
 
     app = flask.Flask("test")
