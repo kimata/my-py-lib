@@ -25,8 +25,6 @@ if "smbus2" not in sys.modules:
 # === 定数 ===
 CONFIG_FILE = pathlib.Path("tests/fixtures/config.example.yaml")
 FIXTURES_DIR = pathlib.Path("tests/fixtures")
-EVIDENCE_DIR = pathlib.Path("tests/evidence")
-EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # === pytest コマンドラインオプション ===
