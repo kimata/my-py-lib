@@ -3,10 +3,11 @@
 Web ページをスクレイピングして、天気に関する情報を取得します
 
 Usage:
-  weather.py [-c CONFIG] [-D]
+  weather.py [-c CONFIG] [-t TYPE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/data/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -t TYPE           : テストする機能を指定します。(all, yahoo, clothing, wbgt, sunset, tenki) [default: all]
   -D                : デバッグモードで動作します。
 """
 
@@ -116,7 +117,7 @@ class TenkiHourlyData:
     """tenki.jp 時間ごとのデータ"""
 
     temp: float
-    precip: int
+    precip: float
     humi: int
 
 
@@ -435,8 +436,8 @@ def get_sunset_nao(pref: int) -> SunsetResult:
 def parse_table_tenki(content: lxml.html.HtmlElement, index: int) -> list[TenkiHourlyData]:
     ROW_LIST: list[dict[str, str | int]] = [
         {"label": "temp", "index": 6, "type": "float"},
-        {"label": "precip", "index": 9, "type": "int"},
-        {"label": "humi", "index": 10, "type": "int"},
+        {"label": "precip", "index": 9, "type": "float"},
+        {"label": "humi", "index": 11, "type": "int"},
     ]
 
     day_info_by_type: dict[str, list[int | float]] = {}
@@ -455,7 +456,7 @@ def parse_table_tenki(content: lxml.html.HtmlElement, index: int) -> list[TenkiH
     return [
         TenkiHourlyData(
             temp=float(day_info_by_type["temp"][i]),
-            precip=int(day_info_by_type["precip"][i]),
+            precip=float(day_info_by_type["precip"][i]),
             humi=int(day_info_by_type["humi"][i]),
         )
         for i in range(24)
@@ -497,12 +498,127 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
+    test_type = args["-t"]
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config = my_lib.config.load(config_file)
 
-    sunset_config = config["sunset"]
+    def test_yahoo_weather() -> None:
+        """Yahoo天気から天気情報を取得するテスト"""
+        logging.info("=" * 60)
+        logging.info("Testing: get_weather_yahoo")
+        logging.info("=" * 60)
+        try:
+            yahoo_url = config["weather"]["data"]["yahoo"]["url"]
+            result = get_weather_yahoo(yahoo_url)
+            logging.info("Today's date: %s", result.today.date)
+            logging.info("Tomorrow's date: %s", result.tomorrow.date)
+            logging.info("Today's hourly data count: %d", len(result.today.data))
+            if result.today.data:
+                first = result.today.data[0]
+                logging.info(
+                    "  Sample (first): hour=%d, weather=%s, temp=%.1f, humi=%.1f, precip=%.1f, wind=%s %dm/s",
+                    first.hour,
+                    first.weather.text,
+                    first.temp,
+                    first.humi,
+                    first.precip,
+                    first.wind.dir,
+                    first.wind.speed,
+                )
+            logging.info("Result:\n%s", my_lib.pretty.format(result))
+        except Exception:
+            logging.exception("Failed to get Yahoo weather")
 
-    logging.info(my_lib.pretty.format(get_sunset_nao(sunset_config)))
+    def test_yahoo_clothing() -> None:
+        """Yahoo天気から服装指数を取得するテスト"""
+        logging.info("=" * 60)
+        logging.info("Testing: get_clothing_yahoo")
+        logging.info("=" * 60)
+        try:
+            yahoo_url = config["weather"]["data"]["yahoo"]["url"]
+            result = get_clothing_yahoo(yahoo_url)
+            logging.info("Today's clothing index: %d", result.today.data)
+            logging.info("Tomorrow's clothing index: %d", result.tomorrow.data)
+            logging.info("Result:\n%s", my_lib.pretty.format(result))
+        except Exception:
+            logging.exception("Failed to get clothing index")
+
+    def test_wbgt() -> None:
+        """環境省WBGTからWBGT情報を取得するテスト"""
+        logging.info("=" * 60)
+        logging.info("Testing: get_wbgt")
+        logging.info("=" * 60)
+        try:
+            wbgt_url = config["wbgt"]["data"]["env_go"]["url"]
+            result = get_wbgt(wbgt_url)
+            if result.current is not None:
+                logging.info("Current WBGT: %.1f", result.current)
+            else:
+                logging.info("Current WBGT: N/A (off-season)")
+            if result.daily.today is not None:
+                logging.info("Today's WBGT: %s", result.daily.today)
+            if result.daily.tomorrow is not None:
+                logging.info("Tomorrow's WBGT: %s", result.daily.tomorrow)
+            logging.info("Result:\n%s", my_lib.pretty.format(result))
+        except Exception:
+            logging.exception("Failed to get WBGT")
+
+    def test_sunset() -> None:
+        """国立天文台から日の入り情報を取得するテスト"""
+        logging.info("=" * 60)
+        logging.info("Testing: get_sunset_nao")
+        logging.info("=" * 60)
+        try:
+            pref = config["sunset"]["data"]["nao"]["pref"]
+            result = get_sunset_nao(pref)
+            logging.info("Today's sunset: %s", result.today)
+            logging.info("Tomorrow's sunset: %s", result.tomorrow)
+            logging.info("Result:\n%s", my_lib.pretty.format(result))
+        except Exception:
+            logging.exception("Failed to get sunset info")
+
+    def test_tenki() -> None:
+        """tenki.jp から降水確率を取得するテスト"""
+        logging.info("=" * 60)
+        logging.info("Testing: get_precip_by_hour_tenki")
+        logging.info("=" * 60)
+        try:
+            tenki_config = config["tenki"]
+            result = get_precip_by_hour_tenki(tenki_config)
+            logging.info("Today's date: %s", result.today.date)
+            logging.info("Tomorrow's date: %s", result.tomorrow.date)
+            logging.info("Today's hourly data count: %d", len(result.today.data))
+            if result.today.data:
+                first = result.today.data[0]
+                logging.info(
+                    "  Sample (first): temp=%.1f, precip=%.1fmm, humi=%d%%",
+                    first.temp,
+                    first.precip,
+                    first.humi,
+                )
+            logging.info("Result:\n%s", my_lib.pretty.format(result))
+        except Exception:
+            logging.exception("Failed to get tenki.jp data")
+
+    # テスト実行
+    if test_type in ("all", "yahoo"):
+        test_yahoo_weather()
+
+    if test_type in ("all", "clothing"):
+        test_yahoo_clothing()
+
+    if test_type in ("all", "wbgt"):
+        test_wbgt()
+
+    if test_type in ("all", "sunset"):
+        test_sunset()
+
+    if test_type in ("all", "tenki"):
+        test_tenki()
+
+    logging.info("=" * 60)
+    logging.info("All tests completed")
+    logging.info("=" * 60)
