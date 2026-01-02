@@ -8,6 +8,7 @@ import multiprocessing.queues
 import threading
 import time
 import traceback
+from collections.abc import Generator
 from typing import Any
 
 import flask
@@ -20,99 +21,125 @@ class EVENT_TYPE(enum.Enum):  # noqa: N801
     SCHEDULE = "schedule"
     LOG = "log"
 
+    @property
+    def index(self) -> int:
+        """イベントタイプのインデックスを返す"""
+        return list(EVENT_TYPE).index(self)
+
 
 blueprint = flask.Blueprint("webapp-event", __name__)
 
 
-# NOTE: サイズは上の Enum の個数+1 にしておく
-event_count = multiprocessing.Array("i", 4)  # type: ignore[type-arg]
+class EventManager:
+    """イベント管理クラス
 
-should_terminate: bool = False
-watch_thread: threading.Thread | None = None
+    SSE (Server-Sent Events) を使用したイベント通知を管理します。
+    """
 
+    def __init__(self) -> None:
+        # NOTE: サイズは EVENT_TYPE の個数 + 1 にしておく
+        self._event_count = multiprocessing.Array("i", len(EVENT_TYPE) + 1)
+        self._should_terminate: bool = False
+        self._watch_thread: threading.Thread | None = None
 
-def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
-    global should_terminate  # noqa: PLW0603
-    global watch_thread  # noqa: PLW0603
+    @property
+    def event_count(self) -> Any:
+        """イベントカウント配列"""
+        return self._event_count
 
-    should_terminate = False
+    @property
+    def should_terminate(self) -> bool:
+        """終了フラグ"""
+        return self._should_terminate
 
-    watch_thread = threading.Thread(target=worker, args=(event_queue,))
-    watch_thread.start()
+    @should_terminate.setter
+    def should_terminate(self, value: bool) -> None:
+        self._should_terminate = value
 
+    @property
+    def watch_thread(self) -> threading.Thread | None:
+        """監視スレッド"""
+        return self._watch_thread
 
-def worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
-    global should_terminate
+    @watch_thread.setter
+    def watch_thread(self, value: threading.Thread | None) -> None:
+        self._watch_thread = value
 
-    logging.info("Start notify watch thread")
+    def start(self, event_queue: multiprocessing.queues.Queue[EVENT_TYPE]) -> None:
+        """ワーカースレッドを開始する
 
-    while True:
-        if should_terminate:
-            break
-        try:
-            if not event_queue.empty():
-                notify_event(event_queue.get())
-            time.sleep(0.1)
-        except OverflowError:  # pragma: no cover
-            # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
-            logging.debug(traceback.format_exc())
-        except ValueError:  # pragma: no cover
-            # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
-            # 発生する。
-            logging.warning(traceback.format_exc())
+        Args:
+            event_queue: イベントを受信するキュー
+        """
+        self._should_terminate = False
+        self._watch_thread = threading.Thread(target=self._worker, args=(event_queue,))
+        self._watch_thread.start()
 
-    logging.info("Stop notify watch thread")
+    def _worker(self, event_queue: multiprocessing.queues.Queue[EVENT_TYPE]) -> None:
+        """イベントキューを監視するワーカー
 
+        Args:
+            event_queue: イベントを受信するキュー
+        """
+        logging.info("Start notify watch thread")
 
-def term() -> None:
-    global should_terminate  # noqa: PLW0603
-    global watch_thread  # noqa: PLW0603
+        while True:
+            if self._should_terminate:
+                break
+            try:
+                if not event_queue.empty():
+                    self.notify_event(event_queue.get())
+                time.sleep(0.1)
+            except OverflowError:  # pragma: no cover
+                # NOTE: テストする際、freezer 使って日付をいじるとこの例外が発生する
+                logging.debug(traceback.format_exc())
+            except ValueError:  # pragma: no cover
+                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこの例外が
+                # 発生する。
+                logging.warning(traceback.format_exc())
 
-    if watch_thread is not None:
-        should_terminate = True
+        logging.info("Stop notify watch thread")
 
-        # NOTE: pytest で timemachine 使うと下記で固まるので join を見送る
-        # watch_thread.join()
+    def term(self) -> None:
+        """ワーカースレッドを終了する"""
+        if self._watch_thread is not None:
+            self._should_terminate = True
 
-        watch_thread = None
+            # NOTE: pytest で timemachine 使うと下記で固まるので join を見送る
+            # self._watch_thread.join()
 
+            self._watch_thread = None
 
-def event_index(event_type: EVENT_TYPE) -> int:
-    if event_type == EVENT_TYPE.CONTROL:
-        return 0
-    elif event_type == EVENT_TYPE.SCHEDULE:
-        return 1
-    elif event_type == EVENT_TYPE.LOG:
-        return 2
-    else:  # pragma: no cover
-        return 3
+    def notify_event(self, event_type: EVENT_TYPE) -> None:
+        """イベントを通知する
 
+        Args:
+            event_type: 通知するイベントタイプ
+        """
+        self._event_count[event_type.index] += 1
 
-def notify_event(event_type: EVENT_TYPE) -> None:
-    global event_count
-    event_count[event_index(event_type)] += 1  # type: ignore[index]
+    def get_event_stream(self, count: int) -> Generator[str, None, None]:
+        """SSE 用のイベントストリームを生成する
 
+        Args:
+            count: 取得するイベント数（0 の場合は無限）
 
-@blueprint.route("/api/event", methods=["GET"])
-def api_event() -> flask.Response:
-    count = flask.request.args.get("count", 0, type=int)
-
-    def event_stream() -> Any:
-        global event_count
-
-        last_count = event_count[:]  # type: ignore[index]
+        Yields:
+            SSE 形式のイベントデータ
+        """
+        last_count = self._event_count[:]
 
         i = 0
         j = 0
         while True:
             time.sleep(0.5)
-            for event_type in EVENT_TYPE.__members__.values():
-                index = event_index(event_type)
+            for event_type in EVENT_TYPE:
+                index = event_type.index
 
-                if last_count[index] != event_count[index]:  # type: ignore[index]
+                if last_count[index] != self._event_count[index]:
                     logging.debug("notify event: %s", event_type.value)
                     yield f"data: {event_type.value}\n\n"
-                    last_count[index] = event_count[index]  # type: ignore[index]
+                    last_count[index] = self._event_count[index]
 
                     i += 1
                     if i == count:
@@ -124,7 +151,73 @@ def api_event() -> flask.Response:
                 yield "data: dummy\n\n"
                 j = 0
 
-    res = flask.Response(flask.stream_with_context(event_stream()), mimetype="text/event-stream")
+
+# モジュールレベルのインスタンス
+_manager = EventManager()
+
+# 後方互換性のためのモジュールレベル変数（_manager のプロパティを参照）
+event_count = _manager.event_count
+should_terminate = property(lambda: _manager.should_terminate)  # type: ignore[assignment]
+watch_thread = property(lambda: _manager.watch_thread)  # type: ignore[assignment]
+
+
+def event_index(event_type: EVENT_TYPE) -> int:
+    """イベントタイプのインデックスを返す（後方互換性のため維持）
+
+    Args:
+        event_type: イベントタイプ
+
+    Returns:
+        イベントタイプのインデックス
+    """
+    return event_type.index
+
+
+def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
+    """ワーカースレッドを開始する
+
+    Args:
+        event_queue: イベントを受信するキュー
+    """
+    _manager.start(event_queue)
+
+
+def worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
+    """イベントキューを監視するワーカー（後方互換性のため維持）
+
+    Args:
+        event_queue: イベントを受信するキュー
+    """
+    _manager._worker(event_queue)
+
+
+def term() -> None:
+    """ワーカースレッドを終了する"""
+    _manager.term()
+
+
+def notify_event(event_type: EVENT_TYPE) -> None:
+    """イベントを通知する
+
+    Args:
+        event_type: 通知するイベントタイプ
+    """
+    _manager.notify_event(event_type)
+
+
+@blueprint.route("/api/event", methods=["GET"])
+def api_event() -> flask.Response:
+    """SSE エンドポイント
+
+    Returns:
+        SSE 形式のレスポンス
+    """
+    count = flask.request.args.get("count", 0, type=int)
+
+    res = flask.Response(
+        flask.stream_with_context(_manager.get_event_stream(count)),
+        mimetype="text/event-stream",
+    )
     res.headers.add("Access-Control-Allow-Origin", "*")
     res.headers.add("Cache-Control", "no-cache")
     res.headers.add("X-Accel-Buffering", "no")
