@@ -4,16 +4,35 @@ webapp:
         name: JST
         zone: Asia/Tokyo
 
-    static_dir_path: tests/data
+    static_dir_path: tests/fixtures
 
     data:
-        log_file_path: tests/data/log.db
-        stat_dir_path: tests/data
+        log_file_path: tests/fixtures/log.db
+        stat_dir_path: tests/fixtures
 
 data:
     selenium: ./data
     dump: ./data/debug
-        
+
+# 天気関連設定
+weather:
+    data:
+        yahoo:
+            url: https://weather.yahoo.co.jp/weather/jp/13/4410/13113.html
+
+sunset:
+    data:
+        nao:
+            pref: 13
+
+wbgt:
+    data:
+        env_go:
+            url: https://www.wbgt.env.go.jp/graph_ref_td.php?region=03&prefecture=44&point=44132
+
+tenki:
+    url: https://tenki.jp/forecast/3/16/4410/13113/1hour.html
+
 slack:
     bot_token: xoxb-000000000000-0000000000000-000000000000000000000000
 
