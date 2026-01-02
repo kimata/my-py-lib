@@ -240,21 +240,21 @@ class TestClear:
 
 
 class TestModuleFunctions:
-    """モジュールレベル関数のテスト（後方互換性）"""
+    """モジュールレベル関数のテスト（テスト用）"""
 
     def test_get_worker_id(self, monkeypatch):
-        """get_worker_id が動作する"""
-        from my_lib.webapp.log import get_worker_id
+        """_get_worker_id が動作する"""
+        from my_lib.webapp.log import _get_worker_id
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert get_worker_id() is None
+        assert _get_worker_id() is None
 
     def test_get_db_path(self, log_db_path, monkeypatch):
-        """get_db_path が動作する"""
-        from my_lib.webapp.log import get_db_path
+        """_get_db_path が動作する"""
+        from my_lib.webapp.log import _get_db_path
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert get_db_path() == log_db_path
+        assert _get_db_path() == log_db_path
 
 
 class TestApiEndpoints:
