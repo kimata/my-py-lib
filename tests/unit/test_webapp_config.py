@@ -41,7 +41,8 @@ class TestInit:
         """STATIC_DIR_PATH を設定する"""
         import my_lib.webapp.config
 
-        config = {"webapp": {"static_dir_path": str(temp_dir / "static")}}
+        config_dict = {"static_dir_path": str(temp_dir / "static")}
+        config = my_lib.webapp.config.WebappConfig.from_dict(config_dict)
 
         my_lib.webapp.config.init(config)
 
@@ -51,13 +52,12 @@ class TestInit:
         """SCHEDULE_FILE_PATH を設定する"""
         import my_lib.webapp.config
 
-        config = {
-            "webapp": {
-                "data": {
-                    "schedule_file_path": str(temp_dir / "schedule.yaml"),
-                }
+        config_dict = {
+            "data": {
+                "schedule_file_path": str(temp_dir / "schedule.yaml"),
             }
         }
+        config = my_lib.webapp.config.WebappConfig.from_dict(config_dict)
 
         my_lib.webapp.config.init(config)
 
@@ -67,13 +67,12 @@ class TestInit:
         """LOG_DIR_PATH を設定する"""
         import my_lib.webapp.config
 
-        config = {
-            "webapp": {
-                "data": {
-                    "log_file_path": str(temp_dir / "log.db"),
-                }
+        config_dict = {
+            "data": {
+                "log_file_path": str(temp_dir / "log.db"),
             }
         }
+        config = my_lib.webapp.config.WebappConfig.from_dict(config_dict)
 
         my_lib.webapp.config.init(config)
 
@@ -83,13 +82,12 @@ class TestInit:
         """STAT_DIR_PATH を設定する"""
         import my_lib.webapp.config
 
-        config = {
-            "webapp": {
-                "data": {
-                    "stat_dir_path": str(temp_dir / "stat"),
-                }
+        config_dict = {
+            "data": {
+                "stat_dir_path": str(temp_dir / "stat"),
             }
         }
+        config = my_lib.webapp.config.WebappConfig.from_dict(config_dict)
 
         my_lib.webapp.config.init(config)
 
