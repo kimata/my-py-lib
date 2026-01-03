@@ -521,7 +521,7 @@ def with_retry(
     max_retries: int = 3,
     delay: float = 1.0,
     exceptions: tuple[type[Exception], ...] = (Exception,),
-    on_retry: Callable[[int, Exception], None] | None = None,
+    on_retry: Callable[[int, Exception], bool | None] | None = None,
 ) -> T:
     """リトライ付きで関数を実行
 
@@ -534,6 +534,8 @@ def with_retry(
         delay: リトライ間の待機秒数
         exceptions: リトライ対象の例外タプル
         on_retry: リトライ時のコールバック (attempt, exception)
+            - None または True を返すとリトライを継続
+            - False を返すとリトライを中止して例外を再スロー
 
     Returns:
         成功時は関数の戻り値
@@ -550,7 +552,9 @@ def with_retry(
             last_exception = e
             if attempt < max_retries - 1:
                 if on_retry:
-                    on_retry(attempt + 1, e)
+                    should_continue = on_retry(attempt + 1, e)
+                    if should_continue is False:
+                        raise
                 time.sleep(delay)
 
     if last_exception:
