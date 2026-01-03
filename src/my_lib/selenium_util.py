@@ -6,7 +6,8 @@ Usage:
   selenium_util.py [-c CONFIG] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -D                : デバッグモードで動作します。
 """
 
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import datetime
 import inspect
+import io
 import json
 import logging
 import os
@@ -25,12 +27,8 @@ import signal
 import sqlite3
 import subprocess
 import time
-import io
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
-
-T = TypeVar("T")
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 import PIL.Image
 import psutil
@@ -45,8 +43,13 @@ import selenium.webdriver.support.expected_conditions
 import undetected_chromedriver
 
 if TYPE_CHECKING:
+    import types
+    from collections.abc import Callable
+
     from selenium.webdriver.remote.webdriver import WebDriver
     from selenium.webdriver.support.wait import WebDriverWait
+
+T = TypeVar("T")
 
 WAIT_RETRY_COUNT: int = 1
 
@@ -58,10 +61,11 @@ class SeleniumError(Exception):
 def _get_chrome_version() -> int | None:
     try:
         result = subprocess.run(
-            ["google-chrome", "--version"],
+            ["google-chrome", "--version"],  # noqa: S607
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
         match = re.search(r"(\d+)\.", result.stdout)
         if match:
@@ -74,9 +78,9 @@ def _get_chrome_version() -> int | None:
 def _create_driver_impl(
     profile_name: str,
     data_path: pathlib.Path,
-    is_headless: bool,
-    use_subprocess: bool = True,
-) -> WebDriver:  # noqa: ARG001
+    is_headless: bool,  # noqa: FBT001
+    use_subprocess: bool = True,  # noqa: FBT001
+) -> WebDriver:
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
 
@@ -140,6 +144,9 @@ def _create_driver_impl(
 
     driver.set_page_load_timeout(30)
 
+    # CDP を使って日本語ロケールを強制設定
+    set_japanese_locale(driver)
+
     return driver
 
 
@@ -159,6 +166,7 @@ def _check_json_file(file_path: pathlib.Path) -> str | None:
 
     Returns:
         エラーメッセージ（正常な場合は None）
+
     """
     if not file_path.exists():
         return None
@@ -178,6 +186,7 @@ def _check_sqlite_db(db_path: pathlib.Path) -> str | None:
 
     Returns:
         エラーメッセージ（正常な場合は None）
+
     """
     if not db_path.exists():
         return None
@@ -203,6 +212,7 @@ def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
 
     Returns:
         ProfileHealthResult: チェック結果
+
     """
     errors: list[str] = []
     has_lock_files = False
@@ -265,12 +275,13 @@ def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
 
     Returns:
         bool: リカバリが成功したかどうか
+
     """
     if not profile_path.exists():
         return True
 
     # バックアップ先を決定（タイムスタンプ付き）
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
     backup_path = profile_path.parent / f"{profile_path.name}.corrupted.{timestamp}"
 
     try:
@@ -281,8 +292,8 @@ def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
             backup_path,
         )
         return True
-    except Exception as e:
-        logging.exception("Failed to backup corrupted profile: %s", e)
+    except Exception:
+        logging.exception("Failed to backup corrupted profile")
         return False
 
 
@@ -306,7 +317,7 @@ def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
 
 def _is_running_in_container() -> bool:
     """コンテナ内で実行中かどうかを判定"""
-    return os.path.exists("/.dockerenv")
+    return pathlib.Path("/.dockerenv").exists()
 
 
 def _cleanup_orphaned_chrome_processes_in_container() -> None:
@@ -343,6 +354,7 @@ def delete_profile(profile_name: str, data_path: pathlib.Path) -> bool:
 
     Returns:
         bool: 削除が成功したかどうか
+
     """
     actual_profile_name = _get_actual_profile_name(profile_name)
     profile_path = data_path / "chrome" / actual_profile_name
@@ -360,13 +372,13 @@ def delete_profile(profile_name: str, data_path: pathlib.Path) -> bool:
         return False
 
 
-def create_driver(
+def create_driver(  # noqa: PLR0913
     profile_name: str,
     data_path: pathlib.Path,
-    is_headless: bool = True,
-    clean_profile: bool = False,
-    auto_recover: bool = True,
-    use_subprocess: bool = True,
+    is_headless: bool = True,  # noqa: FBT001
+    clean_profile: bool = False,  # noqa: FBT001
+    auto_recover: bool = True,  # noqa: FBT001
+    use_subprocess: bool = True,  # noqa: FBT001
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -377,6 +389,7 @@ def create_driver(
         clean_profile: 起動前にロックファイルを削除するか
         auto_recover: プロファイル破損時に自動リカバリするか
         use_subprocess: サブプロセスで Chrome を起動するか
+
     """
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
@@ -455,7 +468,7 @@ def input_xpath(
     xpath: str,
     text: str,
     wait: WebDriverWait[WebDriver] | None = None,
-    is_warn: bool = True,
+    is_warn: bool = True,  # noqa: FBT001
 ) -> bool:
     if wait is not None:
         wait.until(
@@ -478,8 +491,8 @@ def click_xpath(
     driver: WebDriver,
     xpath: str,
     wait: WebDriverWait[WebDriver] | None = None,
-    is_warn: bool = True,
-    move: bool = False,
+    is_warn: bool = True,  # noqa: FBT001
+    move: bool = False,  # noqa: FBT001
 ) -> bool:
     if wait is not None:
         wait.until(
@@ -542,6 +555,7 @@ def with_retry(
 
     Raises:
         最後の例外を再スロー
+
     """
     last_exception: Exception | None = None
 
@@ -572,7 +586,7 @@ def wait_patiently(
         try:
             wait.until(target)
             return
-        except selenium.common.exceptions.TimeoutException as e:  # noqa: PERF203
+        except selenium.common.exceptions.TimeoutException as e:
             logging.warning(
                 "タイムアウトが発生しました。(%s in %s line %d)",
                 inspect.stack()[1].function,
@@ -621,6 +635,26 @@ def clear_cache(driver: WebDriver) -> None:
     driver.execute_cdp_cmd("Network.clearBrowserCache", {})
 
 
+def set_japanese_locale(driver: WebDriver) -> None:
+    """CDP を使って日本語ロケールを強制設定
+
+    Chrome の起動オプションだけでは言語設定が変わってしまうことがあるため、
+    CDP を使って Accept-Language ヘッダーとロケールを強制的に日本語に設定する。
+    """
+    try:
+        driver.execute_cdp_cmd(
+            "Network.setExtraHTTPHeaders",
+            {"headers": {"Accept-Language": "ja-JP,ja;q=0.9"}},
+        )
+        driver.execute_cdp_cmd(
+            "Emulation.setLocaleOverride",
+            {"locale": "ja-JP"},
+        )
+        logging.debug("Japanese locale set via CDP")
+    except Exception:
+        logging.warning("Failed to set Japanese locale via CDP")
+
+
 def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
     if not dump_path.exists():
         return
@@ -631,8 +665,8 @@ def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
         if not item.is_file():
             continue
         try:
-            time_diff = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
-                item.stat().st_mtime, datetime.timezone.utc
+            time_diff = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromtimestamp(
+                item.stat().st_mtime, datetime.UTC
             )
         except FileNotFoundError:
             # ファイルが別プロセスにより削除された場合（SQLiteの一時ファイルなど）
@@ -707,12 +741,22 @@ def _warmup(
 
 
 class browser_tab:  # noqa: N801
-    def __init__(self, driver: WebDriver, url: str) -> None:  # noqa: D107
+    """新しいブラウザタブで URL を開くコンテキストマネージャ"""
+
+    def __init__(self, driver: WebDriver, url: str) -> None:
+        """初期化
+
+        Args:
+            driver: WebDriver インスタンス
+            url: 開く URL
+
+        """
         self.driver = driver
         self.url = url
         self.original_window: str | None = None
 
-    def __enter__(self) -> None:  # noqa: D105
+    def __enter__(self) -> None:
+        """新しいタブを開いて URL にアクセス"""
         self.original_window = self.driver.current_window_handle
         self.driver.execute_script("window.open('');")
         self.driver.switch_to.window(self.driver.window_handles[-1])
@@ -753,8 +797,9 @@ class browser_tab:  # noqa: N801
         self,
         exception_type: type[BaseException] | None,
         exception_value: BaseException | None,
-        traceback: Any,
-    ) -> None:  # noqa: D105
+        traceback: types.TracebackType | None,
+    ) -> None:
+        """タブを閉じて元のウィンドウに戻る"""
         self._cleanup()
 
         # 例外が発生した場合はブラウザの状態を回復
@@ -804,6 +849,7 @@ class error_handler:  # noqa: N801
 
             if handler.exception:
                 logging.warning("処理をスキップしました")
+
     """
 
     def __init__(
@@ -811,9 +857,10 @@ class error_handler:  # noqa: N801
         driver: WebDriver,
         message: str = "Selenium operation failed",
         on_error: Callable[[Exception, PIL.Image.Image | None], None] | None = None,
-        capture_screenshot: bool = True,
-        reraise: bool = True,
+        capture_screenshot: bool = True,  # noqa: FBT001
+        reraise: bool = True,  # noqa: FBT001
     ) -> None:
+        """初期化"""
         self.driver = driver
         self.message = message
         self.on_error = on_error
@@ -822,15 +869,17 @@ class error_handler:  # noqa: N801
         self.exception: Exception | None = None
         self.screenshot: PIL.Image.Image | None = None
 
-    def __enter__(self) -> "error_handler":
+    def __enter__(self) -> Self:
+        """コンテキストマネージャの開始"""
         return self
 
     def __exit__(
         self,
         exception_type: type[BaseException] | None,
         exception_value: BaseException | None,
-        traceback: Any,
+        traceback: types.TracebackType | None,
     ) -> bool:
+        """コンテキストマネージャの終了、エラー処理を実行"""
         if exception_value is None:
             return False
 
@@ -972,7 +1021,7 @@ def _send_signal_to_processes(pids: list[int], sig: signal.Signals, signal_name:
                 os.kill(pid, 0)  # シグナル0は存在確認
             os.kill(pid, sig)
             logging.info("Sent %s to process: PID %d (%s)", signal_name, pid, process_name)
-        except (ProcessLookupError, OSError) as e:  # noqa: PERF203
+        except (ProcessLookupError, OSError) as e:
             # プロセスが既に終了している場合は無視
             errors.append((pid, e))
 
@@ -987,6 +1036,7 @@ def _terminate_chrome_processes(chrome_pids: list[int], timeout: float = 5.0) ->
     Args:
         chrome_pids: 終了対象のプロセスIDリスト
         timeout: SIGTERM後にプロセス終了を待機する最大時間（秒）
+
     """
     if not chrome_pids:
         return
@@ -1057,9 +1107,12 @@ def _get_remaining_chrome_pids(chrome_pids: list[int]) -> list[int]:
         try:
             if psutil.pid_exists(pid):
                 process = psutil.Process(pid)
-                if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
-                    if _is_chrome_related_process(process):
-                        remaining.append(pid)
+                if (
+                    process.is_running()
+                    and process.status() != psutil.STATUS_ZOMBIE
+                    and _is_chrome_related_process(process)
+                ):
+                    remaining.append(pid)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
     return remaining
@@ -1081,6 +1134,7 @@ def _wait_for_processes_with_check(
 
     Returns:
         タイムアウト後も残存しているプロセスIDのリスト
+
     """
     elapsed = 0.0
     last_log_time = 0.0
@@ -1102,12 +1156,12 @@ def _wait_for_processes_with_check(
     return remaining_pids
 
 
-def quit_driver_gracefully(
+def quit_driver_gracefully(  # noqa: C901
     driver: WebDriver | None,
     wait_sec: float = 5.0,
     sigterm_wait_sec: float = 5.0,
     sigkill_wait_sec: float = 5.0,
-) -> None:  # noqa: C901, PLR0912
+) -> None:
     """Chrome WebDriverを確実に終了する
 
     終了フロー:
@@ -1123,6 +1177,7 @@ def quit_driver_gracefully(
         wait_sec: quit 後にプロセス終了を待機する秒数（デフォルト: 5秒）
         sigterm_wait_sec: SIGTERM 後にプロセス終了を待機する秒数（デフォルト: 5秒）
         sigkill_wait_sec: SIGKILL 後にプロセス回収を待機する秒数（デフォルト: 5秒）
+
     """
     if driver is None:
         return
@@ -1139,7 +1194,7 @@ def quit_driver_gracefully(
     finally:
         # undetected_chromedriver の __del__ がシャットダウン時に再度呼ばれるのを防ぐ
         if hasattr(driver, "_has_quit"):
-            driver._has_quit = True  # type: ignore[attr-defined]
+            driver._has_quit = True  # type: ignore[attr-defined]  # noqa: SLF001
 
     # ChromeDriverサービスの停止を試行
     try:
@@ -1208,7 +1263,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
