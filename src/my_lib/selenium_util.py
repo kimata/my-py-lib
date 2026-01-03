@@ -642,6 +642,8 @@ def set_japanese_locale(driver: WebDriver) -> None:
     CDP を使って Accept-Language ヘッダーとロケールを強制的に日本語に設定する。
     """
     try:
+        # NOTE: Network.setExtraHTTPHeaders は Network.enable を先に呼ばないと機能しない
+        driver.execute_cdp_cmd("Network.enable", {})
         driver.execute_cdp_cmd(
             "Network.setExtraHTTPHeaders",
             {"headers": {"Accept-Language": "ja-JP,ja;q=0.9"}},
