@@ -130,6 +130,7 @@ slack_config = my_lib.notify.slack.parse_config(config["slack"])
 ```
 
 環境変数の展開をサポート：
+
 ```yaml
 influxdb:
     token: "${INFLUXDB_TOKEN}"
@@ -138,6 +139,7 @@ influxdb:
 ### 通知システム
 
 レート制限とスロットリング：
+
 - `/dev/shm/notify/` にフットプリントを使用
 - 通知間隔の制限（デフォルト60秒）
 - 複数チャンネル対応（Slack、LINE、メール）
@@ -166,16 +168,19 @@ path = my_lib.pytest_util.get_path(path_str)
 ## 例外クラス
 
 ### センサー関連
+
 - `SensorError` - 基底例外
 - `SensorCommunicationError` - 通信エラー
 - `SensorCRCError` - CRC チェックエラー
 
 ### 設定関連
+
 - `ConfigValidationError` - スキーマ検証エラー（details 属性あり）
 - `ConfigParseError` - YAML パースエラー
 - `ConfigFileNotFoundError` - ファイル未発見
 
 ### 画像関連（pil_util.py）
+
 - `FontNotFoundError` - フォントファイル未発見
 - `ImageNotFoundError` - 画像ファイル未発見
 
@@ -191,11 +196,18 @@ path = my_lib.pytest_util.get_path(path_str)
 **`# type: ignore` コメントは最後の手段とする。** 型エラーが発生した場合は、まずコードを修正して型推論が正しく働くようにする。
 
 対処の優先順位：
+
 1. コードを修正して型推論できるようにする（変数への型注釈、`assert` による型ナローイング等）
 2. `Any` 型を明示的に使用する（型情報がないライブラリの場合）
 3. `# type: ignore` コメントを使用する（他に手段がない場合のみ）
 
 **例外**: テストコード（`tests/`）では、可読性を優先して `# type: ignore` を許容する。
+
+#### ファイルの git add について
+
+支持されて作成したプログラムやリファクタリングの結果追加されたプログラム以外は
+git add しないこと。プログラムが動作するのに必要なデータについては、追加して良いか
+確認すること。
 
 #### 型スタブがないライブラリへの対処
 
@@ -233,6 +245,12 @@ import selenium
 selenium.webdriver.support.expected_conditions  # pyright エラー
 ```
 
+また、避けようがない場合を除き、下記の形式は使用しないこと。
+
+```python
+import xxx as yyy
+```
+
 #### docopt の `__doc__` 対応
 
 `docopt` を使用する場合、`__doc__` が `str | None` のため assert で型を絞り込む：
@@ -262,6 +280,7 @@ logging.error("エラー")
 ## 外部依存
 
 ### 主要な依存関係
+
 - **pyyaml** - YAML 設定ファイル
 - **jsonschema** - 設定バリデーション
 - **slack-sdk** - Slack API
@@ -271,6 +290,7 @@ logging.error("エラー")
 - **selenium** - Web 自動化
 
 ### 開発用依存関係
+
 - **pytest**, **pytest-cov**, **pytest-xdist** - テスト
 - **mypy**, **pyright** - 型チェック
 - **flask** - Web テスト用
