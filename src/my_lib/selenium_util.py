@@ -42,6 +42,8 @@ import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
 import undetected_chromedriver
 
+import my_lib.time
+
 if TYPE_CHECKING:
     import types
     from collections.abc import Callable
@@ -281,7 +283,7 @@ def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
         return True
 
     # バックアップ先を決定（タイムスタンプ付き）
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = my_lib.time.now().strftime("%Y%m%d_%H%M%S")
     backup_path = profile_path.parent / f"{profile_path.name}.corrupted.{timestamp}"
 
     try:
