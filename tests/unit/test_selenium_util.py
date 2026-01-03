@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SLF001, PT012
 """selenium_util.py のテスト"""
+
 from __future__ import annotations
 
-import json
 import pathlib
 import sqlite3
 import time
@@ -239,14 +238,14 @@ class TestIsRunningInContainer:
 
     def test_returns_false_when_not_in_container(self):
         """コンテナ外では False を返す"""
-        with unittest.mock.patch("os.path.exists", return_value=False):
+        with unittest.mock.patch.object(pathlib.Path, "exists", return_value=False):
             result = my_lib.selenium_util._is_running_in_container()
 
             assert result is False
 
     def test_returns_true_when_in_container(self):
         """コンテナ内では True を返す"""
-        with unittest.mock.patch("os.path.exists", return_value=True):
+        with unittest.mock.patch.object(pathlib.Path, "exists", return_value=True):
             result = my_lib.selenium_util._is_running_in_container()
 
             assert result is True
@@ -322,7 +321,7 @@ class TestIsChromeRelatedProcess:
     """_is_chrome_related_process 関数のテスト"""
 
     def test_returns_true_for_chrome(self):
-        """chrome プロセスで True を返す"""
+        """Chrome プロセスで True を返す"""
         mock_process = unittest.mock.MagicMock()
         mock_process.name.return_value = "chrome"
 
@@ -331,7 +330,7 @@ class TestIsChromeRelatedProcess:
         assert result is True
 
     def test_returns_true_for_chromium(self):
-        """chromium プロセスで True を返す"""
+        """Chromium プロセスで True を返す"""
         mock_process = unittest.mock.MagicMock()
         mock_process.name.return_value = "chromium-browser"
 
@@ -340,7 +339,7 @@ class TestIsChromeRelatedProcess:
         assert result is True
 
     def test_returns_false_for_chromedriver(self):
-        """chromedriver プロセスで False を返す"""
+        """Chromedriver プロセスで False を返す"""
         mock_process = unittest.mock.MagicMock()
         mock_process.name.return_value = "chromedriver"
 
@@ -396,7 +395,7 @@ class TestBrowserTab:
         mock_driver.close.assert_called_once()
 
     def test_handles_exception_on_close(self):
-        """close でエラーが発生しても例外を発生させない"""
+        """Close でエラーが発生しても例外を発生させない"""
         mock_driver = unittest.mock.MagicMock()
         mock_driver.current_window_handle = "original"
 
@@ -436,10 +435,12 @@ class TestErrorHandler:
         mock_driver.get_screenshot_as_png.return_value = b""
 
         captured_handler = None
-        with pytest.raises(ValueError):
-            with my_lib.selenium_util.error_handler(mock_driver) as handler:
-                captured_handler = handler
-                raise ValueError("Test error")
+        with (
+            pytest.raises(ValueError, match="Test error"),
+            my_lib.selenium_util.error_handler(mock_driver) as handler,
+        ):
+            captured_handler = handler
+            raise ValueError("Test error")
 
         assert captured_handler is not None
         assert captured_handler.exception is not None
@@ -465,12 +466,11 @@ class TestErrorHandler:
         def on_error(exc, screenshot):
             callback_called.append((exc, screenshot))
 
-        with pytest.raises(ValueError):
-            with my_lib.selenium_util.error_handler(
-                mock_driver,
-                on_error=on_error,
-            ):
-                raise ValueError("Test error")
+        with (
+            pytest.raises(ValueError, match="Test error"),
+            my_lib.selenium_util.error_handler(mock_driver, on_error=on_error),
+        ):
+            raise ValueError("Test error")
 
         assert len(callback_called) == 1
         assert isinstance(callback_called[0][0], ValueError)
@@ -480,13 +480,12 @@ class TestErrorHandler:
         mock_driver = unittest.mock.MagicMock()
 
         captured_handler = None
-        with pytest.raises(ValueError):
-            with my_lib.selenium_util.error_handler(
-                mock_driver,
-                capture_screenshot=False,
-            ) as handler:
-                captured_handler = handler
-                raise ValueError("Test error")
+        with (
+            pytest.raises(ValueError, match="Test error"),
+            my_lib.selenium_util.error_handler(mock_driver, capture_screenshot=False) as handler,
+        ):
+            captured_handler = handler
+            raise ValueError("Test error")
 
         mock_driver.get_screenshot_as_png.assert_not_called()
         assert captured_handler is not None
@@ -505,19 +504,31 @@ class TestQuitDriverGracefully:
         mock_driver = unittest.mock.MagicMock()
         mock_driver.service = None
 
-        with unittest.mock.patch.object(my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]):
-            with unittest.mock.patch.object(my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]):
-                my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
+        with (
+            unittest.mock.patch.object(
+                my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]
+            ),
+            unittest.mock.patch.object(
+                my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]
+            ),
+        ):
+            my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
 
         mock_driver.quit.assert_called_once()
 
     def test_handles_quit_exception(self):
-        """quit 例外を処理する"""
+        """Quit 例外を処理する"""
         mock_driver = unittest.mock.MagicMock()
         mock_driver.quit.side_effect = Exception("Quit failed")
         mock_driver.service = None
 
-        with unittest.mock.patch.object(my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]):
-            with unittest.mock.patch.object(my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]):
-                # 例外が発生しないことを確認
-                my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
+        with (
+            unittest.mock.patch.object(
+                my_lib.selenium_util, "_get_chrome_related_processes", return_value=[]
+            ),
+            unittest.mock.patch.object(
+                my_lib.selenium_util, "_wait_for_processes_with_check", return_value=[]
+            ),
+        ):
+            # 例外が発生しないことを確認
+            my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
