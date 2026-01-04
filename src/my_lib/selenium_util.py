@@ -149,10 +149,6 @@ def _create_driver_impl(
     return driver
 
 
-# chrome_util から再エクスポート（後方互換性のため）
-delete_profile = my_lib.chrome_util.delete_profile
-
-
 def create_driver(  # noqa: PLR0913
     profile_name: str,
     data_path: pathlib.Path,

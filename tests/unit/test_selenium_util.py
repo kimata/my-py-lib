@@ -8,7 +8,6 @@ import unittest.mock
 
 import pytest
 
-import my_lib.chrome_util
 import my_lib.selenium_util
 
 
@@ -324,12 +323,3 @@ class TestQuitDriverGracefully:
         ):
             # 例外が発生しないことを確認
             my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
-
-
-class TestDeleteProfileReexport:
-    """delete_profile 再エクスポートのテスト"""
-
-    def test_delete_profile_is_available(self):
-        """delete_profile が selenium_util から利用可能"""
-        assert hasattr(my_lib.selenium_util, "delete_profile")
-        assert my_lib.selenium_util.delete_profile is my_lib.chrome_util.delete_profile
