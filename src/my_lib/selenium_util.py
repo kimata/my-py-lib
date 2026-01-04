@@ -81,7 +81,7 @@ def _create_driver_impl(
     profile_name: str,
     data_path: pathlib.Path,
     is_headless: bool,  # noqa: FBT001
-    use_subprocess: bool = True,  # noqa: FBT001
+    use_subprocess: bool,  # noqa: FBT001
 ) -> WebDriver:
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
@@ -380,7 +380,7 @@ def create_driver(  # noqa: PLR0913
     is_headless: bool = True,  # noqa: FBT001
     clean_profile: bool = False,  # noqa: FBT001
     auto_recover: bool = True,  # noqa: FBT001
-    use_subprocess: bool = True,  # noqa: FBT001
+    use_subprocess: bool = False,  # noqa: FBT001
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
