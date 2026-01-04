@@ -7,7 +7,8 @@ Usage:
                  [-p HOURS] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -m MODE           : データ取得モード。(data, day_sum, hour_sum, minute_sum のいずれか) [default: data]
   -i DB_SPEC        : 設定ファイルの中で InfluxDB の設定が書かれているパス。[default: sensor.influxdb]
   -s SENSOR_SPEC    : 設定ファイルの中で取得対象のデータの設定が書かれているパス。[default: sensor.lux]
@@ -38,10 +39,10 @@ class InfluxDBConfig(TypedDict):
     bucket: str
 
 
-import influxdb_client
-from influxdb_client.client.flux_table import TableList
+import influxdb_client  # noqa: E402
+from influxdb_client.client.flux_table import TableList  # noqa: E402
 
-import my_lib.time
+import my_lib.time  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -200,7 +201,7 @@ def _process_query_results(
     )
 
 
-def _fetch_data_impl(  # noqa: PLR0913
+def _fetch_data_impl(
     db_config: InfluxDBConfig,
     template: str,
     measure: str,
@@ -246,7 +247,7 @@ def _fetch_data_impl(  # noqa: PLR0913
             client.close()
 
 
-async def _fetch_data_impl_async(  # noqa: PLR0913
+async def _fetch_data_impl_async(
     db_config: InfluxDBConfig,
     template: str,
     measure: str,
@@ -278,7 +279,7 @@ async def _fetch_data_impl_async(  # noqa: PLR0913
     )
 
 
-def fetch_data(  # noqa: PLR0913
+def fetch_data(
     db_config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -343,7 +344,7 @@ def fetch_data(  # noqa: PLR0913
         return SensorDataResult(error_message=str(e))
 
 
-async def fetch_data_async(  # noqa: PLR0913
+async def fetch_data_async(
     db_config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -444,7 +445,7 @@ async def fetch_data_parallel(
     return await asyncio.gather(*tasks, return_exceptions=True)
 
 
-def get_equip_on_minutes(  # noqa: PLR0913
+def get_equip_on_minutes(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -513,7 +514,7 @@ def get_equip_on_minutes(  # noqa: PLR0913
         return 0
 
 
-def get_equip_mode_period(  # noqa: C901, PLR0913
+def get_equip_mode_period(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -578,8 +579,8 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
                 if record.get_value() > threshold_list[i]:
                     if state != i:
                         if state != -1:
-                            assert start_time is not None
-                            assert prev_time is not None
+                            assert start_time is not None  # noqa: S101
+                            assert prev_time is not None  # noqa: S101
                             on_range.append(
                                 [
                                     start_time + localtime_offset,
@@ -592,8 +593,8 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
                     is_idle = False
                     break
             if is_idle and state != -1:
-                assert start_time is not None
-                assert prev_time is not None
+                assert start_time is not None  # noqa: S101
+                assert prev_time is not None  # noqa: S101
                 on_range.append(
                     [
                         start_time + localtime_offset,
@@ -607,7 +608,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
             prev_time = record.get_time()
 
         if state != -1:
-            assert start_time is not None
+            assert start_time is not None  # noqa: S101
             on_range.append(
                 [
                     start_time + localtime_offset,
@@ -621,7 +622,7 @@ def get_equip_mode_period(  # noqa: C901, PLR0913
         return []
 
 
-def get_sum(  # noqa: PLR0913
+def get_sum(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -642,7 +643,7 @@ def get_sum(  # noqa: PLR0913
             return 0
         else:
             sum_value = value_list[0][1]
-            if isinstance(sum_value, (int, float)):
+            if isinstance(sum_value, int | float):
                 return float(sum_value)
             logging.warning("Unexpected sum value type: %s (value=%s)", type(sum_value).__name__, sum_value)
             return 0
@@ -651,7 +652,7 @@ def get_sum(  # noqa: PLR0913
         return 0
 
 
-def get_day_sum(  # noqa: PLR0913
+def get_day_sum(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -674,7 +675,7 @@ def get_day_sum(  # noqa: PLR0913
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_hour_sum(  # noqa: PLR0913
+def get_hour_sum(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -690,7 +691,7 @@ def get_hour_sum(  # noqa: PLR0913
     return get_sum(config, measure, hostname, field, start, stop, every_min, window_min)
 
 
-def get_minute_sum(  # noqa: PLR0913
+def get_minute_sum(
     config: InfluxDBConfig,
     measure: str,
     hostname: str,
@@ -753,7 +754,7 @@ if __name__ == "__main__":
 
         return value
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

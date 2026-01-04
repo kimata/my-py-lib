@@ -6,7 +6,6 @@ import logging
 import pathlib
 import random
 import time
-from typing import Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
@@ -34,7 +33,7 @@ def execute(
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
     dump_path: pathlib.Path,
-) -> None:  # noqa: PLR0913
+) -> None:
     try:
         # NOTE: エラーが起きた後とかだと、一発でページが表示されないことがあるので、事前に一回アクセスさせる。
         logging.info("メルカリにアクセスします。")
@@ -57,10 +56,10 @@ def execute(
 def _execute_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    mercari_login: my_lib.store.mercari.config.MercariLoginConfig,  # noqa: ARG001
+    mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
-    dump_path: pathlib.Path,  # noqa: ARG001
+    dump_path: pathlib.Path,
 ) -> None:
     logging.info("ログインを行います。")
     driver.get(_LOGIN_URL)

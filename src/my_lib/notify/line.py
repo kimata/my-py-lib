@@ -6,7 +6,8 @@ Usage:
   line.py [-c CONFIG] [-D] [-m MESSAGE]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -m MESSAGE        : 送信するメッセージ。[default: TEST]
   -D                : デバッグモードで動作します。
 """
@@ -21,7 +22,7 @@ from typing import Any
 import linebot.v3.messaging
 
 # NOTE: テスト用
-notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
+notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])
 
 
 def get_msg_config(line_config: dict[str, Any]) -> linebot.v3.messaging.Configuration:
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

@@ -3,10 +3,8 @@
 """
 my_lib.flask_util モジュールのユニットテスト
 """
-from __future__ import annotations
 
-import gzip
-import pathlib
+from __future__ import annotations
 
 import flask
 import pytest
@@ -50,7 +48,11 @@ class TestGzipped:
         with app.test_client() as client:
             response = client.get("/test")
 
-            assert "Content-Encoding" not in response.headers or response.headers.get("Content-Encoding") != "gzip"
+            is_not_gzipped = (
+                "Content-Encoding" not in response.headers
+                or response.headers.get("Content-Encoding") != "gzip"
+            )
+            assert is_not_gzipped
 
 
 class TestSupportJsonp:
@@ -344,7 +346,7 @@ class TestFileEtag:
             return flask.Response("test content")
 
         with app.test_client() as client:
-            response = client.get(f"/files/{file_path}")
+            _ = client.get(f"/files/{file_path}")
 
             # ファイルが存在する場合、ETag が設定される
             # 存在しない場合もエラーにならない
@@ -749,7 +751,11 @@ class TestCacheControlBranches:
             response = client.get("/no-cache-control")
             assert response.status_code == 200
             # Cache-Control は設定されない
-            assert "Cache-Control" not in response.headers or response.headers.get("Cache-Control") != "max-age=86400, must-revalidate"
+            no_default_cache = (
+                "Cache-Control" not in response.headers
+                or response.headers.get("Cache-Control") != "max-age=86400, must-revalidate"
+            )
+            assert no_default_cache
 
     def test_etag_conditional_304_no_cache_control(self, app):
         """cache_control=None で 304 を返す場合"""

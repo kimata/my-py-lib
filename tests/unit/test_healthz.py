@@ -3,13 +3,11 @@
 """
 my_lib.healthz モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import pathlib
 import time
-import unittest.mock
-
-import pytest
 
 
 class TestHealthzTarget:
@@ -21,12 +19,12 @@ class TestHealthzTarget:
 
         target = HealthzTarget(
             name="test",
-            liveness_file=pathlib.Path("/tmp/test"),
+            liveness_file=pathlib.Path("/tmp/test"),  # noqa: S108
             interval=60.0,
         )
 
         assert target.name == "test"
-        assert target.liveness_file == pathlib.Path("/tmp/test")
+        assert target.liveness_file == pathlib.Path("/tmp/test")  # noqa: S108
         assert target.interval == 60.0
 
 

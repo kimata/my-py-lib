@@ -6,11 +6,11 @@ import enum
 import logging
 import os
 import pathlib
-from typing import Any
 
 # NOTE: time_machine を使ったテスト時に、別スレッドのものも含めて time.time() を mock で
 # 置き換えたいので、別名にしておく。
 from time import time as gpio_time
+from typing import Any, ClassVar
 
 
 def is_rasberry_pi() -> bool:
@@ -36,21 +36,21 @@ if (
     and (os.environ.get("DUMMY_MODE", "false") != "true")
     and (os.environ.get("TEST", "false") != "true")
 ):  # pragma: no cover
-    from RPi import GPIO as gpio  # type: ignore[assignment]  # noqa: N811
+    from RPi import GPIO as gpio  # type: ignore[assignment]
 else:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         logging.warning("Using dummy GPIO")
 
     # NOTE: 本物の GPIO のように振る舞うダミーのライブラリ
-    class gpio:  # type: ignore[no-redef]  # noqa: N801
+    class gpio:  # type: ignore[no-redef]
         IS_DUMMY: bool = True
         BCM: int = 0
         OUT: int = 0
 
         # Valid GPIO pin numbers for Raspberry Pi (BCM mode)
-        VALID_PINS: set[int] = set(range(28))
+        VALID_PINS: ClassVar[set[int]] = set(range(28))
 
-        state: dict[str, dict[str, Any]] = collections.defaultdict(
+        state: ClassVar[dict[str, dict[str, Any]]] = collections.defaultdict(
             lambda: {
                 "state": collections.defaultdict(lambda: None),
                 "time_start": collections.defaultdict(lambda: None),
@@ -71,11 +71,11 @@ else:
             return gpio.state[worker]
 
         @staticmethod
-        def setmode(mode: int) -> None:  # noqa: ARG004
+        def setmode(mode: int) -> None:
             return
 
         @staticmethod
-        def setup(pin_num: int, direction: int) -> None:  # noqa: ARG004
+        def setup(pin_num: int, direction: int) -> None:
             gpio._validate_pin(pin_num)
 
         @staticmethod
@@ -128,11 +128,11 @@ else:
             return gpio.get_state()["state"][pin_num]
 
         @staticmethod
-        def setwarnings(warnings: bool) -> None:  # noqa: ARG004
+        def setwarnings(warnings: bool) -> None:
             return
 
         @staticmethod
-        def cleanup(chanlist: list[int] | None = None) -> None:  # noqa: ARG004
+        def cleanup(chanlist: list[int] | None = None) -> None:
             return
 
 

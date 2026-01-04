@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SIM117, RUF005
 """センサードライバのテスト（基本テスト）"""
+
 from __future__ import annotations
 
-import struct
 import unittest.mock
 
 import pytest

@@ -20,11 +20,11 @@ import time
 from my_lib.sensor.base import I2CSensorBase
 
 
-class EZO_PH(I2CSensorBase):  # noqa: N801
+class EZO_PH(I2CSensorBase):
     NAME: str = "EZO-pH"
     DEV_ADDR: int = 0x64  # 7bit
 
-    def __init__(self, bus_id: int | None = None, dev_addr: int | None = None) -> None:  # noqa: D107
+    def __init__(self, bus_id: int | None = None, dev_addr: int | None = None) -> None:
         from my_lib.sensor import i2cbus
 
         super().__init__(
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)

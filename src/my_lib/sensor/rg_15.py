@@ -20,7 +20,7 @@ from typing import Any
 import serial
 
 
-class RG_15:  # noqa: N801
+class RG_15:
     NAME: str = "RG_15"
     TYPE: str = "UART"
     DEV: str = "/dev/ttyAMA0"
@@ -30,7 +30,7 @@ class RG_15:  # noqa: N801
     RAIN_START_ACC_SUM: float = 0.04
     RAIN_STOP_INTERVAL_SEC: int = 120
 
-    def __init__(self, dev: str = DEV) -> None:  # noqa: D107
+    def __init__(self, dev: str = DEV) -> None:
         self.dev: str = dev
         self.ser: serial.Serial = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
         self.sum_by_minute: dict[int, float] = {}
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     dev = args["-d"]
     debug_mode = args["-D"]

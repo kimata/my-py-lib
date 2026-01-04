@@ -30,7 +30,7 @@ def print_memory() -> dict[str, int]:
 @blueprint.route("/api/snapshot", methods=["GET"])
 @my_lib.flask_util.support_jsonp
 def snap() -> dict[str, str] | flask.Response:
-    global snapshot_prev  # noqa: PLW0603
+    global snapshot_prev
 
     if not snapshot_prev:
         tracemalloc.start()

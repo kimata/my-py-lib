@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/i2cbus.py のテスト"""
+
 from __future__ import annotations
 
 import unittest.mock
-
-import pytest
 
 from my_lib.sensor.i2cbus import I2CBUS
 

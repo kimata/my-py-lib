@@ -28,7 +28,6 @@ def create_app(config_file):
     my_lib.webapp.config.init(config)
 
     import data.sample_webapp
-
     import my_lib.webapp.base
     import my_lib.webapp.event
     import my_lib.webapp.log

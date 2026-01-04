@@ -3,11 +3,10 @@
 """
 my_lib.footprint モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import time
-
-import pytest
 
 
 class TestExists:

@@ -1,4 +1,4 @@
-# ruff: noqa: S101, SLF001, PT012
+# ruff: noqa: S101
 """selenium_util.py のテスト"""
 
 from __future__ import annotations

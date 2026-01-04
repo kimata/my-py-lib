@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import time
 
-from my_lib.sensor import i2cbus
 from my_lib.sensor.base import I2CSensorBase
 from my_lib.sensor.crc import crc8_sensirion
 from my_lib.sensor.exceptions import SensorCRCError
@@ -66,7 +65,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)

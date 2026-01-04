@@ -3,13 +3,12 @@
 """
 my_lib.time モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import datetime
 import unittest.mock
 import zoneinfo
-
-import pytest
 
 
 class TestGetTz:

@@ -6,7 +6,8 @@ Usage:
   captcha.py [-c CONFIG] [-i IMAGE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -i IMAGE          : CAPTCA 画像。[default: tests/fixtures/captcha.png]
   -D                : デバッグモードで動作します。
 """
@@ -26,18 +27,18 @@ import PIL.Image
 # https://github.com/jiaaro/pydub/issues/795
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub")
 import pydub  # noqa: E402
-import selenium.webdriver.common.by
-import selenium.webdriver.common.keys
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.wait
-import slack_sdk
-import slack_sdk.errors
+import selenium.webdriver.common.by  # noqa: E402
+import selenium.webdriver.common.keys  # noqa: E402
+import selenium.webdriver.remote.webdriver  # noqa: E402
+import selenium.webdriver.support  # noqa: E402
+import selenium.webdriver.support.expected_conditions  # noqa: E402
+import selenium.webdriver.support.wait  # noqa: E402
+import slack_sdk  # noqa: E402
+import slack_sdk.errors  # noqa: E402
 
-import my_lib.notify.mail
-import my_lib.notify.slack
-import my_lib.selenium_util
+import my_lib.notify.mail  # noqa: E402
+import my_lib.notify.slack  # noqa: E402
+import my_lib.selenium_util  # noqa: E402
 
 _RESPONSE_WAIT_SEC: int = 5
 _RESPONSE_TIMEOUT_SEC: int = 300
@@ -209,7 +210,9 @@ def resolve_recaptcha_mail(
     driver.switch_to.default_content()
 
 
-def send_request_text_slack(config: my_lib.notify.slack.HasCaptchaConfig, title: str, message: str) -> str | None:
+def send_request_text_slack(
+    config: my_lib.notify.slack.HasCaptchaConfig, title: str, message: str
+) -> str | None:
     logging.info("CAPTCHA: send request [text]")
 
     title = "CAPTCHA: " + title
@@ -359,7 +362,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -372,7 +375,8 @@ if __name__ == "__main__":
     slack_config = my_lib.notify.slack.parse_config(config["slack"])
 
     if not isinstance(
-        slack_config, (my_lib.notify.slack.SlackConfig, my_lib.notify.slack.SlackCaptchaOnlyConfig)
+        slack_config,
+        my_lib.notify.slack.SlackConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,
     ):
         raise ValueError("captcha 設定がありません")
 

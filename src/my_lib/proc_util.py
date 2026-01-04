@@ -28,7 +28,7 @@ def status_text(status: int) -> str:
         return f"Unknown status: {status}"
 
 
-def kill_child(timeout: float = 5) -> None:  # noqa: C901, PLR0912
+def kill_child(timeout: float = 5) -> None:
     """現在のプロセスの子プロセスを終了させる
 
     Args:
@@ -47,7 +47,7 @@ def kill_child(timeout: float = 5) -> None:  # noqa: C901, PLR0912
             try:
                 logging.info("Terminating child process: %d (%s)", child.pid, child.name())
                 child.terminate()
-            except psutil.NoSuchProcess:  # noqa: PERF203
+            except psutil.NoSuchProcess:
                 pass  # プロセスが既に終了している
             except psutil.AccessDenied:
                 logging.warning("Access denied to terminate process %d", child.pid)
@@ -63,7 +63,7 @@ def kill_child(timeout: float = 5) -> None:  # noqa: C901, PLR0912
                 try:
                     logging.warning("Force killing child process: %d (%s)", child.pid, child.name())
                     child.kill()
-                except psutil.NoSuchProcess:  # noqa: PERF203
+                except psutil.NoSuchProcess:
                     pass  # プロセスが既に終了している
                 except psutil.AccessDenied:
                     logging.warning("Access denied to kill process %d", child.pid)

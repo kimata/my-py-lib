@@ -3,9 +3,8 @@
 """
 my_lib.store.amazon.util モジュールのユニットテスト
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 class TestGetItemUrl:

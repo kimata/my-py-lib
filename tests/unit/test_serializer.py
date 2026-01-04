@@ -3,11 +3,8 @@
 """
 my_lib.serializer モジュールのユニットテスト
 """
+
 from __future__ import annotations
-
-import pathlib
-
-import pytest
 
 
 class TestStore:
@@ -16,7 +13,7 @@ class TestStore:
     def test_stores_data(self, temp_dir):
         """データを保存する"""
         import my_lib.pytest_util
-        from my_lib.serializer import load, store
+        from my_lib.serializer import store
 
         file_path = temp_dir / "test.pkl"
         data = {"key": "value", "number": 42}

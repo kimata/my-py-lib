@@ -3,12 +3,11 @@
 """
 my_lib.json_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import datetime
 import zoneinfo
-
-import pytest
 
 
 class TestDateTimeJSONEncoder:

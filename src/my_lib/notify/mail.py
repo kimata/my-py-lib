@@ -6,7 +6,8 @@ Usage:
   mail.py [-c CONFIG] [-D] [-m MESSAGE]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -m MESSAGE        : 送信するメッセージ。[default: TEST]
   -D                : デバッグモードで動作します。
 """
@@ -20,7 +21,7 @@ import logging
 import pathlib
 import smtplib
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class MailConfig:
 
 
 # 型エイリアス
-MailConfigTypes = Union[MailConfig, MailEmptyConfig]
+MailConfigTypes = MailConfig | MailEmptyConfig
 
 
 @dataclass(frozen=True)
@@ -137,7 +138,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

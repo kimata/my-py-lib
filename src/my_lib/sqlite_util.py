@@ -178,7 +178,7 @@ class DatabaseConnection:
             self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
             logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
-        assert self.conn is not None
+        assert self.conn is not None  # noqa: S101
         return self.conn
 
     def __enter__(self) -> sqlite3.Connection:

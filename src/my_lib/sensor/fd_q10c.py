@@ -27,11 +27,11 @@ class Lock:
     LOCK_FILE: str = "/dev/shm/fd_q10c.lock"  # noqa: S108
     TIMEOUT: int = 5
 
-    def __init__(self) -> None:  # noqa: D107
+    def __init__(self) -> None:
         self.lock_file: str = str(Lock.get_file_path())
         self.lock_fd: int | None = None
 
-    def __enter__(self) -> bool:  # noqa: D105
+    def __enter__(self) -> bool:
         self.lock_fd = os.open(self.lock_file, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
 
         time_start = time.time()
@@ -54,7 +54,7 @@ class Lock:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> None:  # noqa: D105
+    ) -> None:
         if self.lock_fd is None:
             raise RuntimeError("Not Locked")
 
@@ -75,11 +75,11 @@ class Lock:
             return path.with_name(path.name + "." + suffix)
 
 
-class FD_Q10C:  # noqa: N801
+class FD_Q10C:
     NAME: str = "FD_Q10C"
     TYPE: str = "IO_LINK"
 
-    def __init__(self) -> None:  # noqa:D107
+    def __init__(self) -> None:
         self.dev_addr: int | None = None
 
     def ping(self) -> bool:
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     lock_file = args["-l"]
     debug_mode = args["-D"]

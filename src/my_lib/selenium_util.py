@@ -77,8 +77,8 @@ def _get_chrome_version() -> int | None:
 def _create_driver_impl(
     profile_name: str,
     data_path: pathlib.Path,
-    is_headless: bool,  # noqa: FBT001
-    use_subprocess: bool,  # noqa: FBT001
+    is_headless: bool,
+    use_subprocess: bool,
 ) -> WebDriver:
     chrome_data_path = data_path / "chrome"
     log_path = data_path / "log"
@@ -149,13 +149,13 @@ def _create_driver_impl(
     return driver
 
 
-def create_driver(  # noqa: PLR0913
+def create_driver(
     profile_name: str,
     data_path: pathlib.Path,
-    is_headless: bool = True,  # noqa: FBT001
-    clean_profile: bool = False,  # noqa: FBT001
-    auto_recover: bool = True,  # noqa: FBT001
-    use_subprocess: bool = False,  # noqa: FBT001
+    is_headless: bool = True,
+    clean_profile: bool = False,
+    auto_recover: bool = True,
+    use_subprocess: bool = False,
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -174,28 +174,28 @@ def create_driver(  # noqa: PLR0913
     logging.getLogger("selenium.webdriver.remote.remote_connection").setLevel(logging.WARNING)
 
     # NOTE: chrome_util の内部関数を使用（同一パッケージ内での使用は許容）
-    actual_profile_name = my_lib.chrome_util._get_actual_profile_name(profile_name)  # noqa: SLF001
+    actual_profile_name = my_lib.chrome_util._get_actual_profile_name(profile_name)
     profile_path = data_path / "chrome" / actual_profile_name
 
     # プロファイル健全性チェック
-    health = my_lib.chrome_util._check_profile_health(profile_path)  # noqa: SLF001
+    health = my_lib.chrome_util._check_profile_health(profile_path)
     if not health.is_healthy:
         logging.warning("Profile health check failed: %s", ", ".join(health.errors))
 
         if health.has_lock_files and not (health.has_corrupted_json or health.has_corrupted_db):
             # ロックファイルのみの問題なら削除して続行
             logging.info("Cleaning up lock files only")
-            my_lib.chrome_util._cleanup_profile_lock(profile_path)  # noqa: SLF001
+            my_lib.chrome_util._cleanup_profile_lock(profile_path)
         elif auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
             # JSON または DB が破損している場合はプロファイルをリカバリ
             logging.warning("Profile is corrupted, attempting recovery")
-            if my_lib.chrome_util._recover_corrupted_profile(profile_path):  # noqa: SLF001
+            if my_lib.chrome_util._recover_corrupted_profile(profile_path):
                 logging.info("Profile recovery successful, will create new profile")
             else:
                 logging.error("Profile recovery failed")
 
     if clean_profile:
-        my_lib.chrome_util._cleanup_profile_lock(profile_path)  # noqa: SLF001
+        my_lib.chrome_util._cleanup_profile_lock(profile_path)
 
     # NOTE: 1回だけ自動リトライ
     try:
@@ -204,16 +204,16 @@ def create_driver(  # noqa: PLR0913
         logging.warning("First attempt to create driver failed: %s", e)
 
         # コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
-        my_lib.chrome_util._cleanup_orphaned_chrome_processes_in_container()  # noqa: SLF001
+        my_lib.chrome_util._cleanup_orphaned_chrome_processes_in_container()
 
         # プロファイルのロックファイルを削除
-        my_lib.chrome_util._cleanup_profile_lock(profile_path)  # noqa: SLF001
+        my_lib.chrome_util._cleanup_profile_lock(profile_path)
 
         # 再度健全性チェック
-        health = my_lib.chrome_util._check_profile_health(profile_path)  # noqa: SLF001
+        health = my_lib.chrome_util._check_profile_health(profile_path)
         if not health.is_healthy and auto_recover and (health.has_corrupted_json or health.has_corrupted_db):
             logging.warning("Profile still corrupted after first attempt, recovering")
-            my_lib.chrome_util._recover_corrupted_profile(profile_path)  # noqa: SLF001
+            my_lib.chrome_util._recover_corrupted_profile(profile_path)
 
         return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
 
@@ -246,7 +246,7 @@ def input_xpath(
     xpath: str,
     text: str,
     wait: WebDriverWait[WebDriver] | None = None,
-    is_warn: bool = True,  # noqa: FBT001
+    is_warn: bool = True,
 ) -> bool:
     if wait is not None:
         wait.until(
@@ -269,8 +269,8 @@ def click_xpath(
     driver: WebDriver,
     xpath: str,
     wait: WebDriverWait[WebDriver] | None = None,
-    is_warn: bool = True,  # noqa: FBT001
-    move: bool = False,  # noqa: FBT001
+    is_warn: bool = True,
+    move: bool = False,
 ) -> bool:
     if wait is not None:
         wait.until(
@@ -520,7 +520,7 @@ def _warmup(
     time.sleep(sleep_sec)
 
 
-class browser_tab:  # noqa: N801
+class browser_tab:
     """新しいブラウザタブで URL を開くコンテキストマネージャ"""
 
     def __init__(self, driver: WebDriver, url: str) -> None:
@@ -587,7 +587,7 @@ class browser_tab:  # noqa: N801
             self._recover_from_error()
 
 
-class error_handler:  # noqa: N801
+class error_handler:
     """Selenium操作時のエラーハンドリング用コンテキストマネージャ
 
     エラー発生時に自動でログ出力、スクリーンショット取得、コールバック呼び出しを行う。
@@ -637,8 +637,8 @@ class error_handler:  # noqa: N801
         driver: WebDriver,
         message: str = "Selenium operation failed",
         on_error: Callable[[Exception, PIL.Image.Image | None], None] | None = None,
-        capture_screenshot: bool = True,  # noqa: FBT001
-        reraise: bool = True,  # noqa: FBT001
+        capture_screenshot: bool = True,
+        reraise: bool = True,
     ) -> None:
         """初期化"""
         self.driver = driver
@@ -936,7 +936,7 @@ def _wait_for_processes_with_check(
     return remaining_pids
 
 
-def quit_driver_gracefully(  # noqa: C901
+def quit_driver_gracefully(
     driver: WebDriver | None,
     wait_sec: float = 5.0,
     sigterm_wait_sec: float = 5.0,
@@ -974,7 +974,7 @@ def quit_driver_gracefully(  # noqa: C901
     finally:
         # undetected_chromedriver の __del__ がシャットダウン時に再度呼ばれるのを防ぐ
         if hasattr(driver, "_has_quit"):
-            driver._has_quit = True  # type: ignore[attr-defined]  # noqa: SLF001
+            driver._has_quit = True  # type: ignore[attr-defined]
 
     # ChromeDriverサービスの停止を試行
     try:

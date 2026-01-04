@@ -1,4 +1,4 @@
-# ruff: noqa: S101, SLF001
+# ruff: noqa: S101
 """chrome_util.py のテスト"""
 
 from __future__ import annotations

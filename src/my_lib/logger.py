@@ -54,10 +54,7 @@ def init(
     if os.environ.get("NO_COLORED_LOGS", "false") != "true":
         # docker compose の TTY 環境での二重出力を防ぐため、
         # 既存の StreamHandler を明示的に削除してから coloredlogs をインストール
-        root_logger.handlers = [
-            h for h in root_logger.handlers
-            if not isinstance(h, logging.StreamHandler)
-        ]
+        root_logger.handlers = [h for h in root_logger.handlers if not isinstance(h, logging.StreamHandler)]
         # isatty=None で自動検出を有効にしつつ、reconfigure で既存のハンドラーを適切に処理
         coloredlogs.install(
             fmt=actual_format,

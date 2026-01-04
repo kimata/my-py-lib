@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/io_link.py のテスト"""
+
 from __future__ import annotations
 
 from my_lib.sensor import io_link

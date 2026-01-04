@@ -16,7 +16,7 @@ import flask
 YIELD_TIMEOUT = 100
 
 
-class EVENT_TYPE(enum.Enum):  # noqa: N801
+class EVENT_TYPE(enum.Enum):
     CONTROL = "control"
     SCHEDULE = "schedule"
     LOG = "log"

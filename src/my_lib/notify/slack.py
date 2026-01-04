@@ -6,7 +6,8 @@ Usage:
   slack.py [-c CONFIG] [-m MESSAGE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -m MESSAGE        : 送信するメッセージ。[default: TEST]
   -D                : デバッグモードで動作します。
 """
@@ -22,8 +23,9 @@ import pathlib
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, TypedDict, Union
+from typing import Any, Protocol, TypedDict
 
 import slack_sdk
 import slack_sdk.errors
@@ -173,14 +175,14 @@ class SlackConfig:
 
 
 # 型エイリアス
-SlackConfigTypes = Union[
-    SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig, SlackCaptchaOnlyConfig, SlackEmptyConfig
-]
+SlackConfigTypes = (
+    SlackConfig | SlackErrorInfoConfig | SlackErrorOnlyConfig | SlackCaptchaOnlyConfig | SlackEmptyConfig
+)
 
 
 # NOTE: テスト用
 _thread_local = threading.local()
-_notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])  # noqa: PIE807
+_notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])
 _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 
@@ -339,14 +341,17 @@ def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
 
 
 def send(
-    config: HasBotToken | SlackEmptyConfig, ch_name: str, message: FormattedMessage, thread_ts: str | None = None
+    config: HasBotToken | SlackEmptyConfig,
+    ch_name: str,
+    message: FormattedMessage,
+    thread_ts: str | None = None,
 ) -> slack_sdk.web.slack_response.SlackResponse | None:
     if isinstance(config, SlackEmptyConfig):
         return None
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
-def upload_image(  # noqa: PLR0913
+def upload_image(
     config: HasBotToken | SlackEmptyConfig,
     ch_id: str,
     title: str,
@@ -466,7 +471,7 @@ def _split_send(
     return thread_ts
 
 
-def _upload_image(  # noqa: PLR0913
+def _upload_image(
     token: str,
     ch_id: str,
     title: str,
@@ -529,7 +534,7 @@ def _hist_get(is_thread_local: bool = True) -> list[str]:
         if not hasattr(_thread_local, "notify_hist"):
             with _hist_lock:
                 if not hasattr(_thread_local, "notify_hist"):
-                    _thread_local.notify_hist = collections.defaultdict(lambda: [])  # noqa: PIE807
+                    _thread_local.notify_hist = collections.defaultdict(lambda: [])
 
         return _thread_local.notify_hist[worker]
     else:
@@ -545,7 +550,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -562,7 +567,7 @@ if __name__ == "__main__":
 
     slack_config = parse_config(raw_config["slack"])
 
-    if isinstance(slack_config, (SlackConfig, SlackErrorInfoConfig)):
+    if isinstance(slack_config, SlackConfig | SlackErrorInfoConfig):
         info(slack_config, "Test", "This is test")
-    if isinstance(slack_config, (SlackConfig, SlackErrorInfoConfig, SlackErrorOnlyConfig)):
+    if isinstance(slack_config, SlackConfig | SlackErrorInfoConfig | SlackErrorOnlyConfig):
         error(slack_config, "Test", "This is test")

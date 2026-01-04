@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/exceptions.py のテスト"""
+
 from __future__ import annotations
 
 import pytest

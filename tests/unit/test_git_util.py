@@ -3,11 +3,10 @@
 """
 my_lib.git_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import datetime
-
-import pytest
 
 
 class TestGetRevisionInfo:

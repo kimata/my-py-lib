@@ -33,7 +33,7 @@ class ADS1115:
     REG_CONFIG_MUX_01: int = 0
     REG_CONFIG_MUX_0G: int = 4
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:  # noqa: D107
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:
         self.bus_id: int = bus_id
         self.dev_addr: int = dev_addr
         self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)

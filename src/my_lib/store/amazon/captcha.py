@@ -17,7 +17,7 @@ import my_lib.store.captcha
 
 def resolve(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,  # noqa: ARG001
+    wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     xpath: dict[str, str],
 ) -> None:

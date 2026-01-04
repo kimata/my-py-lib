@@ -40,7 +40,10 @@ def build_pil_face_map(
     Returns:
         PIL フォントオブジェクトの辞書
     """
-    return {name: my_lib.pil_util.get_font(font_config, font_type, size) for name, (font_type, size) in spec.items()}
+    return {
+        name: my_lib.pil_util.get_font(font_config, font_type, size)
+        for name, (font_type, size) in spec.items()
+    }
 
 
 def build_pil_face_map_nested(
@@ -73,5 +76,6 @@ def build_plot_face_map(
         matplotlib FontProperties オブジェクトの辞書
     """
     return {
-        name: my_lib.plot_util.get_plot_font(font_config, font_type, size) for name, (font_type, size) in spec.items()
+        name: my_lib.plot_util.get_plot_font(font_config, font_type, size)
+        for name, (font_type, size) in spec.items()
     }

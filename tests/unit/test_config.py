@@ -3,11 +3,11 @@
 """
 my_lib.config モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import json
 import pathlib
-import textwrap
 
 import pytest
 
@@ -266,11 +266,11 @@ class TestGetPath:
         """Path オブジェクトを返す"""
         import my_lib.config
 
-        config = {"paths": {"data": "/tmp/data"}}
+        config = {"paths": {"data": "/tmp/data"}}  # noqa: S108
 
         result = my_lib.config.get_path(config, ["paths", "data"])
         assert isinstance(result, pathlib.Path)
-        assert str(result) == "/tmp/data"
+        assert str(result) == "/tmp/data"  # noqa: S108
 
 
 class TestAbsPath:
@@ -877,11 +877,7 @@ class TestValidationErrorFormattingAdvanced:
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-                "value": {
-                    "oneOf": [{"type": "integer"}, {"type": "boolean"}]
-                }
-            },
+            "properties": {"value": {"oneOf": [{"type": "integer"}, {"type": "boolean"}]}},
         }
         schema_path.write_text(json.dumps(schema))
 
@@ -903,9 +899,7 @@ class TestValidationErrorFormattingAdvanced:
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-                "value": {"not": {"const": "forbidden"}}
-            },
+            "properties": {"value": {"not": {"const": "forbidden"}}},
         }
         schema_path.write_text(json.dumps(schema))
 
@@ -969,11 +963,11 @@ class TestGetPathWithSuffix:
         """サフィックス付きでパスを取得"""
         import my_lib.config
 
-        config = {"base": {"paths": {"data": "/tmp/data"}}}
+        config = {"base": {"paths": {"data": "/tmp/data"}}}  # noqa: S108
 
         result = my_lib.config.get_path(config, ["base"], ["paths", "data"])
         assert isinstance(result, pathlib.Path)
-        assert str(result) == "/tmp/data"
+        assert str(result) == "/tmp/data"  # noqa: S108
 
 
 class TestFormatRequiredErrorEdgeCases:
@@ -1143,7 +1137,7 @@ class TestFormatValidationErrorDirect:
 
         # カスタムバリデータエラーをシミュレート
         schema = {"type": "object"}
-        validator = jsonschema.Draft202012Validator(schema)
+        _ = jsonschema.Draft202012Validator(schema)
 
         # 手動で ValidationError を作成
         error = jsonschema.ValidationError(
@@ -1169,16 +1163,14 @@ class TestFormatValidationErrorDirect:
 
         import my_lib.config
 
-        config_path = pathlib.Path("/tmp/test_type_list.yaml")
+        config_path = pathlib.Path("/tmp/test_type_list.yaml")  # noqa: S108
         config_path.write_text("value: not-matching\n")
 
-        schema_path = pathlib.Path("/tmp/test_type_list_schema.json")
+        schema_path = pathlib.Path("/tmp/test_type_list_schema.json")  # noqa: S108
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
-            "properties": {
-                "value": {"type": ["integer", "boolean"]}
-            },
+            "properties": {"value": {"type": ["integer", "boolean"]}},
         }
         schema_path.write_text(json.dumps(schema))
 
@@ -1650,9 +1642,9 @@ class TestFindYamlLineResetLoopBreak:
         # リセットループ内でパスが完全に見つかるには、
         # 同じネスト構造が繰り返し出現する必要がある
         yaml_lines = [
-            "a:",    # line 0 - path[0] にマッチ
-            "b:",    # line 1 - 同じレベルなのでリセット発生
-            "c:",    # line 2
+            "a:",  # line 0 - path[0] にマッチ
+            "b:",  # line 1 - 同じレベルなのでリセット発生
+            "c:",  # line 2
         ]
         result = _find_yaml_line(yaml_lines, ["a", "b"])
         # アルゴリズムはネストしたパスを期待するため None を返す
@@ -1664,9 +1656,9 @@ class TestFindYamlLineResetLoopBreak:
 
         # 同じレベルの兄弟はネストしたパスではないので見つからない
         yaml_lines = [
-            "first:",     # line 0
-            "second:",    # line 1
-            "third:",     # line 2
+            "first:",  # line 0
+            "second:",  # line 1
+            "third:",  # line 2
         ]
         result = _find_yaml_line(yaml_lines, ["first", "second"])
         # ネストしたパスではないので None

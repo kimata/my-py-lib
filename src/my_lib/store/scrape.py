@@ -5,8 +5,9 @@
 Usage:
   scrape.py [-c CONFIG] [-s DATA_PATH] [-D]
 
-Options:n
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+Options:
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
   -D                : デバッグモードで動作します。
 """
@@ -112,7 +113,7 @@ def _resolve_template(template: str, item: dict[str, Any]) -> str:
     return tmpl.safe_substitute(item_name=item["name"])
 
 
-def process_action(  # noqa: C901, PLR0913
+def process_action(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     item: dict[str, Any],
@@ -189,7 +190,7 @@ def _process_preload(
     process_action(driver, wait, item, actions, "preload action", dump_path=dump_path)
 
 
-def _fetch_price_impl(  # noqa: C901, PLR0912
+def _fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     item: dict[str, Any],
     loop: int,
@@ -299,7 +300,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

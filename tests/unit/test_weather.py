@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """weather.py のテスト"""
+
 from __future__ import annotations
 
 import datetime
-import io
 import unittest.mock
 
 import lxml.html

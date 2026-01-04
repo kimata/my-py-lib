@@ -133,8 +133,7 @@ def etag_cache(f: F) -> F:
                 etag = calculate_etag(data=response.get_data())
                 response.headers["ETag"] = etag
 
-            assert etag
-            if check_etag(etag, flask.request.headers):
+            if etag and check_etag(etag, flask.request.headers):
                 return flask.make_response("", 304)
 
             if "Cache-Control" not in response.headers:
@@ -175,7 +174,7 @@ def _generate_etag_from_data(etag_data: str | bytes | dict[str, Any], weak: bool
     """ETAGデータからETAGを生成する内部関数"""
     if isinstance(etag_data, str):
         return calculate_etag(file_path=etag_data, weak=weak)
-    elif isinstance(etag_data, (bytes, str)):
+    elif isinstance(etag_data, bytes | str):
         return calculate_etag(data=etag_data, weak=weak)
     elif isinstance(etag_data, dict) and "file_path" in etag_data:
         return calculate_etag(file_path=etag_data["file_path"], weak=weak)

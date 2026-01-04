@@ -11,11 +11,11 @@ class ECHONETLite:
 
     EHD1: int = 0x10
 
-    class EHD2:  # noqa: D106
+    class EHD2:
         FORMAT1: int = 0x81
         FORMAT2: int = 0x82
 
-    class ESV:  # noqa: D106
+    class ESV:
         # プロパティ値書き込み要求(応答不要)
         PROP_WRITE_NO_RES: int = 0x60
         # プロパティ値書き込み要求(応答要)
@@ -27,22 +27,22 @@ class ECHONETLite:
         # プロパティ値書き込み・読み出し要求
         PROP_WRITE_READ: int = 0x6E
 
-    class EOJ:  # noqa: D106
+    class EOJ:
         # 住宅・設備関連機器クラスグループ
         CLASS_GROUP_HOUSING: int = 0x02
         # 管理・操作関連機器クラスグループ
         CLASS_GROUP_MANAGEMENT: int = 0x05
 
-        class HOUSE_CLASS_GROUP:  # noqa: N801, D106
+        class HOUSE_CLASS_GROUP:
             # 低圧スマート電力量メータクラス
             LOW_VOLTAGE_SMART_METER: int = 0x88
 
-        class MANAGEMENT_CLASS_GROUP:  # noqa: N801, D106
+        class MANAGEMENT_CLASS_GROUP:
             # コントローラ
             CONTROLLER: int = 0xFF
 
-    class EPC:  # noqa: D106
-        class LOW_VOLTAGE_SMART_METER:  # noqa: N801, D106
+    class EPC:
+        class LOW_VOLTAGE_SMART_METER:
             # 動作状態
             STATUS: int = 0x80
             # 積算電力量有効桁数

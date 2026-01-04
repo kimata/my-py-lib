@@ -23,7 +23,9 @@ class ImageNotFoundError(Exception):
     pass
 
 
-def get_font(config: my_lib.panel_config.FontConfigProtocol, font_type: str, size: int) -> PIL.ImageFont.FreeTypeFont:
+def get_font(
+    config: my_lib.panel_config.FontConfigProtocol, font_type: str, size: int
+) -> PIL.ImageFont.FreeTypeFont:
     """フォントを取得する
 
     Args:
@@ -57,7 +59,7 @@ def text_size(img: PIL.Image.Image, font: PIL.ImageFont.FreeTypeFont, text: str)
     return (int(right - left), int(bottom - top))
 
 
-def draw_text(  # noqa: PLR0913
+def draw_text(
     img: PIL.Image.Image,
     text: str,
     pos: tuple[float, float],
@@ -89,7 +91,7 @@ def draw_text(  # noqa: PLR0913
     return (next_pos_x, next_pos_y)
 
 
-def draw_text_line(  # noqa: PLR0913
+def draw_text_line(
     img: PIL.Image.Image,
     text: str,
     pos: tuple[float, float],
@@ -165,9 +167,7 @@ def load_image(img_config: my_lib.panel_config.IconConfigProtocol) -> PIL.Image.
     return img
 
 
-def alpha_paste(
-    img: PIL.Image.Image, paint_img: PIL.Image.Image, pos: tuple[int, int]
-) -> None:
+def alpha_paste(img: PIL.Image.Image, paint_img: PIL.Image.Image, pos: tuple[int, int]) -> None:
     canvas = PIL.Image.new(
         "RGBA",
         img.size,
@@ -183,4 +183,4 @@ def convert_to_gray(img: PIL.Image.Image) -> PIL.Image.Image:
     img = img.convert("L")
     img = img.point([int(pow(x / 255.0, 1.0 / 2.2) * 255) for x in range(256)])
 
-    return img  # noqa: RET504
+    return img

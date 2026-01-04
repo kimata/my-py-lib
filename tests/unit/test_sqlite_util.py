@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SIM117
 """
 my_lib.sqlite_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -530,5 +531,3 @@ class TestExitMethod:
         with my_lib.sqlite_util.connect(db_path) as conn:
             conn.execute("CREATE TABLE test (id INTEGER)")
             # context manager の __exit__ が呼ばれる
-
-
