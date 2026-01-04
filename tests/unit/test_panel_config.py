@@ -3,6 +3,7 @@
 """
 my_lib.panel_config モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import pathlib

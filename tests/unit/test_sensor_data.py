@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SIM117
 """sensor_data.py のテスト"""
+
 from __future__ import annotations
 
 import datetime
-import sys
 import unittest.mock
-
-import pytest
 
 
 class TestSensorDataResult:
@@ -28,9 +26,7 @@ class TestSensorDataResult:
         import my_lib.sensor_data
 
         now = datetime.datetime.now()
-        result = my_lib.sensor_data.SensorDataResult(
-            value=[1.0, 2.0, 3.0], time=[now, now, now], valid=True
-        )
+        result = my_lib.sensor_data.SensorDataResult(value=[1.0, 2.0, 3.0], time=[now, now, now], valid=True)
 
         assert result.value == [1.0, 2.0, 3.0]
         assert len(result.time) == 3
@@ -173,12 +169,8 @@ class TestFetchData:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")
-        ):
-            result = my_lib.sensor_data.fetch_data(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
+            result = my_lib.sensor_data.fetch_data(db_config, "measure", "hostname", "field")
 
         assert result.valid is False
         assert result.value == []
@@ -200,9 +192,7 @@ class TestFetchData:
         with unittest.mock.patch(
             "my_lib.sensor_data._fetch_data_impl", return_value=[mock_table]
         ) as mock_fetch:
-            my_lib.sensor_data.fetch_data(
-                db_config, "measure", "hostname", "field", window_min=0
-            )
+            my_lib.sensor_data.fetch_data(db_config, "measure", "hostname", "field", window_min=0)
 
             # テンプレートが WITHOUT_AGGREGATION であることを確認
             call_args = mock_fetch.call_args
@@ -233,9 +223,7 @@ class TestFetchDataAsync:
                 "my_lib.sensor_data._fetch_data_impl_async",
                 return_value=[mock_table],
             ):
-                return await my_lib.sensor_data.fetch_data_async(
-                    db_config, "measure", "hostname", "field"
-                )
+                return await my_lib.sensor_data.fetch_data_async(db_config, "measure", "hostname", "field")
 
         result = asyncio.run(run_test())
         assert result.valid is False  # 空のレコードなので valid=False
@@ -292,12 +280,8 @@ class TestGetSum:
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = []
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", return_value=mock_table
-        ):
-            result = my_lib.sensor_data.get_sum(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=mock_table):
+            result = my_lib.sensor_data.get_sum(db_config, "measure", "hostname", "field")
 
         assert result == 0
 
@@ -315,12 +299,8 @@ class TestGetSum:
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = [[10, 150.5]]
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", return_value=mock_table
-        ):
-            result = my_lib.sensor_data.get_sum(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=mock_table):
+            result = my_lib.sensor_data.get_sum(db_config, "measure", "hostname", "field")
 
         assert result == 150.5
 
@@ -335,12 +315,8 @@ class TestGetSum:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")
-        ):
-            result = my_lib.sensor_data.get_sum(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
+            result = my_lib.sensor_data.get_sum(db_config, "measure", "hostname", "field")
 
         assert result == 0
 
@@ -359,12 +335,8 @@ class TestGetDaySum:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data.get_sum", return_value=100.0
-        ) as mock_get_sum:
-            result = my_lib.sensor_data.get_day_sum(
-                db_config, "measure", "hostname", "field", days=7
-            )
+        with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=100.0) as mock_get_sum:
+            result = my_lib.sensor_data.get_day_sum(db_config, "measure", "hostname", "field", days=7)
 
         assert result == 100.0
         mock_get_sum.assert_called_once()
@@ -384,12 +356,8 @@ class TestGetHourSum:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data.get_sum", return_value=50.0
-        ) as mock_get_sum:
-            result = my_lib.sensor_data.get_hour_sum(
-                db_config, "measure", "hostname", "field", hours=24
-            )
+        with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=50.0) as mock_get_sum:
+            result = my_lib.sensor_data.get_hour_sum(db_config, "measure", "hostname", "field", hours=24)
 
         assert result == 50.0
         mock_get_sum.assert_called_once()
@@ -413,12 +381,8 @@ class TestGetMinuteSum:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data.get_sum", return_value=10.0
-        ) as mock_get_sum:
-            result = my_lib.sensor_data.get_minute_sum(
-                db_config, "measure", "hostname", "field", minutes=60
-            )
+        with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=10.0) as mock_get_sum:
+            result = my_lib.sensor_data.get_minute_sum(db_config, "measure", "hostname", "field", minutes=60)
 
         assert result == 10.0
         mock_get_sum.assert_called_once()
@@ -446,9 +410,7 @@ class TestGetEquipOnMinutes:
 
         # NOTE: ソースコードのロギング書式にバグがあるため logging.info をモック
         with unittest.mock.patch.object(logging, "info"):
-            with unittest.mock.patch(
-                "my_lib.sensor_data._fetch_data_impl", return_value=[]
-            ):
+            with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=[]):
                 result = my_lib.sensor_data.get_equip_on_minutes(
                     db_config, "measure", "hostname", "field", threshold=10.0
                 )
@@ -481,9 +443,7 @@ class TestGetEquipOnMinutes:
 
         # NOTE: ソースコードのロギング書式にバグがあるため logging.info をモック
         with unittest.mock.patch.object(logging, "info"):
-            with unittest.mock.patch(
-                "my_lib.sensor_data._fetch_data_impl", return_value=[mock_table]
-            ):
+            with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=[mock_table]):
                 result = my_lib.sensor_data.get_equip_on_minutes(
                     db_config,
                     "measure",
@@ -538,12 +498,8 @@ class TestGetLastEvent:
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = []
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", return_value=mock_table
-        ):
-            result = my_lib.sensor_data.get_last_event(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=mock_table):
+            result = my_lib.sensor_data.get_last_event(db_config, "measure", "hostname", "field")
 
         assert result is None
 
@@ -562,12 +518,8 @@ class TestGetLastEvent:
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = [[expected_time]]
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", return_value=mock_table
-        ):
-            result = my_lib.sensor_data.get_last_event(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", return_value=mock_table):
+            result = my_lib.sensor_data.get_last_event(db_config, "measure", "hostname", "field")
 
         assert result == expected_time
 
@@ -582,12 +534,8 @@ class TestGetLastEvent:
             "bucket": "test_bucket",
         }
 
-        with unittest.mock.patch(
-            "my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")
-        ):
-            result = my_lib.sensor_data.get_last_event(
-                db_config, "measure", "hostname", "field"
-            )
+        with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
+            result = my_lib.sensor_data.get_last_event(db_config, "measure", "hostname", "field")
 
         assert result is None
 

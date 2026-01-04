@@ -6,7 +6,8 @@ Usage:
   log_proxy.py [-c CONFIG] [-p PORT] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -p PORT           : WEB サーバのポートを指定します。[default: 5000]
   -D                : デバッグモードで動作します。
 """
@@ -18,7 +19,7 @@ import logging
 import os
 import time
 import wsgiref.handlers
-from typing import Any, Generator
+from typing import Any
 
 import flask
 import requests
@@ -33,7 +34,7 @@ api_base_url: str | None = None
 
 
 def init(api_base_url_: str) -> None:
-    global api_base_url  # noqa: PLW0603
+    global api_base_url
     global error_response
 
     api_base_url = api_base_url_
@@ -100,7 +101,7 @@ def _make_proxy_request(subpath: str) -> requests.Response:
     if flask.request.method == "GET":
         # GETの場合はクエリパラメータを転送
         params = dict(flask.request.args)
-        res = requests.get(url, params=params)  # noqa: S113
+        res = requests.get(url, params=params, timeout=30)
     else:
         # POSTの場合はフォームデータとクエリパラメータの両方を転送
         params = dict(flask.request.args)
@@ -108,9 +109,9 @@ def _make_proxy_request(subpath: str) -> requests.Response:
         # JSONデータの場合も対応
         if flask.request.is_json:
             data = flask.request.get_json()
-            res = requests.post(url, params=params, json=data)  # noqa: S113
+            res = requests.post(url, params=params, json=data, timeout=30)
         else:
-            res = requests.post(url, params=params, data=data)  # noqa: S113
+            res = requests.post(url, params=params, data=data, timeout=30)
 
     res.raise_for_status()
     return res
@@ -217,7 +218,7 @@ if __name__ == "__main__":
 
         logging.info("Finish watch event")
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -258,38 +259,39 @@ if __name__ == "__main__":
     # /api/proxy/json/api/log_view のテスト (GET)
     proxy_json_url = f"{base_url['proxy']}/api/proxy/json/api/log_view"
     logging.info("Testing GET %s", proxy_json_url)
-    test_res = requests.get(proxy_json_url, params={"test_param": "value"})  # noqa: S113
+    test_res = requests.get(proxy_json_url, params={"test_param": "value"}, timeout=30)
     logging.info("Response: %s", my_lib.pretty.format(json.loads(test_res.text)))
 
     watch_proc = multiprocessing.Process(target=lambda: watch_event(base_url["proxy"], 3))
     watch_proc.start()
 
-    logging.info(my_lib.pretty.format(requests.get(f"{base_url['log']}/api/log_clear").text))  # noqa: S113
+    logging.info(my_lib.pretty.format(requests.get(f"{base_url['log']}/api/log_clear", timeout=30).text))
 
     # POSTリクエストのテスト（プロキシ経由）
     proxy_post_url = f"{base_url['proxy']}/api/proxy/json/api/log_add"
     logging.info("Testing POST %s", proxy_post_url)
 
     my_lib.pretty.format(
-        requests.post(proxy_post_url, data={"message": "Test INFO", "level": "INFO"})  # noqa: S113
+        requests.post(proxy_post_url, data={"message": "Test INFO", "level": "INFO"}, timeout=30)
     )
     time.sleep(0.5)
     my_lib.pretty.format(
-        requests.post(proxy_post_url, data={"message": "Test WARN", "level": "WARN"})  # noqa: S113
+        requests.post(proxy_post_url, data={"message": "Test WARN", "level": "WARN"}, timeout=30)
     )
     time.sleep(0.5)
     my_lib.pretty.format(
-        requests.post(proxy_post_url, data={"message": "Test ERROR", "level": "ERROR"})  # noqa: S113
+        requests.post(proxy_post_url, data={"message": "Test ERROR", "level": "ERROR"}, timeout=30)
     )
 
     watch_proc.join()
 
     # 古いエンドポイントのテスト
-    logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url['proxy']}/api/log_view").text)))  # noqa: S113
+    old_endpoint_res = requests.get(f"{base_url['proxy']}/api/log_view", timeout=30)
+    logging.info(my_lib.pretty.format(json.loads(old_endpoint_res.text)))
 
     # 新しいエンドポイントのテスト
     logging.info("Testing new endpoint: %s", proxy_json_url)
-    logging.info(my_lib.pretty.format(json.loads(requests.get(proxy_json_url).text)))  # noqa: S113
+    logging.info(my_lib.pretty.format(json.loads(requests.get(proxy_json_url, timeout=30).text)))
 
     proc.terminate()
     proc.join()

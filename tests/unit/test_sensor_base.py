@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/base.py のテスト"""
+
 from __future__ import annotations
 
 import unittest.mock

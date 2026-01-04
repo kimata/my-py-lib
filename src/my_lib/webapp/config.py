@@ -52,16 +52,18 @@ class WebappConfig:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> WebappConfig:
         return cls(
-            static_dir_path=pathlib.Path(data["static_dir_path"]).resolve() if "static_dir_path" in data else None,
+            static_dir_path=(
+                pathlib.Path(data["static_dir_path"]).resolve() if "static_dir_path" in data else None
+            ),
             data=WebappDataConfig.from_dict(data["data"]) if "data" in data else None,
         )
 
 
 def init(config: WebappConfig) -> None:
-    global STATIC_DIR_PATH  # noqa: PLW0603
-    global SCHEDULE_FILE_PATH  # noqa: PLW0603
-    global LOG_DIR_PATH  # noqa: PLW0603
-    global STAT_DIR_PATH  # noqa: PLW0603
+    global STATIC_DIR_PATH
+    global SCHEDULE_FILE_PATH
+    global LOG_DIR_PATH
+    global STAT_DIR_PATH
 
     STATIC_DIR_PATH = config.static_dir_path
 

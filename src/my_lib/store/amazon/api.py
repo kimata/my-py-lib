@@ -6,7 +6,8 @@ Usage:
   api.py [-c CONFIG] [-t ASIN...] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
   -D                : デバッグモードで動作します。
 """
@@ -119,9 +120,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
     return price_map
 
 
-def fetch_price_new(  # noqa: C901
-    config: AmazonApiConfig, asin_list: list[str]
-) -> dict[str, AmazonItem]:
+def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
@@ -221,7 +220,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

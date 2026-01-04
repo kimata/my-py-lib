@@ -15,7 +15,7 @@ WAIT_COUNT: int = 30
 class BP35A1:
     NAME: str = "BP35A1"
 
-    def __init__(self, port: str = "/dev/ttyAMA0", debug: bool = False) -> None:  # noqa: D107
+    def __init__(self, port: str = "/dev/ttyAMA0", debug: bool = False) -> None:
         self.ser: serial.Serial = serial.Serial(port=port, baudrate=115200, timeout=5)
         self.opt: int | None = None
         self.ser.reset_input_buffer()
@@ -172,9 +172,7 @@ class BP35A1:
 
         return pan_desc
 
-    def __send_command_raw(
-        self, command: str, echo_back: Any = lambda command: command
-    ) -> str:
+    def __send_command_raw(self, command: str, echo_back: Any = lambda command: command) -> str:
         self.write(command)
         self.write("\r\n")
         # NOTE: echo_back はコマンドからエコーバック文字列を生成する関数。

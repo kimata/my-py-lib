@@ -6,7 +6,8 @@ Usage:
   echonetenergy.py [-c CONFIG] [-i IF_DEV] [-d DEV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -i IF_DEV         : ECHONET Lite のインターフェースデバイスを指定します。[default: BP35A1]
   -d DEV_FILE       : デバイスファイルを指定します。[default: /dev/ttyAMA0]
   -D                : デバッグモードで動作します。
@@ -32,7 +33,7 @@ class EchonetEnergy:
     NAME: str = "EchonetEnergy"
     TYPE: str = "UART"
 
-    def __init__(self, dev_file: str, param: dict[str, Any], debug: bool = False) -> None:  # noqa: D107
+    def __init__(self, dev_file: str, param: dict[str, Any], debug: bool = False) -> None:
         echonet_if = getattr(my_lib.sensor, param["if"].lower())(dev_file, debug)
 
         self.b_id: str = param["id"]
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

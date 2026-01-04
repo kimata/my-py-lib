@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """plot_util.py のテスト"""
+
 from __future__ import annotations
 
 import pathlib
@@ -11,7 +12,7 @@ import pytest
 matplotlib = pytest.importorskip("matplotlib")
 matplotlib_font_manager = pytest.importorskip("matplotlib.font_manager")
 
-import my_lib.plot_util
+import my_lib.plot_util  # noqa: E402
 
 
 class MockFontConfig:
@@ -55,9 +56,7 @@ class TestGetPlotFont:
 
         font_config = MockFontConfig(temp_dir, {"jp_bold": "my_font.ttf"})
 
-        with unittest.mock.patch(
-            "matplotlib.font_manager.FontProperties"
-        ) as mock_fp:
+        with unittest.mock.patch("matplotlib.font_manager.FontProperties") as mock_fp:
             my_lib.plot_util.get_plot_font(font_config, "jp_bold", 16)
 
             call_args = mock_fp.call_args
@@ -74,9 +73,7 @@ class TestGetPlotFont:
 
         my_lib.plot_util._get_font_properties.cache_clear()
 
-        with unittest.mock.patch(
-            "matplotlib.font_manager.FontProperties"
-        ) as mock_fp:
+        with unittest.mock.patch("matplotlib.font_manager.FontProperties") as mock_fp:
             mock_fp.return_value = unittest.mock.MagicMock()
 
             my_lib.plot_util.get_plot_font(font_config, "cache_test", 14)
@@ -93,9 +90,7 @@ class TestGetPlotFont:
 
         my_lib.plot_util._get_font_properties.cache_clear()
 
-        with unittest.mock.patch(
-            "matplotlib.font_manager.FontProperties"
-        ) as mock_fp:
+        with unittest.mock.patch("matplotlib.font_manager.FontProperties") as mock_fp:
             mock_fp.return_value = unittest.mock.MagicMock()
 
             my_lib.plot_util.get_plot_font(font_config, "size_test", 10)

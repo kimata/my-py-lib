@@ -3,12 +3,10 @@
 """
 my_lib.panel_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
-import pathlib
-
 import PIL.Image
-import pytest
 
 
 class TestNotifyError:
@@ -34,8 +32,7 @@ class TestCreateErrorImage:
 
     def test_creates_error_image(self, temp_dir):
         """エラー画像を生成する"""
-        from my_lib.panel_config import FontConfig, PanelGeometry
-        from my_lib.panel_util import create_error_image
+        from my_lib.panel_config import PanelGeometry
 
         # モックのパネル設定を作成
         class MockPanelConfig:

@@ -1,4 +1,3 @@
-# noqa: D104
 from __future__ import annotations
 
 import importlib
@@ -9,21 +8,21 @@ from typing import TYPE_CHECKING, Any
 import my_lib.sensor
 import my_lib.sensor.i2cbus
 
-from .ads1015 import ADS1015 as ads1015  # noqa: N811
-from .apds9250 import APDS9250 as apds9250  # noqa: N811
+from .ads1015 import ADS1015 as ads1015
+from .apds9250 import APDS9250 as apds9250
 from .base import SensorBase, SensorValue
-from .bp35a1 import BP35A1 as bp35a1  # noqa: N811
-from .echonetenergy import EchonetEnergy as echonetenergy  # noqa: N813
-from .echonetlite import ECHONETLite as echonetlite  # noqa: N813
-from .ezo_ph import EZO_PH as ezo_ph  # noqa: N811
-from .ezo_rtd import EZO_RTD as ezo_rtd  # noqa: N811
-from .fd_q10c import FD_Q10C as fd_q10c  # noqa: N811
-from .grove_tds import GROVE_TDS as grove_tds  # noqa: N811
-from .lp_pyra03 import LP_PYRA03 as lp_pyra03  # noqa: N811
-from .rg_15 import RG_15 as rg_15  # noqa: N811
-from .scd4x import SCD4X as scd4x  # noqa: N811
-from .sht35 import SHT35 as sht35  # noqa: N811
-from .sm9561 import SM9561 as sm9561  # noqa: N811
+from .bp35a1 import BP35A1 as bp35a1
+from .echonetenergy import EchonetEnergy as echonetenergy
+from .echonetlite import ECHONETLite as echonetlite
+from .ezo_ph import EZO_PH as ezo_ph
+from .ezo_rtd import EZO_RTD as ezo_rtd
+from .fd_q10c import FD_Q10C as fd_q10c
+from .grove_tds import GROVE_TDS as grove_tds
+from .lp_pyra03 import LP_PYRA03 as lp_pyra03
+from .rg_15 import RG_15 as rg_15
+from .scd4x import SCD4X as scd4x
+from .sht35 import SHT35 as sht35
+from .sm9561 import SM9561 as sm9561
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -36,6 +35,7 @@ if TYPE_CHECKING:
 
         def ping(self) -> bool: ...
         def get_value_map(self) -> dict[str, SensorValue]: ...
+
 
 iolink = importlib.import_module(".io_link", __package__)
 
@@ -131,7 +131,7 @@ def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, SensorValue], bo
             val = sensor.get_value_map()
             logging.info(val)
             value_map.update(val)
-        except Exception:  # noqa: PERF203
+        except Exception:
             logging.exception("Failed to measure using %s", sensor.NAME)
             is_success = False
 

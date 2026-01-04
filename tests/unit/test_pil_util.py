@@ -3,6 +3,7 @@
 """
 my_lib.pil_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -143,7 +144,12 @@ class TestDrawTextLine:
         font = PIL.ImageFont.load_default()
 
         result = draw_text_line(
-            img, "Hello", (10, 10), font, stroke_width=2, stroke_fill="#FF0000"  # type: ignore[arg-type]
+            img,
+            "Hello",
+            (10, 10),
+            font,
+            stroke_width=2,
+            stroke_fill="#FF0000",  # type: ignore[arg-type]
         )
 
         assert isinstance(result, tuple)

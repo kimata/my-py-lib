@@ -18,11 +18,11 @@ import logging
 from my_lib.sensor import ads1115
 
 
-class GROVE_TDS:  # noqa: N801
+class GROVE_TDS:
     NAME: str = "GROVE-TDS"
     TYPE: str = "I2C"
 
-    def __init__(  # noqa: D107
+    def __init__(
         self, bus_id: int = ads1115.i2cbus.I2CBUS.ARM, dev_addr: int = ads1115.ADS1115.DEV_ADDR
     ) -> None:
         self.bus_id: int = bus_id
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)

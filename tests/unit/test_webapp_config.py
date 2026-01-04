@@ -3,12 +3,10 @@
 """
 my_lib.webapp.config モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
-import pathlib
-
 import flask
-import pytest
 
 
 class TestConstants:

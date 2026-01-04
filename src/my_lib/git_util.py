@@ -30,7 +30,7 @@ def get_revision_info() -> RevisionInfo:
     repo = git.Repo(".")
 
     commit = repo.head.commit
-    commit_time = datetime.datetime.fromtimestamp(commit.committed_date, tz=datetime.timezone.utc).astimezone(
+    commit_time = datetime.datetime.fromtimestamp(commit.committed_date, tz=datetime.UTC).astimezone(
         my_lib.time.get_zoneinfo()
     )
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     debug_mode = args["-D"]
 

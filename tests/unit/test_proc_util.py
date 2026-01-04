@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SIM117, S607
 """
 my_lib.proc_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
-import multiprocessing
-import os
 import signal
 import subprocess
-import time
 
 import psutil
-import pytest
 
 
 class TestSignalName:
@@ -79,7 +76,6 @@ class TestStatusText:
 
     def test_terminated_by_sigterm(self):
         """SIGTERM による終了"""
-        from my_lib.proc_util import status_text
 
         # 実際に子プロセスを作成してシグナルで終了させる
         proc = subprocess.Popen(["sleep", "10"])
@@ -170,10 +166,13 @@ class TestKillChild:
         mock_parent.children.return_value = [mock_child]
 
         with unittest.mock.patch("psutil.Process", return_value=mock_parent):
-            with unittest.mock.patch("psutil.wait_procs", side_effect=[
-                ([], [mock_child]),  # 最初の wait で生存
-                ([], []),  # SIGKILL 後に終了
-            ]):
+            with unittest.mock.patch(
+                "psutil.wait_procs",
+                side_effect=[
+                    ([], [mock_child]),  # 最初の wait で生存
+                    ([], []),  # SIGKILL 後に終了
+                ],
+            ):
                 kill_child(timeout=1)
 
         mock_child.kill.assert_called_once()

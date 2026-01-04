@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/__init__.py のテスト"""
+
 from __future__ import annotations
 
 import unittest.mock
@@ -216,4 +217,3 @@ class TestLoad:
         result = load(sensor_def_list)
 
         assert result[0].required is True
-

@@ -6,7 +6,8 @@ Usage:
   log.py [-c CONFIG] [-p PORT] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -p PORT           : WEB サーバのポートを指定します。[default: 5000]
   -D                : デバッグモードで動作します。
 """
@@ -26,7 +27,8 @@ import threading
 import time
 import traceback
 import wsgiref.handlers
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import flask
 
@@ -40,7 +42,7 @@ import my_lib.webapp.event
 T = TypeVar("T")
 
 
-class LOG_LEVEL(enum.Enum):  # noqa: N801
+class LOG_LEVEL(enum.Enum):
     INFO = 0
     WARN = 1
     ERROR = 2
@@ -205,7 +207,7 @@ class LogManager:
         while retry_count < MAX_RETRY_COUNT:
             try:
                 return func(*args, **kwargs)
-            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:  # noqa: PERF203
+            except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
                 last_exception = e
                 error_msg = str(e).lower()
 
@@ -219,7 +221,9 @@ class LogManager:
                         my_lib.sqlite_util.recover(db_path)
                         raise
 
-                    logging.warning("データベースエラー (リトライ %d/%d): %s", retry_count, MAX_RETRY_COUNT, e)
+                    logging.warning(
+                        "データベースエラー (リトライ %d/%d): %s", retry_count, MAX_RETRY_COUNT, e
+                    )
                     time.sleep(delay)
                     delay = min(delay * 2, MAX_RETRY_DELAY_SEC)  # 指数バックオフ
                 else:
@@ -251,11 +255,9 @@ class LogManager:
                 slack_config = my_lib.notify.slack.parse_config(self._config["slack"])
                 if isinstance(
                     slack_config,
-                    (
-                        my_lib.notify.slack.SlackConfig,
-                        my_lib.notify.slack.SlackErrorInfoConfig,
-                        my_lib.notify.slack.SlackErrorOnlyConfig,
-                    ),
+                    my_lib.notify.slack.SlackConfig
+                    | my_lib.notify.slack.SlackErrorInfoConfig
+                    | my_lib.notify.slack.SlackErrorOnlyConfig,
                 ):
                     my_lib.notify.slack.error(slack_config, self._config["slack"]["from"], message)
 
@@ -355,7 +357,7 @@ class LogManager:
             for log in log_list:
                 log["date"] = (
                     datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
-                    .replace(tzinfo=datetime.timezone.utc)
+                    .replace(tzinfo=datetime.UTC)
                     .astimezone(my_lib.time.get_zoneinfo())
                     .strftime("%Y-%m-%d %H:%M:%S")
                 )
@@ -593,7 +595,7 @@ if __name__ == "__main__":
     import my_lib.logger
     import my_lib.pretty
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -613,29 +615,29 @@ if __name__ == "__main__":
     import my_lib.webapp.event
     import my_lib.webapp.log
 
-    def sig_handler(num, frame):  # noqa: ARG001
+    def sig_handler(num, frame):
         my_lib.webapp.log.term()
 
     signal.signal(signal.SIGTERM, sig_handler)
 
     base_url = f"http://127.0.0.1:{port}/test"
 
-    assert config is not None, "Config must be loaded before running test"
+    assert config is not None, "Config must be loaded before running test"  # noqa: S101
     config_: dict[str, Any] = config  # Capture narrowed type for lambda
     proc = multiprocessing.Process(target=lambda: test_run(config_, port, debug_mode))
     proc.start()
 
     time.sleep(0.5)
 
-    logging.info(my_lib.pretty.format(requests.get(f"{base_url}/api/log_clear").text))  # noqa: S113
+    logging.info(my_lib.pretty.format(requests.get(f"{base_url}/api/log_clear", timeout=30).text))
 
-    requests.post(f"{base_url}/api/log_add", data={"message": "Test INFO", "level": "INFO"})  # noqa: S113
-    requests.post(f"{base_url}/api/log_add", data={"message": "Test WARN", "level": "WARN"})  # noqa: S113
-    requests.post(f"{base_url}/api/log_add", data={"message": "Test ERROR", "level": "ERROR"})  # noqa: S113
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test INFO", "level": "INFO"}, timeout=30)
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test WARN", "level": "WARN"}, timeout=30)
+    requests.post(f"{base_url}/api/log_add", data={"message": "Test ERROR", "level": "ERROR"}, timeout=30)
 
     time.sleep(0.5)
 
-    logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url}/api/log_view").text)))  # noqa: S113
+    logging.info(my_lib.pretty.format(json.loads(requests.get(f"{base_url}/api/log_view", timeout=30).text)))
 
     if proc.pid is not None:
         os.kill(proc.pid, signal.SIGUSR1)

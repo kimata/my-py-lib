@@ -3,11 +3,8 @@
 """
 my_lib.notify.slack モジュールのユニットテスト
 """
+
 from __future__ import annotations
-
-import pathlib
-
-import pytest
 
 
 class TestSlackChannelConfig:
@@ -92,12 +89,12 @@ class TestSlackErrorOnlyConfig:
         error_config = SlackErrorConfig(channel=error_channel, interval_min=60)
 
         config = SlackErrorOnlyConfig(
-            bot_token="xoxb-token",
+            bot_token="xoxb-token",  # noqa: S106
             from_name="bot",
             error=error_config,
         )
 
-        assert config.bot_token == "xoxb-token"
+        assert config.bot_token == "xoxb-token"  # noqa: S105
         assert config.from_name == "bot"
         assert config.error.interval_min == 60
 
@@ -120,14 +117,14 @@ class TestSlackConfig:
         error_channel = SlackChannelConfig(name="error", id="C123")
 
         config = SlackConfig(
-            bot_token="xoxb-token",
+            bot_token="xoxb-token",  # noqa: S106
             from_name="bot",
             info=SlackInfoConfig(channel=info_channel),
             captcha=SlackCaptchaConfig(channel=captcha_channel),
             error=SlackErrorConfig(channel=error_channel, interval_min=60),
         )
 
-        assert config.bot_token == "xoxb-token"
+        assert config.bot_token == "xoxb-token"  # noqa: S105
 
 
 class TestFormatSimple:
@@ -275,7 +272,7 @@ class TestError:
         error_channel = SlackChannelConfig(name="error", id="C123")
         error_config = SlackErrorConfig(channel=error_channel, interval_min=0)
         config = SlackErrorOnlyConfig(
-            bot_token="dummy-token",
+            bot_token="dummy-token",  # noqa: S106
             from_name="test",
             error=error_config,
         )

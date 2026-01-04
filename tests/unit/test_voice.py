@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SIM117
 """voice.py のテスト"""
+
 from __future__ import annotations
 
 import io
@@ -11,7 +12,7 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-import my_lib.voice
+import my_lib.voice  # noqa: E402
 
 
 class TestGetQueryUrl:

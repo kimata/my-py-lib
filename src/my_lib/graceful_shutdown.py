@@ -101,7 +101,7 @@ _default_instance: GracefulShutdown | None = None
 
 def get_default() -> GracefulShutdown:
     """デフォルトのシングルトンインスタンスを取得する"""
-    global _default_instance  # noqa: PLW0603
+    global _default_instance
     if _default_instance is None:
         _default_instance = GracefulShutdown()
     return _default_instance

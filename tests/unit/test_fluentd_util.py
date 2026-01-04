@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """fluentd_util.py のテスト"""
+
 from __future__ import annotations
 
 import sys
 import unittest.mock
-
-import pytest
 
 # fluent.sender がインストールされていない場合はモックする
 if "fluent.sender" not in sys.modules:

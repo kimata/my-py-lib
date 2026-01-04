@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """openpyxl_util.py のテスト"""
+
 from __future__ import annotations
 
-import pathlib
 import unittest.mock
 from typing import Any
 
@@ -11,7 +11,7 @@ import pytest
 
 openpyxl = pytest.importorskip("openpyxl")
 
-import my_lib.openpyxl_util
+import my_lib.openpyxl_util  # noqa: E402
 
 
 class TestGenTextPos:
@@ -309,9 +309,7 @@ class TestInsertTableItem:
         item = {"name": "Test Item"}
 
         with unittest.mock.patch("my_lib.openpyxl_util.logging") as mock_logging:
-            my_lib.openpyxl_util._insert_table_item(
-                ws, 1, item, False, None, sheet_def, base_style, None
-            )
+            my_lib.openpyxl_util._insert_table_item(ws, 1, item, False, None, sheet_def, base_style, None)
 
             mock_logging.warning.assert_called()
             call_args = mock_logging.warning.call_args[0][0]

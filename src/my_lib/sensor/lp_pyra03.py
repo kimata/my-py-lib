@@ -20,12 +20,12 @@ import logging
 from my_lib.sensor import ads1115
 
 
-class LP_PYRA03:  # noqa: N801
+class LP_PYRA03:
     NAME: str = "LP_PYRA03"
     TYPE: str = "I2C"
     SENSITIVITY: float = 6.94  # mV/(kW/m^2)
 
-    def __init__(  # noqa: D107
+    def __init__(
         self, bus_id: int = ads1115.i2cbus.I2CBUS.ARM, dev_addr: int = ads1115.ADS1115.DEV_ADDR
     ) -> None:
         self.adc: ads1115.ADS1115 = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
     bus_id = int(args["-b"], 0)
     dev_addr = int(args["-d"], 0)

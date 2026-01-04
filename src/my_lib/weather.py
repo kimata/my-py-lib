@@ -6,7 +6,8 @@ Usage:
   weather.py [-c CONFIG] [-t TYPE] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -t TYPE           : テストする機能を指定します。(all, yahoo, clothing, wbgt, sunset, tenki) [default: all]
   -D                : デバッグモードで動作します。
 """
@@ -172,7 +173,7 @@ def parse_date_yahoo(content: lxml.html.HtmlElement, index: int) -> datetime.dat
         raise ValueError(f"Failed to parse date from: {date_text}")
     date_text = match.group(0)
 
-    return datetime.datetime.strptime(date_text, "%m月%d日").replace(year=datetime.datetime.now().year)  # noqa: DTZ005, DTZ007
+    return datetime.datetime.strptime(date_text, "%m月%d日").replace(year=datetime.datetime.now().year)
 
 
 def parse_table_yahoo(content: lxml.html.HtmlElement, index: int) -> list[HourlyData]:
@@ -379,9 +380,7 @@ def get_sunset_url_nao(pref: int, date: datetime.datetime) -> str:
     Returns:
         URL文字列
     """
-    return "https://eco.mtk.nao.ac.jp/koyomi/dni/{year}/s{pref:02d}{month:02d}.html".format(
-        year=date.year, month=date.month, pref=pref
-    )
+    return f"https://eco.mtk.nao.ac.jp/koyomi/dni/{date.year}/s{pref:02d}{date.month:02d}.html"
 
 
 def get_sunset_date_nao(pref: int, date: datetime.datetime) -> str:
@@ -474,7 +473,7 @@ def parse_date_tenki(content: lxml.html.HtmlElement, index: int) -> datetime.dat
         raise ValueError(f"Failed to parse date from: {date_text}")
     date_text = match.group(0)
 
-    return datetime.datetime.strptime(date_text, "%Y年%m月%d日")  # noqa: DTZ007
+    return datetime.datetime.strptime(date_text, "%Y年%m月%d日")
 
 
 def get_precip_by_hour_tenki(tenki_config: dict[str, Any]) -> TenkiResult:
@@ -494,7 +493,7 @@ if __name__ == "__main__":
     import my_lib.logger
     import my_lib.pretty
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

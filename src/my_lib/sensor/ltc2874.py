@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import pprint
 import time
-from typing import Any
 
 import serial
 import spidev
@@ -148,7 +147,7 @@ def com_write(spi: spidev.SpiDev, ser: serial.Serial, byte_list: list[int]) -> N
     ltc2874_reg_write(spi, 0x0D, 0x00)
 
 
-def com_read(spi: spidev.SpiDev, ser: serial.Serial, length: int) -> list[int]:  # noqa: ARG001
+def com_read(spi: spidev.SpiDev, ser: serial.Serial, length: int) -> list[int]:
     recv = ser.read(length)
     byte_list = list(recv)
 
@@ -173,7 +172,7 @@ def dir_param_read(spi: spidev.SpiDev, ser: serial.Serial, addr: int) -> int:
 
     if len(data) < 2:
         raise SensorCommunicationError("response is too short")
-    elif data[1] != msq_checksum([data[0]]):  # noqa:RET506
+    elif data[1] != msq_checksum([data[0]]):
         raise SensorCRCError("checksum unmatch")
 
     return data[0]
@@ -195,7 +194,7 @@ def dir_param_write(spi: spidev.SpiDev, ser: serial.Serial, addr: int, value: in
 
     if len(data) < 1:
         raise SensorCommunicationError("response is too short")
-    elif data[0] != msq_checksum([]):  # noqa: RET506
+    elif data[0] != msq_checksum([]):
         raise SensorCRCError("checksum unmatch")
 
 
@@ -242,7 +241,7 @@ def isdu_res_read(spi: spidev.SpiDev, ser: serial.Serial, flow: int) -> int:
     return data[0]
 
 
-def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int) -> str | int | list[int]:  # noqa: PLR0912, C901
+def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int) -> str | int | list[int]:
     logging.debug("***** CALL: isdu_read(index: 0x%02X) ****", (index))
     length = 3
 
@@ -250,7 +249,7 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
 
     for msq in isdu_req:
         com_write(spi, ser, msq)
-        data = com_read(spi, ser, 4)
+        _ = com_read(spi, ser, 4)
 
     chk = 0x00
     flow = 1
@@ -267,7 +266,7 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
             else:
                 remain = (header & 0x0F) - 1
             break
-        elif header == 0x01:  # noqa:RET508
+        elif header == 0x01:
             logging.warning("WAIT response")
             continue
         elif (header >> 4) == 0x0C:

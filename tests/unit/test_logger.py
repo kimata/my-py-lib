@@ -3,13 +3,11 @@
 """
 my_lib.logger モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import logging
-import pathlib
 import queue
-
-import pytest
 
 
 class TestLogFormatter:

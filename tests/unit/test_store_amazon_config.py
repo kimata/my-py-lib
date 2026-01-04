@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, S105, S106
 """
 my_lib.store.amazon.config モジュールのユニットテスト
 """
+
 from __future__ import annotations
-
-import pathlib
-
-import pytest
 
 
 class TestAmazonApiConfig:

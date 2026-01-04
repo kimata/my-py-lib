@@ -3,11 +3,8 @@
 """
 my_lib.notify.mail モジュールのユニットテスト
 """
+
 from __future__ import annotations
-
-import pathlib
-
-import pytest
 
 
 class TestMailSmtpConfig:
@@ -21,13 +18,13 @@ class TestMailSmtpConfig:
             host="smtp.example.com",
             port=587,
             user="user@example.com",
-            password="password",
+            password="password",  # noqa: S106
         )
 
         assert config.host == "smtp.example.com"
         assert config.port == 587
         assert config.user == "user@example.com"
-        assert config.password == "password"
+        assert config.password == "password"  # noqa: S105
 
 
 class TestMailEmptyConfig:
@@ -52,7 +49,7 @@ class TestMailConfig:
             host="smtp.example.com",
             port=587,
             user="user",
-            password="pass",
+            password="pass",  # noqa: S106
         )
 
         config = MailConfig(
@@ -130,7 +127,7 @@ class TestParseConfig:
         assert result.smtp.host == "smtp.example.com"
         assert result.smtp.port == 587
         assert result.smtp.user == "user@example.com"
-        assert result.smtp.password == "password"
+        assert result.smtp.password == "password"  # noqa: S105
         assert result.from_address == "from@example.com"
         assert result.to == "to@example.com"
 
@@ -158,7 +155,7 @@ class TestSend:
             host="smtp.example.com",
             port=587,
             user="user",
-            password="pass",
+            password="pass",  # noqa: S106
         )
         config = MailConfig(
             smtp=smtp,

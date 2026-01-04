@@ -6,7 +6,8 @@ Usage:
   config.py [-c CONFIG] [-S] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -S                : YAML 記述をもとにして、JSON Schema の雛形を生成します。
   -D                : デバッグモードで動作します。
 """
@@ -117,7 +118,7 @@ def _get_python_type_jp(instance: Any) -> str:
     return type_map.get(actual_type, actual_type)
 
 
-def _find_yaml_line(yaml_lines: list[str], path: list[str | int]) -> int | None:  # noqa: C901, PLR0912
+def _find_yaml_line(yaml_lines: list[str], path: list[str | int]) -> int | None:
     """YAML ファイル内でパスに対応する行番号を見つける."""
     if not path:
         return None
@@ -191,9 +192,7 @@ def _extract_yaml_context(yaml_lines: list[str], path: list[str | int], context:
     return "\n".join(lines_output)
 
 
-def _format_required_error(
-    error: jsonschema.exceptions.ValidationError, lines: list[str]
-) -> None:
+def _format_required_error(error: jsonschema.exceptions.ValidationError, lines: list[str]) -> None:
     """Format required error."""
     required_props: Any = error.validator_value
     if isinstance(required_props, str):
@@ -236,9 +235,7 @@ def _format_additional_properties_error(
             lines.append(f"  許可されているプロパティ: {allowed_str}")
 
 
-def _format_type_error(
-    error: jsonschema.exceptions.ValidationError, lines: list[str]
-) -> None:
+def _format_type_error(error: jsonschema.exceptions.ValidationError, lines: list[str]) -> None:
     """Format type error."""
     expected: Any = error.validator_value
     expected_str = (
@@ -253,9 +250,7 @@ def _format_type_error(
     lines.append(f"  実際: {actual_type_jp} ({_format_value(error.instance)})")
 
 
-def _format_enum_error(
-    error: jsonschema.exceptions.ValidationError, lines: list[str]
-) -> None:
+def _format_enum_error(error: jsonschema.exceptions.ValidationError, lines: list[str]) -> None:
     """Format enum error."""
     validator_value: Any = error.validator_value
     allowed_str = ", ".join(_format_value(v) for v in validator_value)
@@ -264,9 +259,7 @@ def _format_enum_error(
     lines.append(f"  許可される値: {allowed_str}")
 
 
-def _format_pattern_error(
-    error: jsonschema.exceptions.ValidationError, lines: list[str]
-) -> None:
+def _format_pattern_error(error: jsonschema.exceptions.ValidationError, lines: list[str]) -> None:
     """Format pattern error."""
     lines.append("  問題: 値がパターンに一致しません")
     lines.append(f"  指定値: {_format_value(error.instance)}")
@@ -314,7 +307,7 @@ def _format_simple_error(lines: list[str], problem: str, instance: Any) -> None:
     lines.append(f"  指定値: {_format_value(instance)}")
 
 
-def _format_validation_error(  # noqa: C901, PLR0912
+def _format_validation_error(
     error: jsonschema.exceptions.ValidationError,
     yaml_lines: list[str],
 ) -> str:
@@ -528,9 +521,7 @@ def _validate_config(
     )
 
 
-def get_data(
-    config: dict[str, Any], conf_path: list[str], suffix_path: list[str] | None = None
-) -> Any:
+def get_data(config: dict[str, Any], conf_path: list[str], suffix_path: list[str] | None = None) -> Any:
     if suffix_path is None:
         suffix_path = []
     conf: Any = config
@@ -579,7 +570,7 @@ def load(
         yaml_data: dict[str, Any] = yaml.load(yaml_content, Loader=yaml.SafeLoader)
     except yaml.YAMLError as e:
         details = _format_yaml_error(e, yaml_content)
-        logging.error("\n%s", details)  # noqa: TRY400
+        logging.error("\n%s", details)
         raise ConfigParseError("YAML ファイルの構文エラー", details) from e
 
     if schema_path_obj is not None:
@@ -599,7 +590,7 @@ def generate_schema(config_path: str | pathlib.Path) -> None:
         builder = genson.SchemaBuilder("https://json-schema.org/draft/2020-12/schema")
         builder.add_object(yaml.load(file, Loader=yaml.SafeLoader))
 
-        print(json.dumps(builder.to_schema(), indent=4))  # noqa: T201
+        print(json.dumps(builder.to_schema(), indent=4))
 
 
 if __name__ == "__main__":
@@ -609,7 +600,7 @@ if __name__ == "__main__":
     import my_lib.logger
     import my_lib.pretty
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

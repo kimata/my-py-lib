@@ -3,6 +3,7 @@
 """
 my_lib.thread_util モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import concurrent.futures

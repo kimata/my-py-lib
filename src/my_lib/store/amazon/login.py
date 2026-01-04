@@ -6,7 +6,8 @@ Usage:
   login.py [-c CONFIG] [-t TARGET] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -D                : デバッグモードで動作します。
 """
 
@@ -282,7 +283,7 @@ def execute(
     login_url: str = _LOGIN_URL,
     login_mark_xpath: str = _LOGIN_MARK_XPATH,
     retry: int = 2,
-) -> bool:  # noqa: PLR0913
+) -> bool:
     logging.info("Login start")
 
     driver.get(login_url)
@@ -317,7 +318,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -339,7 +340,7 @@ if __name__ == "__main__":
         slack_config_parsed
         if isinstance(
             slack_config_parsed,
-            (my_lib.notify.slack.SlackConfig, my_lib.notify.slack.SlackCaptchaOnlyConfig),
+            my_lib.notify.slack.SlackConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,
         )
         else None
     )

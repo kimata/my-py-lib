@@ -6,7 +6,8 @@ Usage:
   scrape.py [-c CONFIG] [-t ASIN] [-s DATA_PATH] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
   -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
   -D                : デバッグモードで動作します。
@@ -44,7 +45,7 @@ def _fetch_price_impl(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     slack_config: my_lib.notify.slack.HasErrorConfig | None,
     item: AmazonItem,
-) -> bool:  # noqa: C901, PLR0912
+) -> bool:
     """価格情報を取得して item を更新する.
 
     Returns:
@@ -149,7 +150,7 @@ def _fetch_price_impl(
                 my_lib.notify.slack.error_with_image(
                     slack_config,
                     "価格取得に失敗",
-                    "{url}\nprice_text='{price_text}'".format(url=item.url, price_text=price_text),
+                    f"{item.url}\nprice_text='{price_text}'",
                     {
                         "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
                         "text": "スクリーンショット",
@@ -170,7 +171,7 @@ def _fetch_price_impl(
             my_lib.notify.slack.error_with_image(
                 slack_config,
                 "価格取得に失敗",
-                "{url}\n{traceback}".format(url=item.url, traceback=traceback.format_exc()),
+                f"{item.url}\n{traceback.format_exc()}",
                 {
                     "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
                     "text": "スクリーンショット",
@@ -224,7 +225,7 @@ if __name__ == "__main__":
     import my_lib.pretty
     import my_lib.selenium_util
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
@@ -244,16 +245,16 @@ if __name__ == "__main__":
         slack_config_parsed
         if isinstance(
             slack_config_parsed,
-            (
-                my_lib.notify.slack.SlackConfig,
-                my_lib.notify.slack.SlackErrorInfoConfig,
-                my_lib.notify.slack.SlackErrorOnlyConfig,
-            ),
+            my_lib.notify.slack.SlackConfig
+            | my_lib.notify.slack.SlackErrorInfoConfig
+            | my_lib.notify.slack.SlackErrorOnlyConfig,
         )
         else None
     )
 
-    dump_path = pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
+    dump_path = (
+        pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
+    )
 
     item = AmazonItem.from_asin(asin)
     logging.info(my_lib.pretty.format(fetch_price(driver, wait, item, slack_config, dump_path).to_dict()))

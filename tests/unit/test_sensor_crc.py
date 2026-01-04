@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
 """sensor/crc.py のテスト"""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from my_lib.sensor.crc import crc8_sensirion, crc16_modbus
 
@@ -41,7 +40,7 @@ class TestCrc8Sensirion:
 
     def test_accepts_bytes(self):
         """bytes 型を受け付ける"""
-        result = crc8_sensirion(b"\xBE\xEF")
+        result = crc8_sensirion(b"\xbe\xef")
         assert result == 0x92
 
     def test_accepts_list(self):

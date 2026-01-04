@@ -6,7 +6,8 @@ Usage:
   voice.py [-c CONFIG] [-m MESSAGE] [-s SPEAKER_ID] [-o WAV] [-D]
 
 Options:
-  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。[default: tests/fixtures/config.example.yaml]
+  -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
+                      [default: tests/fixtures/config.example.yaml]
   -m MESSAGE        : 音声化するメッセージ。[default: テストです]
   -s SPEAKER_ID     : スピーカ。[default: 3]
   -o WAV            : 書き出す音声ファイル。[default: text.wav]
@@ -102,14 +103,12 @@ def convert_wav_data(wav_data_in: bytes) -> bytes:
     return out_buf.getvalue()
 
 
-def synthesize(
-    config: dict[str, Any], text: str, speaker_id: int = 3, volume: int | float = 2
-) -> bytes:
+def synthesize(config: dict[str, Any], text: str, speaker_id: int = 3, volume: int | float = 2) -> bytes:
     if not isinstance(text, str) or len(text.strip()) == 0:
         raise ValueError("Text must be a non-empty string")
     if not isinstance(speaker_id, int) or speaker_id < 0:
         raise ValueError("Speaker ID must be a non-negative integer")
-    if not isinstance(volume, (int, float)) or volume < 0:
+    if not isinstance(volume, int | float) or volume < 0:
         raise ValueError("Volume must be a non-negative number")
 
     server_url = config["voice"]["server"]["url"]
@@ -202,7 +201,7 @@ if __name__ == "__main__":
     import my_lib.config
     import my_lib.logger
 
-    assert __doc__ is not None
+    assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]

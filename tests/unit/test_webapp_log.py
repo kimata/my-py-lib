@@ -3,10 +3,8 @@
 """
 my_lib.webapp.log モジュールのユニットテスト
 """
-from __future__ import annotations
 
-import pathlib
-import time
+from __future__ import annotations
 
 import flask
 import pytest
@@ -214,7 +212,7 @@ class TestGet:
 
     def test_returns_empty_list_when_no_logs(self, log_db_path, monkeypatch):
         """ログがない場合は空リストを返す"""
-        from my_lib.webapp.log import _manager, init, term
+        from my_lib.webapp.log import _manager, init
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 

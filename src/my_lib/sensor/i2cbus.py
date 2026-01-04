@@ -12,7 +12,7 @@ class I2CBUS:
     ARM: int = 0x1  # Raspberry Pi のデフォルトの I2C バス番号
     VC: int = 0x0  # dtparam=i2c_vc=on で有効化される I2C のバス番号
 
-    def __init__(self, bus_id: int) -> None:  # noqa: D107
+    def __init__(self, bus_id: int) -> None:
         self.bus_id: int = bus_id
         self.smbus: smbus2.SMBus = smbus2.SMBus(bus_id)
 
@@ -56,7 +56,7 @@ class I2CBUS:
 
         return self.smbus.i2c_rdwr(*i2c_msgs)
 
-    class msg:  # noqa: D106, N801
+    class msg:
         @staticmethod
         def read(address: int, length: int) -> smbus2.i2c_msg:
             return smbus2.i2c_msg.read(address, length)

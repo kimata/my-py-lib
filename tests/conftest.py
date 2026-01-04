@@ -5,6 +5,7 @@
 
 テスト全体で使用する共通のフィクスチャとヘルパーを定義します。
 """
+
 from __future__ import annotations
 
 import logging

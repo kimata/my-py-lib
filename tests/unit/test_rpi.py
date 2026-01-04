@@ -3,6 +3,7 @@
 """
 my_lib.rpi モジュールのユニットテスト
 """
+
 from __future__ import annotations
 
 import time

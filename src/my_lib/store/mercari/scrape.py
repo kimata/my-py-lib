@@ -6,7 +6,8 @@ import contextlib
 import logging
 import re
 import time
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
@@ -241,7 +242,11 @@ def _auto_reload(
 def _parse_item(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     index: int,
-) -> tuple[dict[str, Any], selenium.webdriver.remote.webelement.WebElement, selenium.webdriver.remote.webelement.WebElement]:
+) -> tuple[
+    dict[str, Any],
+    selenium.webdriver.remote.webelement.WebElement,
+    selenium.webdriver.remote.webelement.WebElement,
+]:
     time.sleep(5)
     item_xpath = f"{_ITEM_LIST_XPATH}[{index}]"
 

@@ -53,7 +53,6 @@ slack:
             id: C04Q1CEGW9K
         interval_min: 180
 
-        
 voice:
     server:
         url: http://192.168.0.20:50021
