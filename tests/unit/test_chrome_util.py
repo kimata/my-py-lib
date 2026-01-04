@@ -1,270 +1,258 @@
-#!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, SLF001
 """chrome_util.py のテスト"""
+
 from __future__ import annotations
 
 import pathlib
-import time
+import sqlite3
 import unittest.mock
-
-import pytest
 
 import my_lib.chrome_util
 
 
-class TestCleanupOldChromeProfiles:
-    """cleanup_old_chrome_profiles 関数のテスト"""
+class TestProfileHealthResult:
+    """_ProfileHealthResult データクラスのテスト"""
 
-    def test_returns_empty_list_when_no_chrome_dir(self, temp_dir):
-        """chrome ディレクトリがない場合は空のリストを返す"""
-        result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir)
-        assert result == []
+    def test_creates_instance(self):
+        """インスタンスを作成する"""
+        result = my_lib.chrome_util._ProfileHealthResult(
+            is_healthy=True,
+            errors=[],
+        )
 
-    def test_returns_empty_list_when_chrome_dir_is_empty(self, temp_dir):
-        """chrome ディレクトリが空の場合は空のリストを返す"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
+        assert result.is_healthy is True
+        assert result.errors == []
+        assert result.has_lock_files is False
 
-        result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir)
-        assert result == []
+    def test_creates_instance_with_errors(self):
+        """エラー付きでインスタンスを作成する"""
+        result = my_lib.chrome_util._ProfileHealthResult(
+            is_healthy=False,
+            errors=["Error 1", "Error 2"],
+            has_lock_files=True,
+            has_corrupted_json=True,
+        )
 
-    def test_keeps_default_profile(self, temp_dir):
-        """Default プロファイルは削除しない"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
-        default_profile = chrome_dir / "Default"
-        default_profile.mkdir()
-
-        result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir)
-        assert result == []
-        assert default_profile.exists()
-
-    def test_removes_old_profiles(self, temp_dir):
-        """古いプロファイルを削除する"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
-
-        old_profile = chrome_dir / "Profile_Old"
-        old_profile.mkdir()
-
-        old_time = time.time() - (48 * 3600)
-        import os
-
-        os.utime(old_profile, (old_time, old_time))
-
-        result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir, max_age_hours=24, keep_count=0)
-
-        assert len(result) == 1
-        assert not old_profile.exists()
-
-    def test_keeps_minimum_profiles_by_count(self, temp_dir):
-        """keep_count 以上のプロファイルを削除する"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
-
-        import time as time_module
-
-        # 5つのプロファイルを作成し、順番に異なる時刻を設定
-        for i in range(5):
-            profile = chrome_dir / f"Profile_{i}"
-            profile.mkdir()
-            # 古いものから順に作成時刻を設定
-            old_time = time_module.time() - (100 * 3600) + (i * 3600)
-            import os
-
-            os.utime(profile, (old_time, old_time))
-
-        # max_age_hours を大きくして、時間による削除を無効化
-        # keep_count=3 で、古い順に2つが削除される
-        result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir, max_age_hours=1000, keep_count=3)
-
-        remaining = list(chrome_dir.iterdir())
-        assert len(remaining) == 3
-        assert len(result) == 2
-
-    def test_handles_oserror_on_stat(self, temp_dir):
-        """stat でエラーが発生しても続行する"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
-
-        profile = chrome_dir / "Profile_Test"
-        profile.mkdir()
-
-        # プロファイルディレクトリの stat.st_mtime アクセス時にエラーを発生させる
-        # is_dir() は正常に動作させる必要がある
-        original_stat = pathlib.Path.stat
-        call_count = {}
-
-        def mock_stat(self, *args, **kwargs):
-            path_str = str(self)
-            if "Profile_Test" in path_str:
-                # is_dir() で1回目、st_mtime で2回目
-                call_count[path_str] = call_count.get(path_str, 0) + 1
-                if call_count[path_str] > 1:
-                    raise OSError("Mocked OSError")
-            return original_stat(self, *args, **kwargs)
-
-        with unittest.mock.patch.object(pathlib.Path, "stat", mock_stat):
-            result = my_lib.chrome_util.cleanup_old_chrome_profiles(temp_dir)
-
-        # OSError が発生したプロファイルはスキップされる
-        assert result == []
+        assert result.is_healthy is False
+        assert len(result.errors) == 2
+        assert result.has_lock_files is True
+        assert result.has_corrupted_json is True
 
 
-class TestGetChromeProfileStats:
-    """get_chrome_profile_stats 関数のテスト"""
+class TestCheckJsonFile:
+    """_check_json_file 関数のテスト"""
 
-    def test_returns_zero_when_no_chrome_dir(self, temp_dir):
-        """chrome ディレクトリがない場合はゼロを返す"""
-        result = my_lib.chrome_util.get_chrome_profile_stats(temp_dir)
+    def test_returns_none_for_valid_json(self, temp_dir):
+        """有効な JSON では None を返す"""
+        json_file = temp_dir / "test.json"
+        json_file.write_text('{"key": "value"}')
 
-        assert result["total_count"] == 0
-        assert result["total_size_mb"] == 0
+        result = my_lib.chrome_util._check_json_file(json_file)
 
-    def test_counts_profiles(self, temp_dir):
-        """プロファイルをカウントする"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
+        assert result is None
 
-        for i in range(3):
-            profile = chrome_dir / f"Profile_{i}"
-            profile.mkdir()
+    def test_returns_none_for_nonexistent_file(self, temp_dir):
+        """存在しないファイルでは None を返す"""
+        json_file = temp_dir / "nonexistent.json"
 
-        result = my_lib.chrome_util.get_chrome_profile_stats(temp_dir)
+        result = my_lib.chrome_util._check_json_file(json_file)
 
-        assert result["total_count"] == 3
+        assert result is None
 
-    def test_calculates_size(self, temp_dir):
-        """サイズを計算する"""
-        chrome_dir = temp_dir / "chrome"
-        chrome_dir.mkdir()
+    def test_returns_error_for_invalid_json(self, temp_dir):
+        """無効な JSON ではエラーを返す"""
+        json_file = temp_dir / "invalid.json"
+        json_file.write_text("{invalid json}")
 
-        profile = chrome_dir / "Profile_Test"
-        profile.mkdir()
+        result = my_lib.chrome_util._check_json_file(json_file)
 
-        # 1MB以上のファイルを作成して、丸め誤差を回避
-        test_file = profile / "test.txt"
-        test_file.write_text("x" * (1024 * 1024 + 1))
-
-        result = my_lib.chrome_util.get_chrome_profile_stats(temp_dir)
-
-        assert result["total_size_mb"] >= 1.0
+        assert result is not None
+        assert "corrupted" in result
 
 
-class TestCleanupOrphanedChromeProcesses:
-    """cleanup_orphaned_chrome_processes 関数のテスト"""
+class TestCheckSqliteDb:
+    """_check_sqlite_db 関数のテスト"""
 
-    def test_runs_without_error(self):
-        """エラーなく実行できる"""
-        # psutil があれば正常に動作することを確認
-        my_lib.chrome_util.cleanup_orphaned_chrome_processes()
+    def test_returns_none_for_valid_db(self, temp_dir):
+        """有効な DB では None を返す"""
+        db_file = temp_dir / "test.db"
+        conn = sqlite3.connect(str(db_file))
+        conn.execute("CREATE TABLE test (id INTEGER)")
+        conn.close()
 
-    def test_handles_import_error(self):
-        """ImportError を処理する"""
-        # モジュールキャッシュを一時的にクリアして ImportError を発生させる
-        import importlib
-        import sys
+        result = my_lib.chrome_util._check_sqlite_db(db_file)
 
-        # psutil を一時的にアンロード
-        psutil_backup = sys.modules.get("psutil")
-        if "psutil" in sys.modules:
-            del sys.modules["psutil"]
+        assert result is None
 
-        try:
-            # builtins.__import__ をモックして ImportError を発生させる
-            import builtins
+    def test_returns_none_for_nonexistent_db(self, temp_dir):
+        """存在しない DB では None を返す"""
+        db_file = temp_dir / "nonexistent.db"
 
-            original_import = builtins.__import__
+        result = my_lib.chrome_util._check_sqlite_db(db_file)
 
-            def mock_import(name, *args, **kwargs):
-                if name == "psutil":
-                    raise ImportError("Mocked: No module named 'psutil'")
-                return original_import(name, *args, **kwargs)
+        assert result is None
 
-            builtins.__import__ = mock_import
-            try:
-                # ImportError が発生しても例外にならないことを確認
-                my_lib.chrome_util.cleanup_orphaned_chrome_processes()
-            finally:
-                builtins.__import__ = original_import
-        finally:
-            # psutil を復元
-            if psutil_backup is not None:
-                sys.modules["psutil"] = psutil_backup
+    def test_returns_error_for_corrupted_db(self, temp_dir):
+        """破損した DB ではエラーを返す"""
+        db_file = temp_dir / "corrupted.db"
+        db_file.write_bytes(b"This is not a valid SQLite database")
 
-    def test_finds_chrome_processes(self):
-        """Chrome プロセスを検出する"""
-        import psutil
+        result = my_lib.chrome_util._check_sqlite_db(db_file)
 
-        mock_proc = unittest.mock.MagicMock()
-        mock_proc.info = {
-            "pid": 12345,
-            "name": "chrome",
-            "cmdline": ["chrome"],
-            "ppid": 1,
-            "status": psutil.STATUS_RUNNING,
-        }
-        mock_proc.parent.return_value = unittest.mock.MagicMock()
-        mock_proc.parent.return_value.is_running.return_value = True
-
-        with unittest.mock.patch("psutil.process_iter", return_value=[mock_proc]):
-            my_lib.chrome_util.cleanup_orphaned_chrome_processes()
-
-    def test_terminates_orphaned_processes(self):
-        """孤立したプロセスを終了する"""
-        import psutil
-
-        mock_proc = unittest.mock.MagicMock()
-        mock_proc.info = {
-            "pid": 12345,
-            "name": "chrome",
-            "cmdline": ["chrome"],
-            "ppid": 1,
-            "status": psutil.STATUS_RUNNING,
-        }
-        mock_proc.parent.return_value = None
-
-        with unittest.mock.patch("psutil.process_iter", return_value=[mock_proc]):
-            with unittest.mock.patch.object(my_lib.chrome_util, "_cleanup_chrome_process_groups"):
-                my_lib.chrome_util.cleanup_orphaned_chrome_processes()
-
-        mock_proc.terminate.assert_called_once()
+        assert result is not None
+        assert "database" in result.lower()
 
 
-class TestCleanupChromeProcessGroups:
-    """_cleanup_chrome_process_groups 関数のテスト"""
+class TestCheckProfileHealth:
+    """_check_profile_health 関数のテスト"""
 
-    def test_skips_when_pkill_not_available(self):
-        """pkill がない場合はスキップする"""
-        with unittest.mock.patch("shutil.which", return_value=None):
-            my_lib.chrome_util._cleanup_chrome_process_groups()
+    def test_returns_healthy_for_nonexistent_profile(self, temp_dir):
+        """存在しないプロファイルは健全"""
+        profile_path = temp_dir / "nonexistent_profile"
 
-    def test_runs_pkill_when_available(self):
-        """pkill が利用可能な場合は実行する"""
-        with unittest.mock.patch("shutil.which", return_value="/usr/bin/pkill"):
-            with unittest.mock.patch("subprocess.run") as mock_run:
-                mock_run.return_value = unittest.mock.MagicMock(returncode=0)
+        result = my_lib.chrome_util._check_profile_health(profile_path)
 
-                my_lib.chrome_util._cleanup_chrome_process_groups()
+        assert result.is_healthy is True
+        assert result.errors == []
 
-                assert mock_run.call_count >= 1
+    def test_detects_lock_files(self, temp_dir):
+        """ロックファイルを検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        profile_path.mkdir(parents=True)
+        (profile_path / "SingletonLock").touch()
 
-    def test_handles_timeout(self):
-        """タイムアウトを処理する"""
-        import subprocess
+        result = my_lib.chrome_util._check_profile_health(profile_path)
 
-        with unittest.mock.patch("shutil.which", return_value="/usr/bin/pkill"):
-            with unittest.mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("pkill", 5)):
-                my_lib.chrome_util._cleanup_chrome_process_groups()
+        assert result.has_lock_files is True
+        assert any("Lock file" in error for error in result.errors)
 
-    def test_handles_file_not_found(self):
-        """FileNotFoundError を処理する"""
-        with unittest.mock.patch("shutil.which", return_value="/usr/bin/pkill"):
-            with unittest.mock.patch("subprocess.run", side_effect=FileNotFoundError):
-                my_lib.chrome_util._cleanup_chrome_process_groups()
+    def test_detects_corrupted_json(self, temp_dir):
+        """破損した JSON を検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        profile_path.mkdir(parents=True)
+        (profile_path / "Local State").write_text("{invalid json")
 
-    def test_handles_generic_exception(self):
-        """一般的な例外を処理する"""
-        with unittest.mock.patch("shutil.which", return_value="/usr/bin/pkill"):
-            with unittest.mock.patch("subprocess.run", side_effect=RuntimeError("Test error")):
-                my_lib.chrome_util._cleanup_chrome_process_groups()
+        result = my_lib.chrome_util._check_profile_health(profile_path)
+
+        assert result.has_corrupted_json is True
+        assert not result.is_healthy
+
+    def test_detects_corrupted_db(self, temp_dir):
+        """破損した DB を検出する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        default_path = profile_path / "Default"
+        default_path.mkdir(parents=True)
+        (default_path / "Cookies").write_bytes(b"corrupted data")
+
+        result = my_lib.chrome_util._check_profile_health(profile_path)
+
+        assert result.has_corrupted_db is True
+        assert not result.is_healthy
+
+
+class TestRecoverCorruptedProfile:
+    """_recover_corrupted_profile 関数のテスト"""
+
+    def test_returns_true_for_nonexistent_profile(self, temp_dir):
+        """存在しないプロファイルでは True を返す"""
+        profile_path = temp_dir / "nonexistent_profile"
+
+        result = my_lib.chrome_util._recover_corrupted_profile(profile_path)
+
+        assert result is True
+
+    def test_moves_corrupted_profile(self, temp_dir):
+        """破損したプロファイルを移動する"""
+        profile_path = temp_dir / "corrupted_profile"
+        profile_path.mkdir()
+        (profile_path / "test_file.txt").write_text("test")
+
+        result = my_lib.chrome_util._recover_corrupted_profile(profile_path)
+
+        assert result is True
+        assert not profile_path.exists()
+        # バックアップが作成されていることを確認
+        backup_dirs = list(temp_dir.glob("*corrupted*"))
+        assert len(backup_dirs) == 1
+
+
+class TestCleanupProfileLock:
+    """_cleanup_profile_lock 関数のテスト"""
+
+    def test_removes_lock_files(self, temp_dir):
+        """ロックファイルを削除する"""
+        profile_path = temp_dir / "test_profile"
+        profile_path.mkdir()
+        lock_file = profile_path / "SingletonLock"
+        lock_file.touch()
+
+        my_lib.chrome_util._cleanup_profile_lock(profile_path)
+
+        assert not lock_file.exists()
+
+    def test_handles_nonexistent_locks(self, temp_dir):
+        """存在しないロックファイルでも動作する"""
+        profile_path = temp_dir / "test_profile"
+        profile_path.mkdir()
+
+        # エラーが発生しないことを確認
+        my_lib.chrome_util._cleanup_profile_lock(profile_path)
+
+
+class TestIsRunningInContainer:
+    """_is_running_in_container 関数のテスト"""
+
+    def test_returns_false_when_not_in_container(self):
+        """コンテナ外では False を返す"""
+        with unittest.mock.patch.object(pathlib.Path, "exists", return_value=False):
+            result = my_lib.chrome_util._is_running_in_container()
+
+            assert result is False
+
+    def test_returns_true_when_in_container(self):
+        """コンテナ内では True を返す"""
+        with unittest.mock.patch.object(pathlib.Path, "exists", return_value=True):
+            result = my_lib.chrome_util._is_running_in_container()
+
+            assert result is True
+
+
+class TestGetActualProfileName:
+    """_get_actual_profile_name 関数のテスト"""
+
+    def test_returns_name_without_suffix(self):
+        """PYTEST_XDIST_WORKER がない場合はそのまま返す"""
+        with unittest.mock.patch.dict("os.environ", {}, clear=True):
+            result = my_lib.chrome_util._get_actual_profile_name("test_profile")
+
+            assert result == "test_profile"
+
+    def test_returns_name_with_suffix(self):
+        """PYTEST_XDIST_WORKER がある場合はサフィックス付きで返す"""
+        with unittest.mock.patch.dict("os.environ", {"PYTEST_XDIST_WORKER": "gw0"}):
+            result = my_lib.chrome_util._get_actual_profile_name("test_profile")
+
+            assert result == "test_profile.gw0"
+
+
+class TestDeleteProfile:
+    """delete_profile 関数のテスト"""
+
+    def test_returns_true_for_nonexistent_profile(self, temp_dir):
+        """存在しないプロファイルでは True を返す"""
+        result = my_lib.chrome_util.delete_profile("nonexistent", temp_dir)
+
+        assert result is True
+
+    def test_deletes_existing_profile(self, temp_dir):
+        """存在するプロファイルを削除する"""
+        # NOTE: PYTEST_XDIST_WORKER 環境変数を考慮した実際のプロファイル名を使用
+        actual_name = my_lib.chrome_util._get_actual_profile_name("test_profile")
+        profile_path = temp_dir / "chrome" / actual_name
+        profile_path.mkdir(parents=True)
+        (profile_path / "test_file.txt").write_text("test")
+
+        result = my_lib.chrome_util.delete_profile("test_profile", temp_dir)
+
+        assert result is True
+        assert not profile_path.exists()

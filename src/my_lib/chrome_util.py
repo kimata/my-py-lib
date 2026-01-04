@@ -1,210 +1,242 @@
-#!/usr/bin/env python3
+"""Chrome プロファイル管理ユーティリティ
+
+Chrome プロファイルの健全性チェック、リカバリ、クリーンアップなどを提供します。
+"""
 
 from __future__ import annotations
 
-import contextlib
+import json
 import logging
 import os
 import pathlib
 import shutil
-import subprocess
-import sys
+import signal
+import sqlite3
 import time
+from dataclasses import dataclass
+
+import psutil
+
+import my_lib.time
 
 
-def cleanup_old_chrome_profiles(
-    data_path: pathlib.Path, max_age_hours: int = 24, keep_count: int = 3
-) -> list[str]:
-    """
-    古いChromeプロファイルを自動削除する
+@dataclass
+class _ProfileHealthResult:
+    """プロファイル健全性チェックの結果"""
 
-    Args:
-    ----
-        data_path: データディレクトリのパス
-        max_age_hours: 削除対象とする最大経過時間（時間）
-        keep_count: 最低限保持するプロファイル数
+    is_healthy: bool
+    errors: list[str]
+    has_lock_files: bool = False
+    has_corrupted_json: bool = False
+    has_corrupted_db: bool = False
+
+
+def _check_json_file(file_path: pathlib.Path) -> str | None:
+    """JSON ファイルの整合性をチェック
 
     Returns:
-    -------
-        削除されたプロファイルのリスト
+        エラーメッセージ（正常な場合は None）
 
     """
-    chrome_dir = data_path / "chrome"
-    if not chrome_dir.exists():
-        return []
+    if not file_path.exists():
+        return None
 
-    removed_profiles = []
-    current_time = time.time()
-    max_age_seconds = max_age_hours * 3600
-
-    # プロファイル一覧を取得（作成時刻でソート）
-    profiles = []
-    for item in chrome_dir.iterdir():
-        if item.is_dir() and item.name != "Default":
-            try:
-                mtime = item.stat().st_mtime
-                profiles.append((item, mtime))
-            except OSError:
-                continue
-
-    # 作成時刻でソート（新しい順）
-    profiles.sort(key=lambda x: x[1], reverse=True)
-
-    # 保持すべきプロファイル数を超えた古いプロファイルを削除
-    for i, (profile_path, mtime) in enumerate(profiles):
-        should_remove = False
-
-        # 最低限保持する数を超えている場合
-        if i >= keep_count:
-            should_remove = True
-
-        # 最大経過時間を超えている場合
-        if current_time - mtime > max_age_seconds:
-            should_remove = True
-
-        if should_remove:
-            try:
-                logging.info("Removing old Chrome profile: %s", profile_path)
-                shutil.rmtree(profile_path)
-                removed_profiles.append(str(profile_path))
-            except OSError as e:
-                logging.warning("Failed to remove Chrome profile %s: %s", profile_path, e)
-
-    return removed_profiles
-
-
-def cleanup_orphaned_chrome_processes():
-    """孤立したChromeプロセスを終了する."""
     try:
-        import psutil
-
-        orphaned_processes = []
-        chrome_processes = []
-
-        # 全てのChromeプロセスを収集
-        for proc in psutil.process_iter(["pid", "name", "cmdline", "ppid", "status"]):
-            with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-                if proc.info["name"] and "chrome" in proc.info["name"].lower():
-                    chrome_processes.append(proc)
-
-                    # ゾンビプロセスまたは孤立プロセスをチェック
-                    if proc.info["status"] == psutil.STATUS_ZOMBIE:
-                        orphaned_processes.append(proc)
-                    else:
-                        # 親プロセスが存在しない場合は孤立プロセスと判定
-                        parent = proc.parent()
-                        if parent is None or not parent.is_running():
-                            orphaned_processes.append(proc)
-
-        logging.info("Found %d Chrome processes, %d orphaned", len(chrome_processes), len(orphaned_processes))
-
-        # 段階的にプロセスを終了
-        for proc in orphaned_processes:
-            with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-                if proc.info["status"] == psutil.STATUS_ZOMBIE:
-                    logging.info("Found zombie Chrome process: %s", proc.pid)
-                    continue  # ゾンビプロセスは親プロセスが回収する必要がある
-
-                logging.info("Terminating orphaned Chrome process: %s (PID: %s)", proc.info["name"], proc.pid)
-                try:
-                    # 最初はSIGTERMで優雅に終了を試行
-                    proc.terminate()
-                    proc.wait(timeout=3)
-                    logging.info("Successfully terminated Chrome process: %s", proc.pid)
-                except psutil.TimeoutExpired:
-                    # タイムアウトした場合はSIGKILLで強制終了
-                    with contextlib.suppress(psutil.NoSuchProcess):
-                        logging.info("Force killing Chrome process: %s", proc.pid)
-                        proc.kill()
-                        proc.wait(timeout=2)
-
-        # プロセスグループでの終了も試行
-        _cleanup_chrome_process_groups()
-
-    except ImportError:
-        logging.warning("psutil not available, skipping orphaned process cleanup")
-
-
-def _cleanup_chrome_process_groups():
-    """Chromeプロセスグループの強制終了"""
-    try:
-        # pkillが利用可能かチェック
-        if not shutil.which("pkill"):
-            logging.warning("pkill not available, skipping process group cleanup")
-            return
-
-        # pkillでChromeプロセス全体を終了
-        pkill_path = shutil.which("pkill")
-        if pkill_path is None:
-            return
-        result = subprocess.run(  # noqa: S603
-            [pkill_path, "-f", "chrome"], capture_output=True, text=True, timeout=5, check=False
-        )
-
-        if result.returncode == 0:
-            logging.info("Successfully cleaned up Chrome processes with pkill")
-
-        # Chrome crashpadプロセスも終了
-        subprocess.run(  # noqa: S603
-            [pkill_path, "-f", "chrome_crashpad"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        logging.warning("Failed to cleanup Chrome process groups")
+        content = file_path.read_text(encoding="utf-8")
+        json.loads(content)
+        return None
+    except json.JSONDecodeError as e:
+        return f"{file_path.name} is corrupted: {e}"
     except Exception as e:
-        logging.warning("Error during Chrome process group cleanup: %s", e)
+        return f"{file_path.name} read error: {e}"
 
 
-def get_chrome_profile_stats(data_path: pathlib.Path) -> dict:
-    """Chromeプロファイルの統計情報を取得."""
-    chrome_dir = data_path / "chrome"
-    if not chrome_dir.exists():
-        return {"total_count": 0, "total_size_mb": 0}
+def _check_sqlite_db(db_path: pathlib.Path) -> str | None:
+    """SQLite データベースの整合性をチェック
 
-    total_size = 0
-    profile_count = 0
+    Returns:
+        エラーメッセージ（正常な場合は None）
 
-    for item in chrome_dir.iterdir():
-        if item.is_dir():
-            profile_count += 1
+    """
+    if not db_path.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        if result[0] != "ok":
+            return f"{db_path.name} database is corrupted: {result[0]}"
+        return None
+    except sqlite3.DatabaseError as e:
+        return f"{db_path.name} database error: {e}"
+    except Exception as e:
+        return f"{db_path.name} check error: {e}"
+
+
+def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
+    """Chrome プロファイルの健全性をチェック
+
+    Args:
+        profile_path: Chrome プロファイルのディレクトリパス
+
+    Returns:
+        ProfileHealthResult: チェック結果
+
+    """
+    errors: list[str] = []
+    has_lock_files = False
+    has_corrupted_json = False
+    has_corrupted_db = False
+
+    if not profile_path.exists():
+        # プロファイルが存在しない場合は健全（新規作成される）
+        return _ProfileHealthResult(is_healthy=True, errors=[])
+
+    default_path = profile_path / "Default"
+
+    # 1. ロックファイルのチェック
+    lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    existing_locks = []
+    for lock_file in lock_files:
+        lock_path = profile_path / lock_file
+        if lock_path.exists() or lock_path.is_symlink():
+            existing_locks.append(lock_file)
+            has_lock_files = True
+    if existing_locks:
+        errors.append(f"Lock files exist: {', '.join(existing_locks)}")
+
+    # 2. Local State の JSON チェック
+    local_state_error = _check_json_file(profile_path / "Local State")
+    if local_state_error:
+        errors.append(local_state_error)
+        has_corrupted_json = True
+
+    # 3. Preferences の JSON チェック
+    if default_path.exists():
+        prefs_error = _check_json_file(default_path / "Preferences")
+        if prefs_error:
+            errors.append(prefs_error)
+            has_corrupted_json = True
+
+        # 4. SQLite データベースの整合性チェック
+        for db_name in ["Cookies", "History", "Web Data"]:
+            db_error = _check_sqlite_db(default_path / db_name)
+            if db_error:
+                errors.append(db_error)
+                has_corrupted_db = True
+
+    is_healthy = len(errors) == 0
+
+    return _ProfileHealthResult(
+        is_healthy=is_healthy,
+        errors=errors,
+        has_lock_files=has_lock_files,
+        has_corrupted_json=has_corrupted_json,
+        has_corrupted_db=has_corrupted_db,
+    )
+
+
+def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
+    """破損したプロファイルをバックアップして新規作成を可能にする
+
+    Args:
+        profile_path: Chrome プロファイルのディレクトリパス
+
+    Returns:
+        bool: リカバリが成功したかどうか
+
+    """
+    if not profile_path.exists():
+        return True
+
+    # バックアップ先を決定（タイムスタンプ付き）
+    timestamp = my_lib.time.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = profile_path.parent / f"{profile_path.name}.corrupted.{timestamp}"
+
+    try:
+        shutil.move(str(profile_path), str(backup_path))
+        logging.warning(
+            "Corrupted profile moved to backup: %s -> %s",
+            profile_path,
+            backup_path,
+        )
+        return True
+    except Exception:
+        logging.exception("Failed to backup corrupted profile")
+        return False
+
+
+def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
+    """プロファイルのロックファイルを削除する"""
+    lock_files = ["SingletonLock", "SingletonSocket", "SingletonCookie"]
+    found_locks = []
+    for lock_file in lock_files:
+        lock_path = profile_path / lock_file
+        if lock_path.exists() or lock_path.is_symlink():
+            found_locks.append(lock_path)
+
+    if found_locks:
+        logging.warning("Profile lock files found: %s", ", ".join(str(p.name) for p in found_locks))
+        for lock_path in found_locks:
             try:
-                # ディレクトリサイズを計算
-                for root, _dirs, files in os.walk(item):
-                    for file in files:
-                        file_path = pathlib.Path(root) / file
-                        try:
-                            total_size += file_path.stat().st_size
-                        except OSError:
-                            continue
-            except OSError:
-                continue
-
-    return {"total_count": profile_count, "total_size_mb": round(total_size / (1024 * 1024), 2)}
+                lock_path.unlink()
+            except OSError as e:
+                logging.warning("Failed to remove lock file %s: %s", lock_path, e)
 
 
-if __name__ == "__main__":
-    # テスト用のクリーンアップ実行
-    logging.basicConfig(level=logging.INFO)
+def _is_running_in_container() -> bool:
+    """コンテナ内で実行中かどうかを判定"""
+    return pathlib.Path("/.dockerenv").exists()
 
-    data_path = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("data")
 
-    # Before cleanup stats
-    stats = get_chrome_profile_stats(data_path)
-    logging.info("Chrome profile stats before cleanup:")
-    logging.info("  Profiles: %s", stats["total_count"])
-    logging.info("  Total size: %s MB", stats["total_size_mb"])
+def _cleanup_orphaned_chrome_processes_in_container() -> None:
+    """コンテナ内で実行中の場合のみ、残った Chrome プロセスをクリーンアップ
 
-    removed = cleanup_old_chrome_profiles(data_path)
-    cleanup_orphaned_chrome_processes()
+    NOTE: プロセスツリーに関係なくプロセス名で一律終了するのはコンテナ内限定
+    """
+    if not _is_running_in_container():
+        return
 
-    logging.info("Removed %s old profiles", len(removed))
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            proc_name = proc.info["name"].lower() if proc.info["name"] else ""
+            if "chrome" in proc_name:
+                logging.info("Terminating orphaned Chrome process: PID %d", proc.info["pid"])
+                os.kill(proc.info["pid"], signal.SIGTERM)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, ProcessLookupError, OSError):
+            pass
+    time.sleep(1)
 
-    # After cleanup stats
-    stats = get_chrome_profile_stats(data_path)
-    logging.info("Chrome profile stats after cleanup:")
-    logging.info("  Profiles: %s", stats["total_count"])
-    logging.info("  Total size: %s MB", stats["total_size_mb"])
+
+def _get_actual_profile_name(profile_name: str) -> str:
+    """PYTEST_XDIST_WORKER を考慮した実際のプロファイル名を取得"""
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    return profile_name + ("." + suffix if suffix is not None else "")
+
+
+def delete_profile(profile_name: str, data_path: pathlib.Path) -> bool:
+    """Chrome プロファイルを削除する
+
+    Args:
+        profile_name: プロファイル名
+        data_path: データディレクトリのパス
+
+    Returns:
+        bool: 削除が成功したかどうか
+
+    """
+    actual_profile_name = _get_actual_profile_name(profile_name)
+    profile_path = data_path / "chrome" / actual_profile_name
+
+    if not profile_path.exists():
+        logging.info("Profile does not exist: %s", profile_path)
+        return True
+
+    try:
+        shutil.rmtree(profile_path)
+        logging.warning("Deleted Chrome profile: %s", profile_path)
+        return True
+    except Exception:
+        logging.exception("Failed to delete Chrome profile: %s", profile_path)
+        return False
