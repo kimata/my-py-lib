@@ -36,7 +36,6 @@ import selenium.webdriver.common.action_chains
 import selenium.webdriver.common.by
 import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
-import undetected_chromedriver
 
 import my_lib.chrome_util
 import my_lib.time
@@ -164,6 +163,8 @@ def _create_driver_impl(
     )
 
     if use_undetected:
+        import undetected_chromedriver
+
         chrome_version = _get_chrome_version()
 
         # NOTE: user_multi_procs=True は既存の chromedriver ファイルが存在することを前提としているため、
