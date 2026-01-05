@@ -310,6 +310,135 @@ class TestUploadImage:
         assert result is None
 
 
+class TestAttachFile:
+    """attach_file 関数のテスト"""
+
+    def test_does_nothing_for_empty_config(self, temp_dir):
+        """SlackEmptyConfig では None を返す"""
+        import pathlib
+
+        from my_lib.notify.slack import SlackEmptyConfig, attach_file
+
+        config = SlackEmptyConfig()
+        file_path = pathlib.Path(temp_dir) / "test.txt"
+        file_path.write_text("test content")
+
+        result = attach_file(config, "C123", file_path)
+        assert result is None
+
+    def test_uploads_file_with_default_title(self, temp_dir, mocker):
+        """ファイルをアップロードする（タイトル省略時はファイル名を使用）"""
+        import pathlib
+
+        from my_lib.notify.slack import (
+            SlackChannelConfig,
+            SlackErrorConfig,
+            SlackErrorOnlyConfig,
+            attach_file,
+        )
+
+        # モックの設定
+        mock_client = mocker.MagicMock()
+        mock_client.files_upload_v2.return_value = {"files": [{"id": "F123"}]}
+        mocker.patch("slack_sdk.WebClient", return_value=mock_client)
+
+        error_channel = SlackChannelConfig(name="error", id="C123")
+        error_config = SlackErrorConfig(channel=error_channel, interval_min=60)
+        config = SlackErrorOnlyConfig(
+            bot_token="xoxb-token",  # noqa: S106
+            from_name="bot",
+            error=error_config,
+        )
+
+        file_path = pathlib.Path(temp_dir) / "test.txt"
+        file_path.write_text("test content")
+
+        result = attach_file(config, "C123", file_path)
+
+        assert result == "F123"
+        mock_client.files_upload_v2.assert_called_once()
+        call_kwargs = mock_client.files_upload_v2.call_args[1]
+        assert call_kwargs["channel"] == "C123"
+        assert call_kwargs["title"] == "test.txt"
+
+    def test_uploads_file_with_thread_ts(self, temp_dir, mocker):
+        """スレッドにファイルを添付する"""
+        import pathlib
+
+        from my_lib.notify.slack import (
+            SlackChannelConfig,
+            SlackErrorConfig,
+            SlackErrorOnlyConfig,
+            attach_file,
+        )
+
+        # モックの設定
+        mock_client = mocker.MagicMock()
+        mock_client.files_upload_v2.return_value = {"files": [{"id": "F456"}]}
+        mocker.patch("slack_sdk.WebClient", return_value=mock_client)
+
+        error_channel = SlackChannelConfig(name="error", id="C123")
+        error_config = SlackErrorConfig(channel=error_channel, interval_min=60)
+        config = SlackErrorOnlyConfig(
+            bot_token="xoxb-token",  # noqa: S106
+            from_name="bot",
+            error=error_config,
+        )
+
+        file_path = pathlib.Path(temp_dir) / "log.txt"
+        file_path.write_text("log content")
+
+        result = attach_file(
+            config,
+            "C123",
+            file_path,
+            title="ログファイル",
+            initial_comment="詳細ログ",
+            thread_ts="1234567890.123456",
+        )
+
+        assert result == "F456"
+        call_kwargs = mock_client.files_upload_v2.call_args[1]
+        assert call_kwargs["title"] == "ログファイル"
+        assert call_kwargs["initial_comment"] == "詳細ログ"
+        assert call_kwargs["thread_ts"] == "1234567890.123456"
+
+    def test_returns_none_on_api_error(self, temp_dir, mocker):
+        """API エラー時は None を返す"""
+        import pathlib
+
+        import slack_sdk.errors
+
+        from my_lib.notify.slack import (
+            SlackChannelConfig,
+            SlackErrorConfig,
+            SlackErrorOnlyConfig,
+            attach_file,
+        )
+
+        # モックの設定
+        mock_client = mocker.MagicMock()
+        mock_client.files_upload_v2.side_effect = slack_sdk.errors.SlackApiError(
+            message="error", response={"error": "file_not_found"}
+        )
+        mocker.patch("slack_sdk.WebClient", return_value=mock_client)
+
+        error_channel = SlackChannelConfig(name="error", id="C123")
+        error_config = SlackErrorConfig(channel=error_channel, interval_min=60)
+        config = SlackErrorOnlyConfig(
+            bot_token="xoxb-token",  # noqa: S106
+            from_name="bot",
+            error=error_config,
+        )
+
+        file_path = pathlib.Path(temp_dir) / "test.txt"
+        file_path.write_text("test content")
+
+        result = attach_file(config, "C123", file_path)
+
+        assert result is None
+
+
 class TestHistoryFunctions:
     """履歴関数のテスト"""
 
