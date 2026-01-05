@@ -198,8 +198,8 @@ def create_driver(
     is_headless: bool = True,
     clean_profile: bool = False,
     auto_recover: bool = True,
-    use_subprocess: bool = False,
     use_undetected: bool = True,
+    use_subprocess: bool = False,
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -209,10 +209,16 @@ def create_driver(
         is_headless: ヘッドレスモードで起動するか
         clean_profile: 起動前にロックファイルを削除するか
         auto_recover: プロファイル破損時に自動リカバリするか
-        use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
         use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
+        use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
+
+    Raises:
+        ValueError: use_undetected=False かつ use_subprocess=True の場合
 
     """
+    if not use_undetected and use_subprocess:
+        raise ValueError("use_subprocess=True は use_undetected=True の場合のみ有効です")
+
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
     logging.getLogger("selenium.webdriver.common.selenium_manager").setLevel(logging.WARNING)
