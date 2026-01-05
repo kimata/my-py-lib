@@ -74,23 +74,24 @@ def _get_chrome_version() -> int | None:
     return None
 
 
-def _create_driver_impl(
+def _create_chrome_options(
     profile_name: str,
-    data_path: pathlib.Path,
+    chrome_data_path: pathlib.Path,
+    log_path: pathlib.Path,
     is_headless: bool,
-    use_subprocess: bool,
-) -> WebDriver:
-    chrome_data_path = data_path / "chrome"
-    log_path = data_path / "log"
+) -> selenium.webdriver.chrome.options.Options:
+    """Chrome オプションを作成する
 
-    # NOTE: Pytest を並列実行できるようにする
-    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
-    if suffix is not None:
-        profile_name += "." + suffix
+    Args:
+        profile_name: プロファイル名
+        chrome_data_path: Chrome データディレクトリのパス
+        log_path: ログディレクトリのパス
+        is_headless: ヘッドレスモードで起動するか
 
-    chrome_data_path.mkdir(parents=True, exist_ok=True)
-    log_path.mkdir(parents=True, exist_ok=True)
+    Returns:
+        設定済みの Chrome オプション
 
+    """
     options = selenium.webdriver.chrome.options.Options()
 
     if is_headless:
@@ -122,24 +123,66 @@ def _create_driver_impl(
     if not is_headless:
         options.add_argument("--auto-open-devtools-for-tabs")
 
+    return options
+
+
+def _create_driver_impl(
+    profile_name: str,
+    data_path: pathlib.Path,
+    is_headless: bool,
+    use_subprocess: bool,
+    use_undetected: bool,
+) -> WebDriver:
+    """WebDriver を作成する内部実装
+
+    Args:
+        profile_name: プロファイル名
+        data_path: データディレクトリのパス
+        is_headless: ヘッドレスモードで起動するか
+        use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
+        use_undetected: undetected_chromedriver を使用するか
+
+    Returns:
+        WebDriver インスタンス
+
+    """
+    chrome_data_path = data_path / "chrome"
+    log_path = data_path / "log"
+
+    # NOTE: Pytest を並列実行できるようにする
+    suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
+    if suffix is not None:
+        profile_name += "." + suffix
+
+    chrome_data_path.mkdir(parents=True, exist_ok=True)
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    options = _create_chrome_options(profile_name, chrome_data_path, log_path, is_headless)
+
     service = selenium.webdriver.chrome.service.Service(
         service_args=["--verbose", f"--log-path={str(log_path / 'webdriver.log')!s}"],
     )
 
-    chrome_version = _get_chrome_version()
+    if use_undetected:
+        chrome_version = _get_chrome_version()
 
-    # NOTE: user_multi_procs=True は既存の chromedriver ファイルが存在することを前提としているため、
-    # ファイルが存在しない場合（CI環境の初回実行など）は False にする
-    uc_data_path = pathlib.Path("~/.local/share/undetected_chromedriver").expanduser()
-    use_multi_procs = uc_data_path.exists() and any(uc_data_path.glob("*chromedriver*"))
+        # NOTE: user_multi_procs=True は既存の chromedriver ファイルが存在することを前提としているため、
+        # ファイルが存在しない場合（CI環境の初回実行など）は False にする
+        uc_data_path = pathlib.Path("~/.local/share/undetected_chromedriver").expanduser()
+        use_multi_procs = uc_data_path.exists() and any(uc_data_path.glob("*chromedriver*"))
 
-    driver = undetected_chromedriver.Chrome(
-        service=service,
-        options=options,
-        use_subprocess=use_subprocess,
-        version_main=chrome_version,
-        user_multi_procs=use_multi_procs,
-    )
+        driver = undetected_chromedriver.Chrome(
+            service=service,
+            options=options,
+            use_subprocess=use_subprocess,
+            version_main=chrome_version,
+            user_multi_procs=use_multi_procs,
+        )
+    else:
+        driver = selenium.webdriver.Chrome(
+            service=service,
+            options=options,
+        )
 
     driver.set_page_load_timeout(30)
 
@@ -156,6 +199,7 @@ def create_driver(
     clean_profile: bool = False,
     auto_recover: bool = True,
     use_subprocess: bool = False,
+    use_undetected: bool = True,
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -165,7 +209,8 @@ def create_driver(
         is_headless: ヘッドレスモードで起動するか
         clean_profile: 起動前にロックファイルを削除するか
         auto_recover: プロファイル破損時に自動リカバリするか
-        use_subprocess: サブプロセスで Chrome を起動するか
+        use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
+        use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
 
     """
     # NOTE: ルートロガーの出力レベルを変更した場合でも Selenium 関係は抑制する
@@ -199,7 +244,7 @@ def create_driver(
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
+        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess, use_undetected)
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
 
@@ -215,7 +260,7 @@ def create_driver(
             logging.warning("Profile still corrupted after first attempt, recovering")
             my_lib.chrome_util._recover_corrupted_profile(profile_path)
 
-        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess)
+        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess, use_undetected)
 
 
 def xpath_exists(driver: WebDriver, xpath: str) -> bool:
