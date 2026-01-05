@@ -647,13 +647,15 @@ class error_handler:
     Args:
         driver: WebDriver インスタンス
         message: ログに出力するエラーメッセージ
-        on_error: エラー時に呼ばれるコールバック関数 (exception, screenshot: PIL.Image.Image | None) -> None
+        on_error: エラー時に呼ばれるコールバック関数
+            (exception, screenshot: PIL.Image.Image | None, page_source: str | None) -> None
         capture_screenshot: スクリーンショットを自動取得するか（デフォルト: True）
         reraise: 例外を再送出するか（デフォルト: True）
 
     Attributes:
         exception: 発生した例外（エラーがなければ None）
         screenshot: 取得したスクリーンショット（PIL.Image.Image、取得失敗時は None）
+        page_source: 取得したページソース（取得失敗時は None）
 
     Examples:
         基本的な使用方法::
@@ -664,8 +666,8 @@ class error_handler:
 
         コールバック付き（Slack通知など）::
 
-            def notify(exc, screenshot):
-                slack.error_with_image(config, "エラー発生", str(exc), screenshot)
+            def notify(exc, screenshot, page_source):
+                slack.notify_error_with_page(config, "エラー発生", exc, screenshot, page_source)
 
             with my_lib.selenium_util.error_handler(
                 driver,
@@ -688,7 +690,7 @@ class error_handler:
         self,
         driver: WebDriver,
         message: str = "Selenium operation failed",
-        on_error: Callable[[Exception, PIL.Image.Image | None], None] | None = None,
+        on_error: Callable[[Exception, PIL.Image.Image | None, str | None], None] | None = None,
         capture_screenshot: bool = True,
         reraise: bool = True,
     ) -> None:
@@ -700,6 +702,7 @@ class error_handler:
         self.reraise = reraise
         self.exception: Exception | None = None
         self.screenshot: PIL.Image.Image | None = None
+        self.page_source: str | None = None
 
     def __enter__(self) -> Self:
         """コンテキストマネージャの開始"""
@@ -725,8 +728,12 @@ class error_handler:
         # ログ出力
         logging.exception(self.message)
 
-        # スクリーンショット取得
+        # スクリーンショット・ページソース取得
         if self.capture_screenshot:
+            try:
+                self.page_source = self.driver.page_source
+            except Exception:
+                logging.debug("Failed to capture page source for error handling")
             try:
                 screenshot_bytes = self.driver.get_screenshot_as_png()
                 self.screenshot = PIL.Image.open(io.BytesIO(screenshot_bytes))
@@ -736,7 +743,7 @@ class error_handler:
         # コールバック呼び出し
         if self.on_error is not None:
             try:
-                self.on_error(self.exception, self.screenshot)
+                self.on_error(self.exception, self.screenshot, self.page_source)
             except Exception:
                 logging.exception("Error in on_error callback")
 
