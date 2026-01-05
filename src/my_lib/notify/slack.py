@@ -199,11 +199,11 @@ def info(
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
+) -> str | None:
     if isinstance(config, SlackEmptyConfig):
-        return
+        return None
     title = "Info: " + title
-    _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
+    return _split_send(config.bot_token, config.info.channel.name, title, message, formatter)
 
 
 def error(
@@ -211,9 +211,9 @@ def error(
     title: str,
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
+) -> str | None:
     if isinstance(config, SlackEmptyConfig):
-        return
+        return None
     title = "Error: " + title
 
     _hist_add(message)
@@ -221,11 +221,13 @@ def error(
     interval_min = config.error.interval_min
     if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
-        return
+        return None
 
-    _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
+    thread_ts = _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+
+    return thread_ts
 
 
 def error_with_image(
@@ -234,9 +236,9 @@ def error_with_image(
     message: str,
     attach_img: AttachImage | None,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
-) -> None:
+) -> str | None:
     if isinstance(config, SlackEmptyConfig):
-        return
+        return None
     title = "Error: " + title
 
     _hist_add(message)
@@ -244,7 +246,7 @@ def error_with_image(
     interval_min = config.error.interval_min
     if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
-        return
+        return None
 
     thread_ts = _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
@@ -256,6 +258,8 @@ def error_with_image(
         _upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
 
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+
+    return thread_ts
 
 
 def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
@@ -362,6 +366,32 @@ def upload_image(
     if isinstance(config, SlackEmptyConfig):
         return None
     return _upload_image(config.bot_token, ch_id, title, img, text, thread_ts)
+
+
+def attach_file(
+    config: HasBotToken | SlackEmptyConfig,
+    ch_id: str,
+    file_path: pathlib.Path,
+    title: str | None = None,
+    initial_comment: str | None = None,
+    thread_ts: str | None = None,
+) -> str | None:
+    """ファイルを Slack チャンネルに添付する
+
+    Args:
+        config: Slack 設定（bot_token を含む）
+        ch_id: チャンネル ID
+        file_path: 添付するファイルのパス
+        title: ファイルのタイトル（省略時はファイル名）
+        initial_comment: ファイルに付けるコメント
+        thread_ts: スレッドのタイムスタンプ（指定時はスレッドに添付）
+
+    Returns:
+        アップロードされたファイルの ID、失敗時は None
+    """
+    if isinstance(config, SlackEmptyConfig):
+        return None
+    return _upload_file(config.bot_token, ch_id, file_path, title, initial_comment, thread_ts)
 
 
 def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
@@ -502,6 +532,39 @@ def _upload_image(
             logging.exception("Failed to send Slack message")
 
             return None
+
+
+def _upload_file(
+    token: str,
+    ch_id: str,
+    file_path: pathlib.Path,
+    title: str | None = None,
+    initial_comment: str | None = None,
+    thread_ts: str | None = None,
+) -> str | None:
+    client = slack_sdk.WebClient(token=token)
+
+    try:
+        kwargs: dict[str, Any] = {
+            "channel": ch_id,
+            "file": str(file_path),
+        }
+        if title:
+            kwargs["title"] = title
+        else:
+            kwargs["title"] = file_path.name
+        if initial_comment:
+            kwargs["initial_comment"] = initial_comment
+        if thread_ts:
+            kwargs["thread_ts"] = thread_ts
+
+        resp: Any = client.files_upload_v2(**kwargs)
+
+        return resp["files"][0]["id"]
+    except slack_sdk.errors.SlackApiError:
+        logging.exception("Failed to upload file to Slack")
+
+        return None
 
 
 # NOTE: テスト用
