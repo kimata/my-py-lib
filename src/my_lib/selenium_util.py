@@ -665,7 +665,7 @@ class error_handler:
         コールバック付き（Slack通知など）::
 
             def notify(exc, screenshot):
-                slack.error("エラー発生", str(exc), screenshot)
+                slack.error_with_image(config, "エラー発生", str(exc), screenshot)
 
             with my_lib.selenium_util.error_handler(
                 driver,
