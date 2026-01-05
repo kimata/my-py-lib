@@ -15,6 +15,7 @@ Options:
 from __future__ import annotations
 
 import collections
+import gzip
 import json
 import logging
 import math
@@ -23,6 +24,7 @@ import pathlib
 import tempfile
 import threading
 import time
+import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, TypedDict
@@ -260,6 +262,83 @@ def error_with_image(
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
 
     return thread_ts
+
+
+def notify_error_with_page(
+    config: HasErrorConfig | SlackEmptyConfig,
+    title: str,
+    exception: Exception,
+    screenshot: Image.Image | None,
+    page_source: str | None,
+    formatter: Callable[[str, str], FormattedMessage] = format_simple,
+) -> str | None:
+    """エラーをスクリーンショットと page_source 付きで通知する
+
+    例外情報をトレースバック付きで通知し、スクリーンショットを添付する。
+    page_source が指定された場合は gzip 圧縮してスレッドに添付する。
+
+    Args:
+        config: Slack 設定（error チャンネル設定を含む）
+        title: エラータイトル
+        exception: 発生した例外
+        screenshot: スクリーンショット画像（PIL.Image.Image）
+        page_source: ページの HTML ソース
+        formatter: メッセージフォーマッタ（デフォルト: format_simple）
+
+    Returns:
+        スレッドのタイムスタンプ（通知失敗時は None）
+
+    Examples:
+        my_lib.selenium_util.error_handler と組み合わせて使用::
+
+            def on_error(exc, screenshot, page_source):
+                my_lib.notify.slack.notify_error_with_page(
+                    config, "処理に失敗", exc, screenshot, page_source
+                )
+
+            with my_lib.selenium_util.error_handler(driver, on_error=on_error):
+                do_something()
+
+    """
+    if isinstance(config, SlackEmptyConfig):
+        return None
+
+    message = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+
+    attach_img: AttachImage | None = None
+    if screenshot is not None:
+        attach_img = {"data": screenshot, "text": "screenshot"}
+
+    thread_ts = error_with_image(config, title, message, attach_img, formatter)
+
+    # page_source を gzip 圧縮してスレッドに添付
+    if page_source is not None and thread_ts is not None:
+        ch_id = config.error.channel.id
+        if ch_id is not None:
+            _attach_page_source_gzip(config, ch_id, page_source, thread_ts)
+
+    return thread_ts
+
+
+def _attach_page_source_gzip(
+    config: HasBotToken,
+    ch_id: str,
+    page_source: str,
+    thread_ts: str,
+) -> None:
+    """page_source を gzip 圧縮してスレッドに添付"""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".html.gz", delete=False) as tmp:
+            tmp_path = pathlib.Path(tmp.name)
+
+        with gzip.open(tmp_path, "wt", encoding="utf-8") as gz:
+            gz.write(page_source)
+
+        _upload_file(config.bot_token, ch_id, tmp_path, "page_source.html.gz", None, thread_ts)
+
+        tmp_path.unlink()
+    except Exception:
+        logging.debug("Failed to attach page source")
 
 
 def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
