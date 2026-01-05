@@ -254,8 +254,8 @@ class TestErrorHandler:
 
         callback_called = []
 
-        def on_error(exc, screenshot):
-            callback_called.append((exc, screenshot))
+        def on_error(exc, screenshot, page_source):
+            callback_called.append((exc, screenshot, page_source))
 
         with (
             pytest.raises(ValueError, match="Test error"),
