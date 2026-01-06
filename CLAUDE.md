@@ -165,6 +165,172 @@ path = my_lib.pytest_util.get_path(path_str)
 テストでファイル存在確認時は `my_lib.footprint.exists()` または
 `my_lib.pytest_util.get_path()` を使用すること。
 
+## 設定クラスの実装規約
+
+全プロジェクトで統一された設定管理パターン。
+
+### 基本構造
+
+```python
+from __future__ import annotations
+
+import pathlib
+from dataclasses import dataclass
+from typing import Any, Self
+
+import my_lib.config
+
+
+@dataclass(frozen=True)  # 必須: 不変性を保証
+class SubConfig:
+    """ネストされた設定"""
+    name: str
+    value: int
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成"""
+        return cls(
+            name=data["name"],
+            value=data["value"],
+        )
+
+
+@dataclass(frozen=True)
+class Config:
+    """メイン設定"""
+    base_dir: pathlib.Path
+    sub: SubConfig
+    optional_field: str | None = None
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            base_dir=pathlib.Path(data["base_dir"]),
+            sub=SubConfig.parse(data["sub"]),  # ネストは再帰的に parse()
+            optional_field=data.get("optional_field"),
+        )
+
+
+def load(config_path: str, schema_path: str | None = None) -> Config:
+    """設定ファイルを読み込んでパースする（module-level 関数）"""
+    raw = my_lib.config.load(config_path, schema_path)
+    return Config.parse(raw)
+```
+
+### ルール
+
+| ルール                 | 説明                                             |
+| ---------------------- | ------------------------------------------------ |
+| `frozen=True`          | 全ての設定 dataclass に必須。設定の不変性を保証  |
+| `@classmethod parse()` | 辞書からインスタンスを生成するファクトリメソッド |
+| 戻り値型 `Self`        | `typing.Self` を使用（Python 3.11+）             |
+| ネストの処理           | 子クラスの `parse()` を再帰的に呼び出す          |
+| `load()` 関数          | module-level で定義。スキーマ検証 → パースの流れ |
+
+### パターン別の実装例
+
+#### リストの処理
+
+```python
+@dataclass(frozen=True)
+class ParentConfig:
+    items: list[ItemConfig]
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            items=[ItemConfig.parse(item) for item in data["items"]],
+        )
+```
+
+#### Optional フィールド
+
+```python
+@dataclass(frozen=True)
+class Config:
+    required: str
+    optional: SubConfig | None = None
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        optional_data = data.get("optional")
+        return cls(
+            required=data["required"],
+            optional=SubConfig.parse(optional_data) if optional_data else None,
+        )
+```
+
+#### デフォルト値
+
+```python
+from dataclasses import field
+
+@dataclass(frozen=True)
+class Config:
+    # シンプルなデフォルト
+    timeout: int = 30
+
+    # ミュータブルなデフォルト（list, dict）は field() を使用
+    tags: list[str] = field(default_factory=list)
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            timeout=data.get("timeout", 30),
+            tags=data.get("tags", []),
+        )
+```
+
+#### 型変換
+
+```python
+@classmethod
+def parse(cls, data: dict[str, Any]) -> Self:
+    return cls(
+        # pathlib.Path への変換
+        path=pathlib.Path(data["path"]),
+        # 数値型の明示的変換
+        scale=float(data.get("scale", 1.0)),
+        offset=int(data.get("offset", 0)),
+    )
+```
+
+### 検証ロジック
+
+JSON Schema による検証は `my_lib.config.load()` で実施。
+追加の検証が必要な場合は `parse()` 内で実装：
+
+```python
+@classmethod
+def parse(cls, data: dict[str, Any]) -> Self:
+    scale = data["scale"]
+    if scale not in ("linear", "log"):
+        msg = f"scale must be 'linear' or 'log', got {scale}"
+        raise ValueError(msg)
+
+    return cls(scale=scale)
+```
+
+### アンチパターン（避けるべき実装）
+
+```python
+# Bad: frozen なし（ミュータブルになる）
+@dataclass
+class Config:
+    ...
+
+# Bad: parse() を使わず直接コンストラクタ呼び出し
+config = Config(**data)  # 型変換やネスト処理が行われない
+
+# Bad: get() のデフォルト値が None になりうる
+optional = parse_sub(data.get("optional"))  # None が渡される可能性
+
+# Good: None チェックを明示
+optional_data = data.get("optional")
+optional = parse_sub(optional_data) if optional_data else None
+```
+
 ## 例外クラス
 
 ### センサー関連
