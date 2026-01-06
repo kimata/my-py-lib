@@ -155,21 +155,6 @@ class EventManager:
 # モジュールレベルのインスタンス
 _manager = EventManager()
 
-# テスト用のモジュールレベル変数
-event_count = _manager.event_count
-
-
-def _event_index(event_type: EVENT_TYPE) -> int:
-    """イベントタイプのインデックスを返す（テスト用）
-
-    Args:
-        event_type: イベントタイプ
-
-    Returns:
-        イベントタイプのインデックス
-    """
-    return event_type.index
-
 
 def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
     """ワーカースレッドを開始する
@@ -178,15 +163,6 @@ def start(event_queue: multiprocessing.queues.Queue[Any]) -> None:
         event_queue: イベントを受信するキュー
     """
     _manager.start(event_queue)
-
-
-def _worker(event_queue: multiprocessing.queues.Queue[Any]) -> None:
-    """イベントキューを監視するワーカー（テスト用）
-
-    Args:
-        event_queue: イベントを受信するキュー
-    """
-    _manager._worker(event_queue)
 
 
 def term() -> None:
