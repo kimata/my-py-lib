@@ -406,6 +406,63 @@ def with_retry(
     raise RuntimeError("Unexpected state in with_retry")
 
 
+def with_session_retry(
+    func: Callable[[], T],
+    driver_name: str,
+    data_dir: pathlib.Path,
+    *,
+    max_retries: int = 1,
+    clear_profile_on_error: bool = True,
+    on_retry: Callable[[int, int], None] | None = None,
+    before_retry: Callable[[], None] | None = None,
+) -> T:
+    """InvalidSessionIdException 発生時にプロファイル削除してリトライ
+
+    ブラウザのセッションが無効になった場合（クラッシュ等）、
+    プロファイルを削除して再起動することで復旧を試みる。
+
+    Args:
+        func: 実行する関数
+        driver_name: Chrome プロファイル名
+        data_dir: Selenium データディレクトリ
+        max_retries: 最大リトライ回数 (デフォルト: 1)
+        clear_profile_on_error: エラー時にプロファイルを削除するか
+        on_retry: リトライ時のコールバック (attempt, max_retries) - ステータス更新用
+        before_retry: リトライ前のコールバック - quit_selenium() 呼び出し用
+
+    Returns:
+        成功時は関数の戻り値
+
+    Raises:
+        InvalidSessionIdException: リトライ上限に達した場合
+
+    """
+
+    def retry_handler(attempt: int, exception: Exception) -> bool | None:
+        if before_retry:
+            before_retry()
+
+        if attempt <= max_retries and clear_profile_on_error:
+            logging.warning(
+                "セッションエラーが発生しました。プロファイルを削除してリトライします（%d/%d）",
+                attempt,
+                max_retries,
+            )
+            if on_retry:
+                on_retry(attempt, max_retries)
+            my_lib.chrome_util.delete_profile(driver_name, data_dir)
+            return True
+        return False
+
+    return with_retry(
+        func,
+        max_retries=max_retries + 1,
+        delay=0,
+        exceptions=(selenium.common.exceptions.InvalidSessionIdException,),
+        on_retry=retry_handler,
+    )
+
+
 def wait_patiently(
     driver: WebDriver,
     wait: WebDriverWait[WebDriver],
