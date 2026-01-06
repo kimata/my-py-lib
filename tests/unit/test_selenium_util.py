@@ -323,3 +323,147 @@ class TestQuitDriverGracefully:
         ):
             # 例外が発生しないことを確認
             my_lib.selenium_util.quit_driver_gracefully(mock_driver, wait_sec=0.1)
+
+
+class TestWithSessionRetry:
+    """with_session_retry 関数のテスト"""
+
+    def test_success_without_retry(self, temp_dir):
+        """正常終了（リトライなし）"""
+        call_count = 0
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+
+        result = my_lib.selenium_util.with_session_retry(
+            func,
+            driver_name="TestDriver",
+            data_dir=temp_dir,
+        )
+
+        assert result == "success"
+        assert call_count == 1
+
+    def test_retry_on_invalid_session(self, temp_dir):
+        """InvalidSessionIdException でリトライ"""
+        import selenium.common.exceptions
+
+        call_count = 0
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise selenium.common.exceptions.InvalidSessionIdException("Session expired")
+            return "success"
+
+        with unittest.mock.patch("my_lib.chrome_util.delete_profile") as mock_delete:
+            result = my_lib.selenium_util.with_session_retry(
+                func,
+                driver_name="TestDriver",
+                data_dir=temp_dir,
+                max_retries=1,
+            )
+
+        assert result == "success"
+        assert call_count == 2
+        mock_delete.assert_called_once_with("TestDriver", temp_dir)
+
+    def test_raises_after_max_retries(self, temp_dir):
+        """最大リトライ回数超過で例外"""
+        import selenium.common.exceptions
+
+        def func():
+            raise selenium.common.exceptions.InvalidSessionIdException("Session expired")
+
+        with (
+            unittest.mock.patch("my_lib.chrome_util.delete_profile"),
+            pytest.raises(
+                selenium.common.exceptions.InvalidSessionIdException,
+                match="Session expired",
+            ),
+        ):
+            my_lib.selenium_util.with_session_retry(
+                func,
+                driver_name="TestDriver",
+                data_dir=temp_dir,
+                max_retries=2,
+            )
+
+    def test_clear_profile_on_error_false(self, temp_dir):
+        """clear_profile_on_error=False でプロファイル削除をスキップ"""
+        import selenium.common.exceptions
+
+        def func():
+            raise selenium.common.exceptions.InvalidSessionIdException("Session expired")
+
+        with (
+            unittest.mock.patch("my_lib.chrome_util.delete_profile") as mock_delete,
+            pytest.raises(selenium.common.exceptions.InvalidSessionIdException),
+        ):
+            my_lib.selenium_util.with_session_retry(
+                func,
+                driver_name="TestDriver",
+                data_dir=temp_dir,
+                clear_profile_on_error=False,
+            )
+
+        mock_delete.assert_not_called()
+
+    def test_on_retry_callback_called(self, temp_dir):
+        """on_retry コールバックが呼ばれる"""
+        import selenium.common.exceptions
+
+        call_count = 0
+        callback_calls = []
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise selenium.common.exceptions.InvalidSessionIdException("Session expired")
+            return "success"
+
+        def on_retry(attempt, max_retries):
+            callback_calls.append((attempt, max_retries))
+
+        with unittest.mock.patch("my_lib.chrome_util.delete_profile"):
+            my_lib.selenium_util.with_session_retry(
+                func,
+                driver_name="TestDriver",
+                data_dir=temp_dir,
+                max_retries=2,
+                on_retry=on_retry,
+            )
+
+        assert len(callback_calls) == 1
+        assert callback_calls[0] == (1, 2)
+
+    def test_before_retry_callback_called(self, temp_dir):
+        """before_retry コールバックが呼ばれる"""
+        import selenium.common.exceptions
+
+        call_count = 0
+        before_retry_called = []
+
+        def func():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise selenium.common.exceptions.InvalidSessionIdException("Session expired")
+            return "success"
+
+        def before_retry():
+            before_retry_called.append(True)
+
+        with unittest.mock.patch("my_lib.chrome_util.delete_profile"):
+            my_lib.selenium_util.with_session_retry(
+                func,
+                driver_name="TestDriver",
+                data_dir=temp_dir,
+                before_retry=before_retry,
+            )
+
+        assert len(before_retry_called) == 1
