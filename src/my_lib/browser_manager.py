@@ -35,6 +35,7 @@ class BrowserManager:
         wait_timeout: WebDriverWait のタイムアウト秒数（デフォルト: 5.0）
         use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
         clear_profile_on_error: 起動エラー時にプロファイルを削除するか（デフォルト: False）
+        max_retry_on_error: 起動エラー時のリトライ回数（デフォルト: 1）
 
     Example:
         >>> manager = BrowserManager(
@@ -52,6 +53,7 @@ class BrowserManager:
     wait_timeout: float = 5.0
     use_undetected: bool = True
     clear_profile_on_error: bool = False
+    max_retry_on_error: int = 1
 
     # 内部状態
     _driver: WebDriver | None = field(default=None, init=False, repr=False)
@@ -63,6 +65,9 @@ class BrowserManager:
         ドライバーが未起動の場合は新規作成し、キャッシュをクリアします。
         既に起動済みの場合は既存のドライバーを返します。
 
+        clear_profile_on_error=True の場合、起動失敗時にプロファイルを削除して
+        max_retry_on_error 回までリトライします。
+
         Returns:
             (WebDriver, WebDriverWait) のタプル
 
@@ -73,25 +78,53 @@ class BrowserManager:
         if self._driver is not None and self._wait is not None:
             return (self._driver, self._wait)
 
-        try:
-            logging.info("Selenium ドライバーを起動しています (%s)...", self.profile_name)
-            self._driver = my_lib.selenium_util.create_driver(
-                self.profile_name,
-                self.data_dir,
-                use_undetected=self.use_undetected,
-            )
-            self._wait = selenium.webdriver.support.wait.WebDriverWait(self._driver, self.wait_timeout)
+        last_error: Exception | None = None
+        max_attempts = self.max_retry_on_error + 1 if self.clear_profile_on_error else 1
 
-            my_lib.selenium_util.clear_cache(self._driver)
+        for attempt in range(max_attempts):
+            try:
+                if attempt > 0:
+                    logging.info(
+                        "Selenium ドライバーを再起動しています (%s) [リトライ %d/%d]...",
+                        self.profile_name,
+                        attempt,
+                        self.max_retry_on_error,
+                    )
+                else:
+                    logging.info("Selenium ドライバーを起動しています (%s)...", self.profile_name)
 
-            logging.info("Selenium ドライバーを起動しました (%s)", self.profile_name)
-            return (self._driver, self._wait)
-        except Exception as e:
-            logging.exception("Selenium ドライバーの起動に失敗しました (%s)", self.profile_name)
-            if self.clear_profile_on_error:
-                logging.warning("プロファイルを削除します: %s", self.profile_name)
-                my_lib.chrome_util.delete_profile(self.profile_name, self.data_dir)
-            raise my_lib.selenium_util.SeleniumError(f"Selenium の起動に失敗しました: {e}") from e
+                self._driver = my_lib.selenium_util.create_driver(
+                    self.profile_name,
+                    self.data_dir,
+                    use_undetected=self.use_undetected,
+                )
+                self._wait = selenium.webdriver.support.wait.WebDriverWait(self._driver, self.wait_timeout)
+
+                my_lib.selenium_util.clear_cache(self._driver)
+
+                logging.info("Selenium ドライバーを起動しました (%s)", self.profile_name)
+                return (self._driver, self._wait)
+            except Exception as e:
+                last_error = e
+                logging.exception("Selenium ドライバーの起動に失敗しました (%s)", self.profile_name)
+
+                if self.clear_profile_on_error and attempt < max_attempts - 1:
+                    logging.warning(
+                        "プロファイルを削除してリトライします: %s (試行 %d/%d)",
+                        self.profile_name,
+                        attempt + 1,
+                        max_attempts,
+                    )
+                    my_lib.chrome_util.delete_profile(self.profile_name, self.data_dir)
+                    continue
+
+                if self.clear_profile_on_error:
+                    logging.warning("プロファイルを削除します: %s", self.profile_name)
+                    my_lib.chrome_util.delete_profile(self.profile_name, self.data_dir)
+
+        raise my_lib.selenium_util.SeleniumError(
+            f"Selenium の起動に失敗しました: {last_error}"
+        ) from last_error
 
     def has_driver(self) -> bool:
         """ドライバーが起動しているか確認
