@@ -37,28 +37,6 @@ class TestEventType:
         assert EVENT_TYPE.LOG.index == 2
 
 
-class TestEventIndex:
-    """_event_index 関数のテスト"""
-
-    def test_control_index(self):
-        """CONTROL のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, _event_index
-
-        assert _event_index(EVENT_TYPE.CONTROL) == 0
-
-    def test_schedule_index(self):
-        """SCHEDULE のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, _event_index
-
-        assert _event_index(EVENT_TYPE.SCHEDULE) == 1
-
-    def test_log_index(self):
-        """LOG のインデックス"""
-        from my_lib.webapp.event import EVENT_TYPE, _event_index
-
-        assert _event_index(EVENT_TYPE.LOG) == 2
-
-
 class TestNotifyEvent:
     """notify_event 関数のテスト"""
 
@@ -121,7 +99,7 @@ class TestStart:
 
 
 class TestWorker:
-    """_worker 関数のテスト"""
+    """EventManager._worker メソッドのテスト"""
 
     def test_processes_events(self):
         """イベントを処理する"""
@@ -129,7 +107,7 @@ class TestWorker:
         import threading
         import time
 
-        from my_lib.webapp.event import EVENT_TYPE, _manager, _worker
+        from my_lib.webapp.event import EVENT_TYPE, _manager
 
         queue = multiprocessing.Queue()
         queue.put(EVENT_TYPE.LOG)
@@ -141,18 +119,18 @@ class TestWorker:
             _manager.should_terminate = True
 
         threading.Thread(target=run_worker).start()
-        _worker(queue)
+        _manager._worker(queue)
 
     def test_stops_on_terminate(self):
         """終了フラグで停止する"""
         import multiprocessing
 
-        from my_lib.webapp.event import _manager, _worker
+        from my_lib.webapp.event import _manager
 
         queue = multiprocessing.Queue()
         _manager.should_terminate = True
 
-        _worker(queue)
+        _manager._worker(queue)
 
 
 class TestEventManager:
