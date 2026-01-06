@@ -112,6 +112,7 @@ class TestGetDriver:
             profile_name="TestProfile",
             data_dir=temp_dir,
             clear_profile_on_error=True,
+            max_retry_on_error=0,
         )
 
         with (
