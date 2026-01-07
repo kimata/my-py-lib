@@ -128,6 +128,10 @@ class EventManager:
         Yields:
             SSE 形式のイベントデータ
         """
+        # NOTE: 接続確立時に即座にダミーデータを送信して HTTP レスポンスヘッダーを
+        # フラッシュする。これにより EventSource.onopen が発火する。
+        yield "data: dummy\n\n"
+
         last_count = self._event_count[:]
 
         i = 0
