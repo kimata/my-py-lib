@@ -20,6 +20,7 @@ class EVENT_TYPE(enum.Enum):
     CONTROL = "control"
     SCHEDULE = "schedule"
     LOG = "log"
+    DATA = "data"
 
     @property
     def index(self) -> int:
