@@ -194,6 +194,9 @@ class TestEventManager:
         threading.Thread(target=trigger_event).start()
 
         stream = manager.get_event_stream(count=1)
+        # 最初のダミーデータをスキップ
+        dummy = next(stream)
+        assert "data: dummy" in dummy
         result = next(stream)
 
         assert "data: schedule" in result
