@@ -255,7 +255,7 @@ class ProgressManager:
         # NOTE: tmux 環境では幅計算が実際と異なることがあるため、余裕を持たせる
         terminal_width = self._console.width
         if os.environ.get("TMUX"):
-            terminal_width -= 2
+            terminal_width -= 1
 
         table = rich.table.Table(
             show_header=False,
