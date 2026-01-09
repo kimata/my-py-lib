@@ -1,5 +1,5 @@
-"""Web application utilities for Flask-based applications."""
+"""Web application utilities for Flask-based applications.
 
-from my_lib.webapp import base, config, event, log, proxy, util
-
-__all__ = ["base", "config", "event", "log", "proxy", "util"]
+NOTE: Submodules are not auto-imported to avoid requiring Flask for non-web usage.
+Import specific modules as needed: `from my_lib.webapp import base`
+"""
