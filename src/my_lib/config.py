@@ -539,6 +539,22 @@ def get_path(
     return pathlib.Path(get_data(config, conf_path, suffix_path))
 
 
+def resolve_path(config: dict[str, Any], relative_path: str | pathlib.Path) -> pathlib.Path:
+    """base_dir を基準にして相対パスを解決する.
+
+    Args:
+        config: 設定辞書（base_dir キーを含む）
+        relative_path: 解決したい相対パス
+
+    Returns:
+        base_dir を基準にした絶対パス
+    """
+    base_dir = config.get("base_dir")
+    if base_dir is None:
+        raise KeyError("config に base_dir が含まれていません")
+    return pathlib.Path(base_dir) / relative_path
+
+
 def _abs_path(config_path: str | pathlib.Path = CONFIG_PATH) -> pathlib.Path:
     return pathlib.Path(pathlib.Path.cwd(), config_path)
 
