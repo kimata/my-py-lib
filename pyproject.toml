@@ -48,6 +48,7 @@ dev = [
     "types-pytz>=2025.2.0",
     "types-paramiko>=4.0.0",
     "types-pyyaml>=6.0.12",
+    "types-requests>=2.32.0",
     "amazon-paapi5>=1.1.2",
     "flask-cors>=4.0.1",
     "flask>=3.0.3",
@@ -61,7 +62,6 @@ dev = [
     "pytest-forked>=1.6.0",
     "pytest-rerunfailures>=15.1",
     "undetected-chromedriver>=3.5.5",
-    "types-requests>=2.32.0",
 ]
 
 [tool.uv]
