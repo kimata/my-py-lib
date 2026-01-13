@@ -64,7 +64,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
         [asin_list[i : (i + _PAAPI_SPLIT)] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
     ):
         if i != 0:
-            time.sleep(10)
+            time.sleep(1)
 
         resp: Any = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
@@ -133,7 +133,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
         [asin_list[i : i + _PAAPI_SPLIT] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
     ):
         if i != 0:
-            time.sleep(10)
+            time.sleep(1)
 
         resp: Any = default_api.get_items(
             paapi5_python_sdk.get_items_request.GetItemsRequest(
