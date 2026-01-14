@@ -74,7 +74,7 @@ def load(path_str: str | pathlib.Path, init_value: T | None = None) -> T | dict[
     with path.open("rb") as f:
         if isinstance(init_value, dict):
             # NOTE: dict の場合は、プログラムの更新でキーが追加された場合にも自動的に追従させる
-            data: dict[str, Any] = init_value.copy()
+            data: dict[str, Any] = {**init_value}
             data.update(pickle.load(f))  # noqa: S301
             return data
         else:

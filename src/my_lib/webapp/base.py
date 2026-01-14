@@ -36,6 +36,8 @@ def webapp(filename: str) -> flask.Response:
         if not str(requested_path).startswith(str(static_dir)):
             flask.abort(404)
 
+        # NOTE: static_dir は上で STATIC_DIR_PATH が None でないことを確認後に取得しているので
+        # 型チェッカーが Path 型として認識できる
         if requested_path.exists():
             etag = my_lib.flask_util.calculate_etag(file_path=str(requested_path), weak=True)
 
@@ -45,7 +47,7 @@ def webapp(filename: str) -> flask.Response:
                 response.headers["Cache-Control"] = "max-age=86400, must-revalidate"
                 return response
 
-            response = flask.send_from_directory(my_lib.webapp.config.STATIC_DIR_PATH, filename)
+            response = flask.send_from_directory(static_dir, filename)
 
             if response.status_code == 200:
                 response.headers["ETag"] = etag
@@ -53,7 +55,7 @@ def webapp(filename: str) -> flask.Response:
 
             return response
         else:
-            return flask.send_from_directory(my_lib.webapp.config.STATIC_DIR_PATH, filename)
+            return flask.send_from_directory(static_dir, filename)
     except (ValueError, OSError):
         flask.abort(404)
 
