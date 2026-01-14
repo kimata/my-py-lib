@@ -35,7 +35,6 @@ api_base_url: str | None = None
 
 def init(api_base_url_: str) -> None:
     global api_base_url
-    global error_response
 
     api_base_url = api_base_url_
 

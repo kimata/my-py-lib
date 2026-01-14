@@ -8,7 +8,7 @@ import io
 import socket
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import flask
 
@@ -65,7 +65,10 @@ def support_jsonp(f: F) -> F:
         callback = flask.request.args.get("callback")
         if callback:
             content = callback + "(" + f().data.decode().strip() + ")"
-            return flask.current_app.response_class(content, mimetype="text/javascript")
+            return cast(
+                flask.Response,
+                flask.current_app.response_class(content, mimetype="text/javascript"),
+            )
         else:
             return f(*args, **kwargs)
 
