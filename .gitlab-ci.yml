@@ -19,12 +19,11 @@ test-typecheck:
 
     before_script:
         - uv sync --locked --no-editable
-        - uv tool install ty
 
     script:
         - uv run python -m pyright
         - uv run mypy src/
-        - ty check src/
+        - uv run ty check src/
 
     cache:
         - key:
