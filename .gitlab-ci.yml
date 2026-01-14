@@ -17,6 +17,9 @@ test-typecheck:
 
     needs: []
 
+    before_script:
+        - uv sync --locked --no-editable
+
     script:
         - uv run python -m pyright
         - uv run mypy src/
@@ -34,11 +37,21 @@ test-walk-through:
 
     needs: []
 
+    before_script:
+        - uv sync --locked --no-editable
+
     script:
         - apt update
         - apt install --no-install-recommends --assume-yes smem
 
         - uv run pytest tests/unit/
+
+    cache:
+        - key:
+              files:
+                  - uv.lock
+          paths:
+              - ${UV_CACHE_DIR}
 
     artifacts:
         when: always
