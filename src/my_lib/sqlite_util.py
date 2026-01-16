@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """SQLiteデータベースのユーティリティ関数
 
-Kubernetes manual storage class（ローカルストレージ/NFS）環境に最適化。
+CephFS/NFS/Kubernetes manual storage class環境に最適化。
+WALモード + 排他ロック + mmap無効化により、分散ファイルシステムでも安全に動作。
 
 環境変数による設定:
     SQLITE_JOURNAL_MODE: ジャーナルモード (WAL/DELETE/TRUNCATE/PERSIST) デフォルト: WAL
     SQLITE_MMAP_SIZE: mmapサイズ（バイト単位、0で無効化）デフォルト: 0
-    SQLITE_LOCKING_MODE: ロックモード (NORMAL/EXCLUSIVE) デフォルト: NORMAL
+    SQLITE_LOCKING_MODE: ロックモード (NORMAL/EXCLUSIVE) デフォルト: EXCLUSIVE
     SQLITE_LOCK_MODE: fcntlロックモード (BLOCK/NONBLOCK) デフォルト: BLOCK
     SQLITE_CHECKPOINT_DIR: WALチェックポイント用ディレクトリ
 """
@@ -71,10 +72,9 @@ def init(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
     # 外部キー制約を有効化（データ整合性のため）
     conn.execute("PRAGMA foreign_keys=ON")
 
-    # ロックモード: NFSでは排他ロックモードが推奨される場合がある
-    locking_mode = os.environ.get("SQLITE_LOCKING_MODE", "NORMAL")
-    if locking_mode == "EXCLUSIVE":
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+    # ロックモード: CephFS/NFSでは排他ロックモードが必要
+    locking_mode = os.environ.get("SQLITE_LOCKING_MODE", "EXCLUSIVE")
+    conn.execute(f"PRAGMA locking_mode={locking_mode}")
 
     conn.commit()
     logging.info("SQLiteデータベースのテーブル設定を初期化しました")
