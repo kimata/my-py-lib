@@ -148,8 +148,3 @@ reportIndexIssue = false
 reportGeneralTypeIssues = false
 
 [tool.ty.rules]
-not-subscriptable = "ignore"
-unsupported-operator = "ignore"
-invalid-assignment = "ignore"
-invalid-argument-type = "ignore"
-not-iterable = "ignore"
