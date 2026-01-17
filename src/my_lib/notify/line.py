@@ -54,7 +54,7 @@ def get_msg_config(line_config: LineConfig) -> linebot.v3.messaging.Configuratio
     )
 
 
-def send_impl(
+def _send_impl(
     line_config: LineConfig,
     message: linebot.v3.messaging.FlexMessage | linebot.v3.messaging.TemplateMessage,
 ) -> None:
@@ -68,12 +68,12 @@ def send_impl(
             api.broadcast(
                 linebot.v3.messaging.BroadcastRequest(messages=[message], notificationDisabled=False)
             )
-        except Exception:
+        except linebot.v3.messaging.ApiException:
             logging.exception("Failed to send message")
 
 
 def send(line_config: LineConfig, message: dict[str, Any]) -> None:
-    send_impl(line_config, linebot.v3.messaging.TemplateMessage.from_dict(message))
+    _send_impl(line_config, linebot.v3.messaging.TemplateMessage.from_dict(message))
 
 
 def error(line_config: LineConfig, text: str) -> None:
@@ -117,7 +117,7 @@ def error(line_config: LineConfig, text: str) -> None:
         },
     )
 
-    send_impl(line_config, message)
+    _send_impl(line_config, message)
 
 
 def info(line_config: LineConfig, text: str) -> None:
@@ -161,7 +161,7 @@ def info(line_config: LineConfig, text: str) -> None:
         },
     )
 
-    send_impl(line_config, message)
+    _send_impl(line_config, message)
 
 
 # NOTE: テスト用

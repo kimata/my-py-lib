@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 ECHONET Lite を使って電力系から電力を取得するライブラリです。
 
@@ -23,7 +23,8 @@ import struct
 import tempfile
 from typing import Any
 
-import my_lib.sensor.echonetlite
+import my_lib.sensor
+from my_lib.sensor.echonetlite import ECHONETLite, EchonetLiteFrame, EchonetLiteProperty
 
 PAN_DESC_DAT_PATH: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
 RETRY_COUNT: int = 5
@@ -50,9 +51,9 @@ class EchonetEnergy:
     def ping(self) -> bool:
         return self.echonet_if.ping()
 
-    def parse_frame(self, recv_packet: bytes) -> dict[str, Any]:
+    def parse_frame(self, recv_packet: bytes) -> EchonetLiteFrame:
         self.logger.debug("recv_packet = \n%s", pprint.pformat(recv_packet, indent=2))
-        frame = my_lib.sensor.echonetlite.parse_frame(recv_packet)
+        frame = ECHONETLite.parse_frame(recv_packet)
         self.logger.debug("frame = \n%s", pprint.pformat(frame, indent=2))
 
         return frame
@@ -84,7 +85,7 @@ class EchonetEnergy:
 
         self.ipv6_addr = self.echonet_if.connect(pan_info)
         if self.ipv6_addr is None:
-            raise Exception("Faile to connect Wi-SUN")
+            raise RuntimeError("Failed to connect Wi-SUN")
 
         # NOTE: インスタンスリスト通知メッセージが来ない場合があるので
         # チェックを省略
@@ -93,20 +94,20 @@ class EchonetEnergy:
         #     recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
 
         #     frame = self.parse_frame(recv_packet)
-        #     if ((frame['EDATA']['SEOJ'] == 0x0EF001) and
-        #         (frame['EDATA']['DEOJ'] == 0x0EF001)):
+        #     if ((frame.edata.seoj == 0x0EF001) and
+        #         (frame.edata.deoj == 0x0EF001)):
         #         break
 
         # # インスタンスリスト
         # inst_list = ECHONETLite.parse_inst_list(
-        #     frame['EDATA']['prop_list'][0]['EDT'])
+        #     frame.edata.props[0].edt)
 
         # # 低圧スマート電力量メータクラスがあるか確認
         # is_meter_exit = ECHONETLite.check_class(
         #     inst_list, 0x02, 0x88)
 
         # if not is_meter_exit:
-        #     raise Exception('Meter not fount')
+        #     raise Exception('Meter not found')
 
     def disconnect(self) -> None:
         self.echonet_if.disconnect()
@@ -119,40 +120,42 @@ class EchonetEnergy:
             self.connect(pan_info)
             self.is_connected = True
 
-        meter_eoj = my_lib.sensor.echonetlite.build_eoj(
-            my_lib.sensor.echonetlite.EOJ.CLASS_GROUP_HOUSING,
-            my_lib.sensor.echonetlite.EOJ.HOUSE_CLASS_GROUP.LOW_VOLTAGE_SMART_METER,
+        meter_eoj = ECHONETLite.build_eoj(
+            ECHONETLite.EOJ.CLASS_GROUP_HOUSING,
+            ECHONETLite.EOJ.HOUSE_CLASS_GROUP.LOW_VOLTAGE_SMART_METER,
         )
 
-        edata = my_lib.sensor.echonetlite.build_edata(
-            my_lib.sensor.echonetlite.build_eoj(
-                my_lib.sensor.echonetlite.EOJ.CLASS_GROUP_MANAGEMENT,
-                my_lib.sensor.echonetlite.EOJ.MANAGEMENT_CLASS_GROUP.CONTROLLER,
+        edata = ECHONETLite.build_edata(
+            ECHONETLite.build_eoj(
+                ECHONETLite.EOJ.CLASS_GROUP_MANAGEMENT,
+                ECHONETLite.EOJ.MANAGEMENT_CLASS_GROUP.CONTROLLER,
             ),
             meter_eoj,
-            my_lib.sensor.echonetlite.ESV.PROP_READ,
+            ECHONETLite.ESV.PROP_READ,
             [
-                {
-                    "EPC": (my_lib.sensor.echonetlite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY),
-                    "PDC": 0,
-                }
+                EchonetLiteProperty(
+                    epc=ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY,
+                    pdc=0,
+                )
             ],
         )
-        send_packet = my_lib.sensor.echonetlite.build_frame(edata)
+        send_packet = ECHONETLite.build_frame(edata)
 
         while True:
-            self.echonet_if.send_udp(self.ipv6_addr, my_lib.sensor.echonetlite.UDP_PORT, send_packet)
+            self.echonet_if.send_udp(self.ipv6_addr, ECHONETLite.UDP_PORT, send_packet)
             recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
             frame = self.parse_frame(recv_packet)
 
-            if frame["EDATA"]["SEOJ"] != meter_eoj:
+            if frame.edata is None:
                 continue
-            for prop in frame["EDATA"]["prop_list"]:
-                if prop["EPC"] != my_lib.sensor.echonetlite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY:
+            if frame.edata.seoj != meter_eoj:
+                continue
+            for prop in frame.edata.props:
+                if prop.epc != ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY:
                     continue
-                if len(prop["EDT"]) != prop["PDC"]:
+                if prop.edt is None or len(prop.edt) != prop.pdc:
                     continue
-                return [struct.unpack(">I", prop["EDT"])[0]]
+                return [struct.unpack(">I", prop.edt)[0]]
 
     def get_value_map(self) -> dict[str, int]:
         value = self.get_value()

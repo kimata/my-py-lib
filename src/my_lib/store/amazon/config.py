@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 
-@dataclass
+@dataclass(frozen=True)
 class AmazonApiConfig:
     """PA-API 5.0 用の設定."""
 
@@ -19,7 +19,7 @@ class AmazonApiConfig:
     associate: str
 
     @classmethod
-    def from_dict(cls, amazon_config: dict[str, Any]) -> AmazonApiConfig:
+    def parse(cls, amazon_config: dict[str, Any]) -> Self:
         """dict から AmazonApiConfig を生成する.
 
         Args:
@@ -34,7 +34,7 @@ class AmazonApiConfig:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class AmazonLoginConfig:
     """Amazon ログイン用の設定."""
 
@@ -43,7 +43,7 @@ class AmazonLoginConfig:
     dump_path: pathlib.Path
 
     @classmethod
-    def from_dict(cls, amazon_config: dict[str, Any], dump_path: pathlib.Path) -> AmazonLoginConfig:
+    def parse(cls, amazon_config: dict[str, Any], dump_path: pathlib.Path) -> Self:
         """dict から AmazonLoginConfig を生成する.
 
         Args:
@@ -57,7 +57,7 @@ class AmazonLoginConfig:
         )
 
 
-@dataclass
+@dataclass  # NOTE: scrape.py で price/category を更新するため frozen=False
 class AmazonItem:
     """Amazon 商品情報."""
 
@@ -76,7 +76,7 @@ class AmazonItem:
         return cls(asin=asin, url=get_item_url(asin))
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> AmazonItem:
+    def parse(cls, data: dict[str, Any]) -> AmazonItem:
         """dict から AmazonItem を生成する."""
         from my_lib.store.amazon.util import get_item_url
 

@@ -90,25 +90,25 @@ class TestImageAttachmentFromData:
 
 
 class TestParseConfig:
-    """parse_config 関数のテスト"""
+    """MailConfig.parse メソッドのテスト"""
 
     def test_returns_empty_config_for_empty_data(self):
         """空のデータは MailEmptyConfig を返す"""
-        from my_lib.notify.mail import MailEmptyConfig, parse_config
+        from my_lib.notify.mail import MailConfig, MailEmptyConfig
 
-        result = parse_config({})
+        result = MailConfig.parse({})
         assert isinstance(result, MailEmptyConfig)
 
     def test_returns_empty_config_without_smtp(self):
         """smtp がない場合は MailEmptyConfig を返す"""
-        from my_lib.notify.mail import MailEmptyConfig, parse_config
+        from my_lib.notify.mail import MailConfig, MailEmptyConfig
 
-        result = parse_config({"from": "from@example.com"})
+        result = MailConfig.parse({"from": "from@example.com"})
         assert isinstance(result, MailEmptyConfig)
 
     def test_parses_valid_config(self):
         """有効な設定をパースする"""
-        from my_lib.notify.mail import MailConfig, parse_config
+        from my_lib.notify.mail import MailConfig
 
         data = {
             "smtp": {
@@ -121,7 +121,7 @@ class TestParseConfig:
             "to": "to@example.com",
         }
 
-        result = parse_config(data)
+        result = MailConfig.parse(data)
 
         assert isinstance(result, MailConfig)
         assert result.smtp.host == "smtp.example.com"
@@ -145,11 +145,13 @@ class TestSend:
 
     def test_handles_exception_gracefully(self, mocker):
         """例外を適切に処理する"""
+        import smtplib
+
         from my_lib.notify.mail import MailConfig, MailSmtpConfig, send
 
-        # SMTP 接続をモック
+        # SMTP 接続をモック（SMTPException を発生させる）
         mock_smtp = mocker.patch("smtplib.SMTP")
-        mock_smtp.side_effect = Exception("Connection failed")
+        mock_smtp.side_effect = smtplib.SMTPException("Connection failed")
 
         smtp = MailSmtpConfig(
             host="smtp.example.com",

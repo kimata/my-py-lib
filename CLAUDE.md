@@ -217,6 +217,17 @@ except Exception:
     logging.exception("...")
 ```
 
+#### ライブラリ別推奨例外型
+
+| ライブラリ | 推奨する例外型                                       |
+| ---------- | ---------------------------------------------------- |
+| smtplib    | `smtplib.SMTPException`                              |
+| linebot    | `linebot.v3.messaging.ApiException`                  |
+| slack_sdk  | `slack_sdk.errors.SlackApiError`, `SlackClientError` |
+| selenium   | `TimeoutException`, `WebDriverException`             |
+| I2C 通信   | `OSError`, `SensorCommunicationError`                |
+| urllib     | `urllib.error.URLError`, `urllib.error.HTTPError`    |
+
 ### 例外クラスの定義
 
 すべての例外クラスには docstring を記述：
@@ -228,15 +239,28 @@ class MyError(Exception):
 
 ### 重複コードの禁止
 
-同一機能のコードが複数ファイルに存在する場合は、1箇所に統合し、
-他方は re-export として後方互換性を維持する：
+同一機能のコードが複数ファイルに存在する場合は、1箇所に統合する。
+
+#### リファクタリング時の API 変更
+
+リファクタリング時に既存の API を変更する場合、後方互換性のためのラッパー関数は
+作成せず、呼び出し元を直接修正する：
 
 ```python
-# 後方互換性のための re-export
-from my_lib.new_module import SomeClass, some_function
+# Bad: 後方互換性のためのラッパー関数を残す
+def parse_config(data: dict[str, Any]) -> Config:
+    return Config.parse(data)
 
-__all__ = ["SomeClass", "some_function"]
+# Good: 呼び出し元を直接修正
+# Before: result = parse_config(data)
+# After:  result = Config.parse(data)
 ```
+
+**理由**:
+
+- コードの重複を避ける
+- API の一貫性を保つ
+- 将来の混乱を防ぐ
 
 ## 設定クラスの実装規約
 
