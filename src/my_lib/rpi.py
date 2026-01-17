@@ -12,6 +12,10 @@ import pathlib
 from time import time as gpio_time
 from typing import Any, ClassVar
 
+# NOTE: gpio は実行環境によって RPi.GPIO モジュールまたはダミークラスになる
+# Protocol で型定義が困難なため（クラス自体/モジュールとして使用）、Any で扱う
+gpio: Any
+
 
 def is_rasberry_pi() -> bool:
     try:
@@ -36,13 +40,15 @@ if (
     and (os.environ.get("DUMMY_MODE", "false") != "true")
     and (os.environ.get("TEST", "false") != "true")
 ):  # pragma: no cover
-    from RPi import GPIO as gpio  # type: ignore[assignment]
+    from RPi import GPIO
+
+    gpio = GPIO
 else:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         logging.warning("Using dummy GPIO")
 
     # NOTE: 本物の GPIO のように振る舞うダミーのライブラリ
-    class gpio:
+    class _DummyGPIO:
         IS_DUMMY: bool = True
         BCM: int = 0
         OUT: int = 0
@@ -134,6 +140,8 @@ else:
         @staticmethod
         def cleanup(chanlist: list[int] | None = None) -> None:
             return
+
+    gpio = _DummyGPIO
 
 
 gpio.level = enum.Enum("level", {"HIGH": 1, "LOW": 0})  # type: ignore[misc]
