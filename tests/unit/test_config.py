@@ -12,6 +12,141 @@ import pathlib
 import pytest
 
 
+class TestConfigAccessor:
+    """ConfigAccessor クラスのテスト"""
+
+    def test_get_simple_key(self):
+        """単一キーの取得"""
+        import my_lib.config
+
+        config = {"key": "value"}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("key") == "value"
+
+    def test_get_nested_keys(self):
+        """ネストしたキーの取得"""
+        import my_lib.config
+
+        config = {"level1": {"level2": {"level3": "deep_value"}}}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("level1", "level2", "level3") == "deep_value"
+
+    def test_get_missing_key_returns_default(self):
+        """存在しないキーはデフォルト値を返す"""
+        import my_lib.config
+
+        config = {"key": "value"}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("nonexistent") is None
+        assert cfg.get("nonexistent", default="default") == "default"
+
+    def test_get_with_none_value(self):
+        """None 値の場合はデフォルトを返す"""
+        import my_lib.config
+
+        config = {"key": None}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("key") is None
+        assert cfg.get("key", default="default") == "default"
+
+    def test_get_through_non_dict(self):
+        """途中で dict でない場合はデフォルトを返す"""
+        import my_lib.config
+
+        config = {"key": "string_value"}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("key", "nested") is None
+
+    def test_get_list_returns_list(self):
+        """get_list はリストを返す"""
+        import my_lib.config
+
+        config = {"items": [1, 2, 3]}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_list("items") == [1, 2, 3]
+
+    def test_get_list_returns_empty_for_missing(self):
+        """get_list は存在しない場合は空リストを返す"""
+        import my_lib.config
+
+        config = {}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_list("nonexistent") == []
+
+    def test_get_list_returns_empty_for_non_list(self):
+        """get_list はリスト以外の場合は空リストを返す"""
+        import my_lib.config
+
+        config = {"key": "string"}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_list("key") == []
+
+    def test_get_dict_returns_dict(self):
+        """get_dict は辞書を返す"""
+        import my_lib.config
+
+        config = {"nested": {"a": 1, "b": 2}}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_dict("nested") == {"a": 1, "b": 2}
+
+    def test_get_dict_returns_empty_for_missing(self):
+        """get_dict は存在しない場合は空辞書を返す"""
+        import my_lib.config
+
+        config = {}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_dict("nonexistent") == {}
+
+    def test_get_dict_returns_empty_for_non_dict(self):
+        """get_dict は辞書以外の場合は空辞書を返す"""
+        import my_lib.config
+
+        config = {"key": [1, 2, 3]}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_dict("key") == {}
+
+    def test_get_str_returns_string(self):
+        """get_str は文字列を返す"""
+        import my_lib.config
+
+        config = {"name": "test"}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_str("name") == "test"
+
+    def test_get_str_converts_to_string(self):
+        """get_str は数値などを文字列に変換する"""
+        import my_lib.config
+
+        config = {"number": 42}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_str("number") == "42"
+
+    def test_get_str_returns_default_for_missing(self):
+        """get_str は存在しない場合はデフォルトを返す"""
+        import my_lib.config
+
+        config = {}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_str("nonexistent") == ""
+        assert cfg.get_str("nonexistent", default="N/A") == "N/A"
+
+    def test_accessor_factory_function(self):
+        """accessor ファクトリ関数のテスト"""
+        import my_lib.config
+
+        config = {"prometheus": {"url": "http://localhost:9090"}}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get("prometheus", "url") == "http://localhost:9090"
+
+    def test_nested_get_dict(self):
+        """ネストしたパスで get_dict を使用"""
+        import my_lib.config
+
+        config = {"prometheus": {"instance_map": {"host1": "instance1"}}}
+        cfg = my_lib.config.accessor(config)
+        assert cfg.get_dict("prometheus", "instance_map") == {"host1": "instance1"}
+
+
 class TestFormatPath:
     """_format_path 関数のテスト"""
 
