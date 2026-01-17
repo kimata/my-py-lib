@@ -12,16 +12,16 @@ import datetime
 class TestGetRevisionInfo:
     """get_revision_info 関数のテスト"""
 
-    def test_returns_revision_info_dict(self):
-        """RevisionInfo 辞書を返す"""
+    def test_returns_revision_info_dataclass(self):
+        """RevisionInfo dataclass を返す"""
         import my_lib.git_util
 
         result = my_lib.git_util.get_revision_info()
 
-        assert isinstance(result, dict)
-        assert "hash" in result
-        assert "date" in result
-        assert "is_dirty" in result
+        assert isinstance(result, my_lib.git_util.RevisionInfo)
+        assert hasattr(result, "hash")
+        assert hasattr(result, "date")
+        assert hasattr(result, "is_dirty")
 
     def test_hash_is_valid_sha(self):
         """ハッシュが有効な SHA である"""
@@ -30,9 +30,9 @@ class TestGetRevisionInfo:
         result = my_lib.git_util.get_revision_info()
 
         # SHA-1 ハッシュは40文字の16進数
-        assert isinstance(result["hash"], str)
-        assert len(result["hash"]) == 40
-        assert all(c in "0123456789abcdef" for c in result["hash"])
+        assert isinstance(result.hash, str)
+        assert len(result.hash) == 40
+        assert all(c in "0123456789abcdef" for c in result.hash)
 
     def test_date_is_datetime(self):
         """日付が datetime オブジェクトである"""
@@ -40,8 +40,8 @@ class TestGetRevisionInfo:
 
         result = my_lib.git_util.get_revision_info()
 
-        assert isinstance(result["date"], datetime.datetime)
-        assert result["date"].tzinfo is not None
+        assert isinstance(result.date, datetime.datetime)
+        assert result.date.tzinfo is not None
 
     def test_is_dirty_is_boolean(self):
         """is_dirty が真偽値である"""
@@ -49,7 +49,7 @@ class TestGetRevisionInfo:
 
         result = my_lib.git_util.get_revision_info()
 
-        assert isinstance(result["is_dirty"], bool)
+        assert isinstance(result.is_dirty, bool)
 
 
 class TestGetRevisionStr:
@@ -86,4 +86,4 @@ class TestGetRevisionStr:
         result = my_lib.git_util.get_revision_str()
         info = my_lib.git_util.get_revision_info()
 
-        assert info["hash"] in result
+        assert info.hash in result

@@ -107,7 +107,7 @@ def slack_config(config):
     """Slack 設定を取得"""
     import my_lib.notify.slack
 
-    return my_lib.notify.slack.parse_config(config["slack"])
+    return my_lib.notify.slack.SlackConfig.parse(config["slack"])
 
 
 @pytest.fixture

@@ -17,7 +17,7 @@ class TestProfileHealthResult:
         """インスタンスを作成する"""
         result = my_lib.chrome_util._ProfileHealthResult(
             is_healthy=True,
-            errors=[],
+            errors=(),
         )
 
         assert result.is_healthy is True
@@ -28,7 +28,7 @@ class TestProfileHealthResult:
         """エラー付きでインスタンスを作成する"""
         result = my_lib.chrome_util._ProfileHealthResult(
             is_healthy=False,
-            errors=["Error 1", "Error 2"],
+            errors=("Error 1", "Error 2"),
             has_lock_files=True,
             has_corrupted_json=True,
         )

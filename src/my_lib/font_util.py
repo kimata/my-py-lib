@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import matplotlib.font_manager
+import matplotlib.font_manager  # type: ignore[import-untyped]
 import PIL.ImageFont
 
 import my_lib.panel_config

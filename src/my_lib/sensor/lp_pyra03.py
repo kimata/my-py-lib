@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import logging
 
-from my_lib.sensor import ads1115
+from my_lib.sensor import i2cbus
+from my_lib.sensor.ads1115 import ADS1115
 
 
 class LP_PYRA03:
@@ -25,10 +26,8 @@ class LP_PYRA03:
     TYPE: str = "I2C"
     SENSITIVITY: float = 6.94  # mV/(kW/m^2)
 
-    def __init__(
-        self, bus_id: int = ads1115.i2cbus.I2CBUS.ARM, dev_addr: int = ads1115.ADS1115.DEV_ADDR
-    ) -> None:
-        self.adc: ads1115.ADS1115 = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = ADS1115.DEV_ADDR) -> None:
+        self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=dev_addr)
         self.dev_addr: int = self.adc.dev_addr
 
     def ping(self) -> bool:

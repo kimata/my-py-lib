@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101, SIM117
+# ruff: noqa: S101, S106, SIM117
 """sensor_data.py のテスト"""
 
 from __future__ import annotations
@@ -162,12 +162,12 @@ class TestFetchData:
         """例外発生時に空の結果を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
             result = my_lib.sensor_data.fetch_data(db_config, "measure", "hostname", "field")
@@ -179,12 +179,12 @@ class TestFetchData:
         """window_min=0 の場合、FLUX_QUERY_WITHOUT_AGGREGATION を使用する"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         mock_table = unittest.mock.MagicMock()
         mock_table.records = []
@@ -208,12 +208,12 @@ class TestFetchDataAsync:
 
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         mock_table = unittest.mock.MagicMock()
         mock_table.records = []
@@ -238,12 +238,12 @@ class TestFetchDataParallel:
 
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         requests = [
             my_lib.sensor_data.DataRequest(measure="m1", hostname="h1", field="f1"),
@@ -270,12 +270,12 @@ class TestGetSum:
         """空の結果で0を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = []
@@ -289,12 +289,12 @@ class TestGetSum:
         """合計値を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = [[10, 150.5]]
@@ -308,12 +308,12 @@ class TestGetSum:
         """例外発生時に0を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
             result = my_lib.sensor_data.get_sum(db_config, "measure", "hostname", "field")
@@ -328,12 +328,12 @@ class TestGetDaySum:
         """正しいパラメータで get_sum を呼び出す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=100.0) as mock_get_sum:
             result = my_lib.sensor_data.get_day_sum(db_config, "measure", "hostname", "field", days=7)
@@ -349,12 +349,12 @@ class TestGetHourSum:
         """正しいパラメータで get_sum を呼び出す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=50.0) as mock_get_sum:
             result = my_lib.sensor_data.get_hour_sum(db_config, "measure", "hostname", "field", hours=24)
@@ -374,12 +374,12 @@ class TestGetMinuteSum:
         """正しいパラメータで get_sum を呼び出す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data.get_sum", return_value=10.0) as mock_get_sum:
             result = my_lib.sensor_data.get_minute_sum(db_config, "measure", "hostname", "field", minutes=60)
@@ -401,12 +401,12 @@ class TestGetEquipOnMinutes:
 
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         # NOTE: ソースコードのロギング書式にバグがあるため logging.info をモック
         with unittest.mock.patch.object(logging, "info"):
@@ -423,12 +423,12 @@ class TestGetEquipOnMinutes:
 
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         # 10個のレコード（5個が閾値以上）
         records = []
@@ -463,12 +463,12 @@ class TestGetEquipOnMinutes:
 
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch.object(logging, "info"):
             with unittest.mock.patch(
@@ -488,12 +488,12 @@ class TestGetLastEvent:
         """空の結果で None を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         mock_table = unittest.mock.MagicMock()
         mock_table.to_values.return_value = []
@@ -507,12 +507,12 @@ class TestGetLastEvent:
         """datetime を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         expected_time = datetime.datetime(2024, 1, 1, 12, 0, 0)
         mock_table = unittest.mock.MagicMock()
@@ -527,12 +527,12 @@ class TestGetLastEvent:
         """例外発生時に None を返す"""
         import my_lib.sensor_data
 
-        db_config: my_lib.sensor_data.InfluxDBConfig = {
-            "url": "http://localhost:8086",
-            "token": "test_token",
-            "org": "test_org",
-            "bucket": "test_bucket",
-        }
+        db_config = my_lib.sensor_data.InfluxDBConfig(
+            url="http://localhost:8086",
+            token="test_token",
+            org="test_org",
+            bucket="test_bucket",
+        )
 
         with unittest.mock.patch("my_lib.sensor_data._fetch_data_impl", side_effect=Exception("Test error")):
             result = my_lib.sensor_data.get_last_event(db_config, "measure", "hostname", "field")

@@ -8,6 +8,19 @@ from typing import Any, Self
 
 
 @dataclass(frozen=True)
+class MercariItem:
+    """メルカリ出品アイテム情報"""
+
+    id: str
+    url: str
+    name: str
+    price: int
+    view: int
+    favorite: int
+    is_stop: int
+
+
+@dataclass(frozen=True)
 class MercariLoginConfig:
     """メルカリ ログイン情報"""
 

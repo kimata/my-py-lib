@@ -141,7 +141,7 @@ class TestDrawTextLine:
         from my_lib.pil_util import draw_text_line
 
         img = PIL.Image.new("RGBA", (200, 100), (255, 255, 255, 255))
-        font = PIL.ImageFont.load_default()
+        font: PIL.ImageFont.FreeTypeFont = PIL.ImageFont.load_default()  # type: ignore[assignment]
 
         result = draw_text_line(
             img,
@@ -149,7 +149,7 @@ class TestDrawTextLine:
             (10, 10),
             font,
             stroke_width=2,
-            stroke_fill="#FF0000",  # type: ignore[arg-type]
+            stroke_fill="#FF0000",
         )
 
         assert isinstance(result, tuple)

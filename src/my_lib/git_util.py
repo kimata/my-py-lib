@@ -13,14 +13,15 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import TypedDict
+from dataclasses import dataclass
 
 import git
 
 import my_lib.time
 
 
-class RevisionInfo(TypedDict):
+@dataclass(frozen=True)
+class RevisionInfo:
     hash: str
     date: datetime.datetime
     is_dirty: bool
@@ -34,19 +35,19 @@ def get_revision_info() -> RevisionInfo:
         my_lib.time.get_zoneinfo()
     )
 
-    return {
-        "hash": commit.hexsha,
-        "date": commit_time,
-        "is_dirty": repo.is_dirty(),
-    }
+    return RevisionInfo(
+        hash=commit.hexsha,
+        date=commit_time,
+        is_dirty=repo.is_dirty(),
+    )
 
 
 def get_revision_str() -> str:
     revision_info = get_revision_info()
 
     return (
-        f"Git hash: {revision_info['hash']}{' (dirty)' if revision_info['is_dirty'] else ''}\n"
-        f"Git date: {revision_info['date'].strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        f"Git hash: {revision_info.hash}{' (dirty)' if revision_info.is_dirty else ''}\n"
+        f"Git date: {revision_info.date.strftime('%Y-%m-%d %H:%M:%S %Z')}"
     )
 
 

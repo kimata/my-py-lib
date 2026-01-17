@@ -8,7 +8,7 @@ import pprint
 import time
 
 import serial
-import spidev
+import spidev  # type: ignore[import-untyped]
 
 import my_lib.sensor
 import my_lib.sensor.io_link

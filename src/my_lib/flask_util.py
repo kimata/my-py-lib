@@ -59,7 +59,7 @@ def gzipped(f: F) -> F:
 
         return f(*args, **kwargs)
 
-    return view_func  # type: ignore[return-value]
+    return cast(F, view_func)
 
 
 def support_jsonp(f: F) -> F:
@@ -75,7 +75,7 @@ def support_jsonp(f: F) -> F:
         else:
             return f(*args, **kwargs)
 
-    return decorated_function  # type: ignore[return-value]
+    return cast(F, decorated_function)
 
 
 def remote_host(request: flask.Request) -> str:
@@ -147,7 +147,7 @@ def etag_cache(f: F) -> F:
 
         return response
 
-    return decorated_function  # type: ignore[return-value]
+    return cast(F, decorated_function)
 
 
 def etag_file(file_path: str | Path) -> Callable[[F], F]:
@@ -171,7 +171,7 @@ def etag_file(file_path: str | Path) -> Callable[[F], F]:
 
             return response
 
-        return decorated_function  # type: ignore[return-value]
+        return cast(F, decorated_function)
 
     return decorator
 
@@ -251,7 +251,7 @@ def etag_conditional(
 
             return response
 
-        return decorated_function  # type: ignore[return-value]
+        return cast(F, decorated_function)
 
     return decorator
 
@@ -322,6 +322,6 @@ def file_etag(
 
             return response
 
-        return decorated_function  # type: ignore[return-value]
+        return cast(F, decorated_function)
 
     return decorator

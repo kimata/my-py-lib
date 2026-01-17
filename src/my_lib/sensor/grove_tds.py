@@ -15,19 +15,18 @@ from __future__ import annotations
 
 import logging
 
-from my_lib.sensor import ads1115
+from my_lib.sensor import i2cbus
+from my_lib.sensor.ads1115 import ADS1115
 
 
 class GROVE_TDS:
     NAME: str = "GROVE-TDS"
     TYPE: str = "I2C"
 
-    def __init__(
-        self, bus_id: int = ads1115.i2cbus.I2CBUS.ARM, dev_addr: int = ads1115.ADS1115.DEV_ADDR
-    ) -> None:
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = ADS1115.DEV_ADDR) -> None:
         self.bus_id: int = bus_id
         self.dev_addr: int = dev_addr
-        self.adc: ads1115.ADS1115 = ads1115.ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+        self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=dev_addr)
 
         self.adc.set_mux(self.adc.REG_CONFIG_MUX_0G)
         self.adc.set_pga(self.adc.REG_CONFIG_FSR_2048)

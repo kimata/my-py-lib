@@ -16,23 +16,24 @@ import json
 import re
 from typing import Any
 
+# ISO 8601形式の日時文字列パターン（タイムゾーン付き）
+_ISO_DATETIME_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)$")
+
 
 class DateTimeJSONEncoder(json.JSONEncoder):
     """datetime オブジェクトを ISO format 文字列に変換する JSON エンコーダー"""
 
-    def default(self, obj: Any) -> Any:  # type: ignore[override]
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        return super().default(obj)
+    def default(self, o: Any) -> Any:
+        if isinstance(o, datetime.datetime):
+            return o.isoformat()
+        return super().default(o)
 
 
 def datetime_hook(dct: dict[str, Any]) -> dict[str, Any]:
     """辞書内のISO形式文字列をdatetimeオブジェクトに変換するフック関数"""
-    # ISO 8601形式の日時文字列パターン（タイムゾーン付き）
-    iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)$")
 
     def convert_value(value: Any) -> Any:
-        if isinstance(value, str) and iso_pattern.match(value):
+        if isinstance(value, str) and _ISO_DATETIME_PATTERN.match(value):
             try:
                 # ISO形式文字列をdatetimeオブジェクトに変換
                 return datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -54,13 +55,11 @@ def loads(json_str: str) -> Any:
     result = json.loads(json_str, object_hook=datetime_hook)
 
     # 結果が文字列で、ISO形式の日時文字列の場合はdatetimeオブジェクトに変換
-    if isinstance(result, str):
-        iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)$")
-        if iso_pattern.match(result):
-            try:
-                return datetime.datetime.fromisoformat(result.replace("Z", "+00:00"))
-            except ValueError:
-                return result
+    if isinstance(result, str) and _ISO_DATETIME_PATTERN.match(result):
+        try:
+            return datetime.datetime.fromisoformat(result.replace("Z", "+00:00"))
+        except ValueError:
+            return result
 
     return result
 

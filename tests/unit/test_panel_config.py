@@ -103,57 +103,57 @@ class TestIconConfig:
         assert config.brightness == 1.0
 
 
-class TestParseFontConfig:
-    """parse_font_config 関数のテスト"""
+class TestFontConfigParse:
+    """FontConfig.parse() メソッドのテスト"""
 
     def test_parses_valid_data(self):
         """有効なデータをパースする"""
-        from my_lib.panel_config import parse_font_config
+        from my_lib.panel_config import FontConfig
 
         data: dict[str, str | dict[str, str]] = {
             "path": "/fonts",
             "map": {"jp_bold": "Bold.ttf"},
         }
 
-        config = parse_font_config(data)
+        config = FontConfig.parse(data)
 
         assert config.path == pathlib.Path("/fonts")
         assert config.map == {"jp_bold": "Bold.ttf"}
 
     def test_raises_for_non_string_path(self):
         """path が文字列でない場合は例外"""
-        from my_lib.panel_config import parse_font_config
+        from my_lib.panel_config import FontConfig
 
         data = {"path": 123, "map": {}}
 
         with pytest.raises(TypeError, match="path must be a string"):
-            parse_font_config(data)  # type: ignore[arg-type]
+            FontConfig.parse(data)  # type: ignore[arg-type]
 
     def test_raises_for_non_dict_map(self):
         """map が辞書でない場合は例外"""
-        from my_lib.panel_config import parse_font_config
+        from my_lib.panel_config import FontConfig
 
         data = {"path": "/fonts", "map": "not a dict"}
 
         with pytest.raises(TypeError, match="map must be a dict"):
-            parse_font_config(data)  # type: ignore[arg-type]
+            FontConfig.parse(data)
 
     def test_default_empty_map(self):
         """map がない場合は空辞書"""
-        from my_lib.panel_config import parse_font_config
+        from my_lib.panel_config import FontConfig
 
         data: dict[str, str | dict[str, str]] = {"path": "/fonts"}
 
-        config = parse_font_config(data)
+        config = FontConfig.parse(data)
         assert config.map == {}
 
 
-class TestParsePanelGeometry:
-    """parse_panel_geometry 関数のテスト"""
+class TestPanelGeometryParse:
+    """PanelGeometry.parse() メソッドのテスト"""
 
     def test_parses_valid_data(self):
         """有効なデータをパースする"""
-        from my_lib.panel_config import parse_panel_geometry
+        from my_lib.panel_config import PanelGeometry
 
         data = {
             "width": 800,
@@ -162,7 +162,7 @@ class TestParsePanelGeometry:
             "offset_y": 20,
         }
 
-        geometry = parse_panel_geometry(data)
+        geometry = PanelGeometry.parse(data)
 
         assert geometry.width == 800
         assert geometry.height == 600
@@ -171,22 +171,22 @@ class TestParsePanelGeometry:
 
     def test_default_offsets(self):
         """オフセットがない場合は 0"""
-        from my_lib.panel_config import parse_panel_geometry
+        from my_lib.panel_config import PanelGeometry
 
         data = {"width": 800, "height": 600}
 
-        geometry = parse_panel_geometry(data)
+        geometry = PanelGeometry.parse(data)
 
         assert geometry.offset_x == 0
         assert geometry.offset_y == 0
 
 
-class TestParseIconConfig:
-    """parse_icon_config 関数のテスト"""
+class TestIconConfigParse:
+    """IconConfig.parse() メソッドのテスト"""
 
     def test_parses_valid_data(self):
         """有効なデータをパースする"""
-        from my_lib.panel_config import parse_icon_config
+        from my_lib.panel_config import IconConfig
 
         data: dict[str, str | float] = {
             "path": "/icons/icon.png",
@@ -194,7 +194,7 @@ class TestParseIconConfig:
             "brightness": 0.8,
         }
 
-        config = parse_icon_config(data)
+        config = IconConfig.parse(data)
 
         assert config.path == pathlib.Path("/icons/icon.png")
         assert config.scale == 1.5
@@ -202,20 +202,20 @@ class TestParseIconConfig:
 
     def test_raises_for_non_string_path(self):
         """path が文字列でない場合は例外"""
-        from my_lib.panel_config import parse_icon_config
+        from my_lib.panel_config import IconConfig
 
         data = {"path": 123}
 
         with pytest.raises(TypeError, match="path must be a string"):
-            parse_icon_config(data)  # type: ignore[arg-type]
+            IconConfig.parse(data)
 
     def test_default_values(self):
         """デフォルト値"""
-        from my_lib.panel_config import parse_icon_config
+        from my_lib.panel_config import IconConfig
 
         data: dict[str, str | float] = {"path": "/icons/icon.png"}
 
-        config = parse_icon_config(data)
+        config = IconConfig.parse(data)
 
         assert config.scale == 1.0
         assert config.brightness == 1.0

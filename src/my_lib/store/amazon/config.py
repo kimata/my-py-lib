@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 from dataclasses import dataclass
 from typing import Any, Self
@@ -91,17 +92,8 @@ class AmazonItem:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """dict に変換する."""
-        result: dict[str, Any] = {"asin": self.asin, "url": self.url}
-        if self.price is not None:
-            result["price"] = self.price
-        if self.thumb_url is not None:
-            result["thumb_url"] = self.thumb_url
-        if self.category is not None:
-            result["category"] = self.category
-        if self.stock is not None:
-            result["stock"] = self.stock
-        return result
+        """dict に変換する（None 値は除外）"""
+        return {k: v for k, v in dataclasses.asdict(self).items() if v is not None}
 
 
 # NOTE: 下記の関数を Mock してテストをする際、返り値として以下の DUMMY_AMAZON_ITEM を使ってください。

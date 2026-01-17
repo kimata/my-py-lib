@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, Self
 
 if TYPE_CHECKING:
     import my_lib.notify.slack
@@ -78,6 +78,24 @@ class FontConfig:
     path: pathlib.Path
     map: dict[str, str] = field(default_factory=dict)
 
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成する"""
+        path = data["path"]
+        if not isinstance(path, str):
+            msg = "font config path must be a string"
+            raise TypeError(msg)
+
+        map_data = data.get("map", {})
+        if not isinstance(map_data, dict):
+            msg = "font config map must be a dict"
+            raise TypeError(msg)
+
+        return cls(
+            path=pathlib.Path(path),
+            map=dict(map_data),
+        )
+
 
 @dataclass(frozen=True)
 class PanelGeometry:
@@ -88,6 +106,16 @@ class PanelGeometry:
     offset_x: int = 0
     offset_y: int = 0
 
+    @classmethod
+    def parse(cls, data: dict[str, int]) -> Self:
+        """辞書からインスタンスを生成する"""
+        return cls(
+            width=data["width"],
+            height=data["height"],
+            offset_x=data.get("offset_x", 0),
+            offset_y=data.get("offset_y", 0),
+        )
+
 
 @dataclass(frozen=True)
 class IconConfig:
@@ -97,51 +125,22 @@ class IconConfig:
     scale: float = 1.0
     brightness: float = 1.0
 
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成する"""
+        path = data["path"]
+        if not isinstance(path, str):
+            msg = "icon config path must be a string"
+            raise TypeError(msg)
 
-# === パース関数 ===
-def parse_font_config(data: dict[str, str | dict[str, str]]) -> FontConfig:
-    """フォント設定をパースする"""
-    path = data["path"]
-    if not isinstance(path, str):
-        msg = "font config path must be a string"
-        raise TypeError(msg)
+        scale = data.get("scale", 1.0)
+        brightness = data.get("brightness", 1.0)
 
-    map_data = data.get("map", {})
-    if not isinstance(map_data, dict):
-        msg = "font config map must be a dict"
-        raise TypeError(msg)
-
-    return FontConfig(
-        path=pathlib.Path(path),
-        map=dict(map_data),
-    )
-
-
-def parse_panel_geometry(data: dict[str, int]) -> PanelGeometry:
-    """パネルジオメトリをパースする"""
-    return PanelGeometry(
-        width=data["width"],
-        height=data["height"],
-        offset_x=data.get("offset_x", 0),
-        offset_y=data.get("offset_y", 0),
-    )
-
-
-def parse_icon_config(data: dict[str, str | float]) -> IconConfig:
-    """アイコン設定をパースする"""
-    path = data["path"]
-    if not isinstance(path, str):
-        msg = "icon config path must be a string"
-        raise TypeError(msg)
-
-    scale = data.get("scale", 1.0)
-    brightness = data.get("brightness", 1.0)
-
-    return IconConfig(
-        path=pathlib.Path(path),
-        scale=float(scale) if scale is not None else 1.0,
-        brightness=float(brightness) if brightness is not None else 1.0,
-    )
+        return cls(
+            path=pathlib.Path(path),
+            scale=float(scale) if scale is not None else 1.0,
+            brightness=float(brightness) if brightness is not None else 1.0,
+        )
 
 
 # === パネルコンテキスト ===

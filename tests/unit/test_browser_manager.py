@@ -163,7 +163,7 @@ class TestGetDriver:
         ):
             _, wait = manager.get_driver()
 
-            assert wait._timeout == 15.0  # type: ignore[union-attr]
+            assert wait._timeout == 15.0
 
 
 class TestQuit:

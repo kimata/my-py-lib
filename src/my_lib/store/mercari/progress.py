@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    import my_lib.store.mercari.config
 
 
 @runtime_checkable
@@ -19,10 +22,10 @@ class ProgressObserver(Protocol):
             def on_total_count(self, count: int) -> None:
                 print(f"Total: {count}")
 
-            def on_item_start(self, index: int, total: int, item: dict[str, Any]) -> None:
-                print(f"Processing {index}/{total}: {item['name']}")
+            def on_item_start(self, index: int, total: int, item: MercariItem) -> None:
+                print(f"Processing {index}/{total}: {item.name}")
 
-            def on_item_complete(self, index: int, total: int, item: dict[str, Any]) -> None:
+            def on_item_complete(self, index: int, total: int, item: MercariItem) -> None:
                 print(f"Completed {index}/{total}")
 
         observer = MyProgressDisplay()
@@ -39,18 +42,18 @@ class ProgressObserver(Protocol):
         """
         ...
 
-    def on_item_start(self, index: int, total: int, item: dict[str, Any]) -> None:
+    def on_item_start(self, index: int, total: int, item: my_lib.store.mercari.config.MercariItem) -> None:
         """各アイテムの処理開始時に呼ばれる
 
         Args:
             index: 現在のアイテムのインデックス（1始まり）
             total: アイテム総数
-            item: アイテム情報（id, name, price, view, favorite, is_stop など）
+            item: アイテム情報
 
         """
         ...
 
-    def on_item_complete(self, index: int, total: int, item: dict[str, Any]) -> None:
+    def on_item_complete(self, index: int, total: int, item: my_lib.store.mercari.config.MercariItem) -> None:
         """各アイテムの処理完了時に呼ばれる
 
         Args:

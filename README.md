@@ -134,7 +134,7 @@ app = flask.Flask(__name__)
 
 # webapp設定を初期化
 config = my_lib.config.load("config.yaml")
-my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.from_dict(config["webapp"]))
+my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.parse(config["webapp"]))
 
 @app.route("/health")
 def health():

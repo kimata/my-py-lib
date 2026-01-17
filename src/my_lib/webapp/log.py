@@ -78,20 +78,16 @@ class LogManager:
     """
 
     def __init__(self) -> None:
-        self._slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
-            my_lib.notify.slack.SlackEmptyConfig()
-        )
+        self._slack_config: my_lib.notify.slack.SlackConfigTypes = my_lib.notify.slack.SlackEmptyConfig()
         self._worker_states: dict[str | None, WorkerLogState] = {}
 
     @property
-    def slack_config(self) -> my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig:
+    def slack_config(self) -> my_lib.notify.slack.SlackConfigTypes:
         """Slack 設定"""
         return self._slack_config
 
     @slack_config.setter
-    def slack_config(
-        self, value: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig
-    ) -> None:
+    def slack_config(self, value: my_lib.notify.slack.SlackConfigTypes) -> None:
         self._slack_config = value
 
     @staticmethod
@@ -151,7 +147,7 @@ class LogManager:
 
     def init(
         self,
-        slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+        slack_config: my_lib.notify.slack.SlackConfigTypes,
         is_read_only: bool = False,
     ) -> None:
         """ログシステムを初期化する
@@ -285,7 +281,10 @@ class LogManager:
         my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
         if level == LOG_LEVEL.ERROR:
-            if not isinstance(self._slack_config, my_lib.notify.slack.SlackEmptyConfig):
+            if not isinstance(
+                self._slack_config,
+                my_lib.notify.slack.SlackEmptyConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,
+            ):
                 my_lib.notify.slack.error(self._slack_config, self._slack_config.from_name, message)
 
             if (os.environ.get("DUMMY_MODE", "false") == "true") and (
@@ -416,7 +415,7 @@ def _get_worker_id() -> str | None:
 
 
 def init(
-    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.SlackConfigTypes,
     is_read_only: bool = False,
 ) -> None:
     """ログシステムを初期化する
@@ -592,7 +591,7 @@ def api_log_view() -> flask.Response:
 
 
 def test_run(
-    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+    slack_config: my_lib.notify.slack.SlackConfigTypes,
     port: int,
     debug_mode: bool,
 ) -> None:
@@ -657,7 +656,7 @@ if __name__ == "__main__":
     base_url = f"http://127.0.0.1:{port}/test"
 
     assert config is not None, "Config must be loaded before running test"  # noqa: S101
-    slack_config = my_lib.notify.slack.parse_config(config.get("slack", {}))
+    slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
     proc = multiprocessing.Process(target=lambda: test_run(slack_config, port, debug_mode))
     proc.start()
 

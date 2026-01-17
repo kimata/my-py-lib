@@ -28,7 +28,7 @@ class TestAmazonApiConfig:
         assert config.region == "us-west-2"
         assert config.associate == "associate_id"
 
-    def test_from_dict(self):
+    def test_parse(self):
         """dict から生成できる"""
         from my_lib.store.amazon.config import AmazonApiConfig
 
@@ -40,7 +40,7 @@ class TestAmazonApiConfig:
             "associate": "associate_id",
         }
 
-        config = AmazonApiConfig.from_dict(data)
+        config = AmazonApiConfig.parse(data)
 
         assert config.access_key == "access_key"
         assert config.secret_key == "secret_key"
@@ -63,7 +63,7 @@ class TestAmazonLoginConfig:
         assert config.password == "password123"
         assert config.dump_path == temp_dir
 
-    def test_from_dict(self, temp_dir):
+    def test_parse(self, temp_dir):
         """dict から生成できる"""
         from my_lib.store.amazon.config import AmazonLoginConfig
 
@@ -72,7 +72,7 @@ class TestAmazonLoginConfig:
             "pass": "password123",
         }
 
-        config = AmazonLoginConfig.from_dict(data, temp_dir)
+        config = AmazonLoginConfig.parse(data, temp_dir)
 
         assert config.user == "user@example.com"
         assert config.password == "password123"
@@ -125,7 +125,7 @@ class TestAmazonItem:
         assert item.asin == "B0G3SXHCLJ"
         assert item.url == "https://www.amazon.co.jp/dp/B0G3SXHCLJ"
 
-    def test_from_dict(self):
+    def test_parse(self):
         """dict から生成できる"""
         from my_lib.store.amazon.config import AmazonItem
 
@@ -135,14 +135,14 @@ class TestAmazonItem:
             "category": "ゲーム",
         }
 
-        item = AmazonItem.from_dict(data)
+        item = AmazonItem.parse(data)
 
         assert item.asin == "B0G3SXHCLJ"
         assert item.url == "https://www.amazon.co.jp/dp/B0G3SXHCLJ"
         assert item.price == 69980
         assert item.category == "ゲーム"
 
-    def test_from_dict_with_custom_url(self):
+    def test_parse_with_custom_url(self):
         """カスタム URL 付きの dict から生成できる"""
         from my_lib.store.amazon.config import AmazonItem
 
@@ -151,7 +151,7 @@ class TestAmazonItem:
             "url": "https://custom.url/product",
         }
 
-        item = AmazonItem.from_dict(data)
+        item = AmazonItem.parse(data)
 
         assert item.url == "https://custom.url/product"
 
