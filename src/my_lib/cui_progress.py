@@ -376,6 +376,14 @@ class ProgressManager:
 
         self._refresh_display()
 
+    def get_elapsed_time(self) -> float:
+        """開始からの経過時間（秒）を取得
+
+        Returns:
+            経過時間（秒）
+        """
+        return time.time() - self._start_time
+
     def print(self, *args: Any, **kwargs: Any) -> None:
         """コンソールに出力（非TTY環境でのみ使用）
 
@@ -452,6 +460,14 @@ class NullProgressManager:
 
     def set_status(self, _status: str, *, is_error: bool = False) -> None:
         """何もしない"""
+
+    def get_elapsed_time(self) -> float:
+        """開始からの経過時間（秒）を取得
+
+        Returns:
+            経過時間（秒）
+        """
+        return time.time() - self._start_time
 
     def print(self, *args: Any, **kwargs: Any) -> None:
         """コンソールに出力（Live 表示がないため常に出力）"""
