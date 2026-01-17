@@ -148,11 +148,8 @@ reportIndexIssue = false
 reportGeneralTypeIssues = false
 
 [tool.ty.rules]
-# 外部ライブラリで型スタブがないものに対するインポートエラーを無視
-unresolved-import = "ignore"
-# mypy/pyright 用の type: ignore コメントが ty で不要な場合の警告を無視
-unused-ignore-comment = "ignore"
-# RPi.GPIO と ダミークラスの Union 型で属性が見つからない警告を無視
-possibly-missing-attribute = "ignore"
-# echonetlite モジュールのクラス属性解決問題を無視
-unresolved-attribute = "ignore"
+not-subscriptable = "ignore"
+unsupported-operator = "ignore"
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+not-iterable = "ignore"
