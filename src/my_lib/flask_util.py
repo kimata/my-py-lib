@@ -8,7 +8,7 @@ import io
 import socket
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import flask
 
@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     import werkzeug.datastructures
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+# ETag 生成に使用するデータ型
+ETagData: TypeAlias = str | bytes | dict[str, Any]
 
 
 def gzipped(f: F) -> F:
@@ -173,7 +176,7 @@ def etag_file(file_path: str | Path) -> Callable[[F], F]:
     return decorator
 
 
-def _generate_etag_from_data(etag_data: str | bytes | dict[str, Any], weak: bool = True) -> str | None:
+def _generate_etag_from_data(etag_data: ETagData, weak: bool = True) -> str | None:
     """ETAGデータからETAGを生成する内部関数"""
     if isinstance(etag_data, str):
         return calculate_etag(file_path=etag_data, weak=weak)
@@ -187,7 +190,7 @@ def _generate_etag_from_data(etag_data: str | bytes | dict[str, Any], weak: bool
 
 
 def etag_conditional(
-    etag_func: Callable[..., str | bytes | dict[str, Any]] | None = None,
+    etag_func: Callable[..., ETagData] | None = None,
     cache_control: str = "max-age=86400, must-revalidate",
     weak: bool = True,
 ) -> Callable[[F], F]:

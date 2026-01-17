@@ -9,4 +9,4 @@ class MercariError(Exception):
 
 
 class LoginError(MercariError):
-    """ログイン失敗"""
+    """メルカリへのログインに失敗した場合に発生するエラー"""

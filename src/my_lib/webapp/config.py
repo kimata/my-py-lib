@@ -5,7 +5,7 @@ import logging
 import os
 import pathlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 import flask
 
@@ -23,7 +23,7 @@ LOG_DIR_PATH: pathlib.Path | None = None
 STAT_DIR_PATH: pathlib.Path | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class WebappDataConfig:
     """webapp.data セクションの設定"""
 
@@ -32,7 +32,7 @@ class WebappDataConfig:
     stat_dir_path: pathlib.Path | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> WebappDataConfig:
+    def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
             schedule_file_path=pathlib.Path(data["schedule_file_path"]).resolve()
             if "schedule_file_path" in data
@@ -42,7 +42,7 @@ class WebappDataConfig:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class WebappConfig:
     """webapp セクションの設定"""
 
@@ -50,12 +50,12 @@ class WebappConfig:
     data: WebappDataConfig | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> WebappConfig:
+    def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
             static_dir_path=(
                 pathlib.Path(data["static_dir_path"]).resolve() if "static_dir_path" in data else None
             ),
-            data=WebappDataConfig.from_dict(data["data"]) if "data" in data else None,
+            data=WebappDataConfig.parse(data["data"]) if "data" in data else None,
         )
 
 

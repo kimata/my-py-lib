@@ -21,7 +21,7 @@ class TestProfileHealthResult:
         )
 
         assert result.is_healthy is True
-        assert result.errors == []
+        assert result.errors == ()
         assert result.has_lock_files is False
 
     def test_creates_instance_with_errors(self):
@@ -113,7 +113,7 @@ class TestCheckProfileHealth:
         result = my_lib.chrome_util._check_profile_health(profile_path)
 
         assert result.is_healthy is True
-        assert result.errors == []
+        assert result.errors == ()
 
     def test_detects_lock_files(self, temp_dir):
         """ロックファイルを検出する"""

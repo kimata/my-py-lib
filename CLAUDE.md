@@ -165,6 +165,79 @@ path = my_lib.pytest_util.get_path(path_str)
 テストでファイル存在確認時は `my_lib.footprint.exists()` または
 `my_lib.pytest_util.get_path()` を使用すること。
 
+## コーディング規約
+
+### データ構造の定義
+
+- **TypedDict は使用しない**: 構造化データには `@dataclass(frozen=True)` を使用
+- TypedDict は辞書のような使い勝手だが、属性アクセス（`.属性名`）を使えない
+- dataclass は型安全性が高く、IDE のサポートも充実
+
+### メソッド命名規則
+
+| 用途           | メソッド名      | 説明                                       |
+| -------------- | --------------- | ------------------------------------------ |
+| 辞書からの生成 | `parse()`       | クラスメソッド。`from_dict()` は使用しない |
+| 内部実装       | `_メソッド名()` | アンダースコアで始める                     |
+
+### ファイルヘッダー
+
+- **Shebang**: `#!/usr/bin/env python3` を使用（`python` は使用しない）
+
+### 型エイリアスの使用
+
+複合型が3箇所以上で出現する場合は型エイリアスを定義：
+
+```python
+from typing import TypeAlias
+
+ETagData: TypeAlias = str | bytes | dict[str, Any]
+```
+
+### dataclass の frozen 属性
+
+| 用途            | frozen 設定    | 理由                                 |
+| --------------- | -------------- | ------------------------------------ |
+| 設定クラス      | `frozen=True`  | 不変性を保証                         |
+| 結果/データ転送 | `frozen=True`  | 不変性を保証                         |
+| 状態管理        | `frozen=False` | 状態更新が必要。コメントで理由を明示 |
+
+### 例外処理
+
+`except Exception:` は最後の手段。可能な限り具体的な例外型を使用：
+
+```python
+# Good
+except sqlite3.OperationalError:
+except socket.timeout:
+except requests.RequestException:
+
+# Avoid（ただしログ出力は必須）
+except Exception:
+    logging.exception("...")
+```
+
+### 例外クラスの定義
+
+すべての例外クラスには docstring を記述：
+
+```python
+class MyError(Exception):
+    """エラーの概要を1行で記述"""
+```
+
+### 重複コードの禁止
+
+同一機能のコードが複数ファイルに存在する場合は、1箇所に統合し、
+他方は re-export として後方互換性を維持する：
+
+```python
+# 後方互換性のための re-export
+from my_lib.new_module import SomeClass, some_function
+
+__all__ = ["SomeClass", "some_function"]
+```
+
 ## 設定クラスの実装規約
 
 全プロジェクトで統一された設定管理パターン。

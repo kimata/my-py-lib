@@ -20,12 +20,12 @@ import psutil
 import my_lib.time
 
 
-@dataclass
+@dataclass(frozen=True)
 class _ProfileHealthResult:
     """プロファイル健全性チェックの結果"""
 
     is_healthy: bool
-    errors: list[str]
+    errors: tuple[str, ...]
     has_lock_files: bool = False
     has_corrupted_json: bool = False
     has_corrupted_db: bool = False
@@ -91,7 +91,7 @@ def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
 
     if not profile_path.exists():
         # プロファイルが存在しない場合は健全（新規作成される）
-        return _ProfileHealthResult(is_healthy=True, errors=[])
+        return _ProfileHealthResult(is_healthy=True, errors=())
 
     default_path = profile_path / "Default"
 
@@ -130,7 +130,7 @@ def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
 
     return _ProfileHealthResult(
         is_healthy=is_healthy,
-        errors=errors,
+        errors=tuple(errors),
         has_lock_files=has_lock_files,
         has_corrupted_json=has_corrupted_json,
         has_corrupted_db=has_corrupted_db,

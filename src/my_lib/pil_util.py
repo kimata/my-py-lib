@@ -16,10 +16,14 @@ _loaded_fonts: dict[pathlib.Path, bool] = {}
 
 
 class FontNotFoundError(Exception):
+    """フォントファイルが見つからない場合に発生するエラー"""
+
     pass
 
 
 class ImageNotFoundError(Exception):
+    """画像ファイルが見つからない場合に発生するエラー"""
+
     pass
 
 
