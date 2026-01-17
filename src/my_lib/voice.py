@@ -27,9 +27,9 @@ import wave
 from dataclasses import dataclass
 from typing import Any, Self
 
-import numpy as np
+import numpy as np  # type: ignore[import-untyped]
 import pyaudio  # type: ignore[import-untyped]
-import scipy.signal
+import scipy.signal  # type: ignore[import-untyped]
 
 
 @dataclass(frozen=True)

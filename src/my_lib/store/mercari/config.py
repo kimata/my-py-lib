@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,14 @@ class MercariLoginConfig:
     user: str
     password: str
 
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成"""
+        return cls(
+            user=data["user"],
+            password=data["pass"],
+        )
+
 
 @dataclass(frozen=True)
 class LineLoginConfig:
@@ -22,18 +30,10 @@ class LineLoginConfig:
     user: str
     password: str
 
-
-def parse_mercari_login(data: dict[str, Any]) -> MercariLoginConfig:
-    """メルカリログイン設定をパースする"""
-    return MercariLoginConfig(
-        user=data["user"],
-        password=data["pass"],
-    )
-
-
-def parse_line_login(data: dict[str, Any]) -> LineLoginConfig:
-    """LINEログイン設定をパースする"""
-    return LineLoginConfig(
-        user=data["user"],
-        password=data["pass"],
-    )
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成"""
+        return cls(
+            user=data["user"],
+            password=data["pass"],
+        )

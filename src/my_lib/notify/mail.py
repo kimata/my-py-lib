@@ -47,6 +47,28 @@ class MailConfig:
     from_address: str
     to: str
 
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> MailConfig | MailEmptyConfig:
+        """メール設定をパースする
+
+        存在するフィールドに応じて適切な Config クラスを返す。
+        設定が空または不十分な場合は MailEmptyConfig を返す。
+        """
+        # 空の設定の場合
+        if not data or "smtp" not in data:
+            return MailEmptyConfig()
+
+        return cls(
+            smtp=MailSmtpConfig(
+                host=data["smtp"]["host"],
+                port=data["smtp"]["port"],
+                user=data["user"],
+                password=data["pass"],
+            ),
+            from_address=data["from"],
+            to=data["to"],
+        )
+
 
 # 型エイリアス
 MailConfigTypes = MailConfig | MailEmptyConfig
@@ -76,7 +98,7 @@ def send(mail_config: MailConfigTypes, message: str) -> None:
         return
     try:
         _send_impl(mail_config, message)
-    except Exception:
+    except smtplib.SMTPException:
         logging.exception("Failed to send Mail message")
 
 
@@ -97,28 +119,6 @@ def build_message(subject: str, message: str, image: ImageAttachment | None = No
         msg.attach(mime_img)
 
     return msg.as_string()
-
-
-def parse_config(data: dict[str, Any]) -> MailConfigTypes:
-    """メール設定をパースする
-
-    存在するフィールドに応じて適切な Config クラスを返す。
-    設定が空または不十分な場合は MailEmptyConfig を返す。
-    """
-    # 空の設定の場合
-    if not data or "smtp" not in data:
-        return MailEmptyConfig()
-
-    return MailConfig(
-        smtp=MailSmtpConfig(
-            host=data["smtp"]["host"],
-            port=data["smtp"]["port"],
-            user=data["user"],
-            password=data["pass"],
-        ),
-        from_address=data["from"],
-        to=data["to"],
-    )
 
 
 def _send_impl(mail_config: MailConfig, message: str) -> None:
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         logging.warning("メールの設定が記載されていません。")
         sys.exit(-1)
 
-    mail_config = parse_config(raw_config["mail"])
+    mail_config = MailConfig.parse(raw_config["mail"])
 
     if isinstance(mail_config, MailEmptyConfig):
         logging.warning("メールの設定が不完全です。")

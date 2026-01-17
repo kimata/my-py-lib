@@ -60,7 +60,7 @@ class I2CSensorBase(SensorBase):
         logging.debug("ping to dev:0x%02X, bus:0x%02X", self.dev_addr, self.bus_id)
         try:
             return self._ping_impl()
-        except Exception:
+        except OSError:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
