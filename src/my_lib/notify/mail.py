@@ -21,7 +21,7 @@ import logging
 import pathlib
 import smtplib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeAlias
 
 
 @dataclass(frozen=True)
@@ -71,7 +71,7 @@ class MailConfig:
 
 
 # 型エイリアス
-MailConfigTypes = MailConfig | MailEmptyConfig
+MailConfigTypes: TypeAlias = MailConfig | MailEmptyConfig
 
 
 @dataclass(frozen=True)

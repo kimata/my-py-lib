@@ -22,7 +22,10 @@ import pathlib
 import sqlite3
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+
+# sqlite3.connect の isolation_level パラメータの型
+IsolationLevel = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
 
 
 @dataclass(frozen=True)
@@ -31,7 +34,7 @@ class SQLiteConnectionParams:
 
     timeout: float
     check_same_thread: bool
-    isolation_level: str
+    isolation_level: IsolationLevel
 
 
 def init_persistent(conn: sqlite3.Connection) -> None:

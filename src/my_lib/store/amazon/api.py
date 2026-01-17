@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     logging.info(
         fetch_price(
-            AmazonApiConfig.from_dict(config["store"]["amazon"]),
+            AmazonApiConfig.parse(config["store"]["amazon"]),
             asin_list,
         )
     )

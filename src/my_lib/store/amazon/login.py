@@ -325,16 +325,14 @@ if __name__ == "__main__":
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config: dict[str, Any] = my_lib.config.load(config_file)
-    login_config = AmazonLoginConfig.from_dict(
-        config["store"]["amazon"], pathlib.Path(config["data"]["dump"])
-    )
+    login_config = AmazonLoginConfig.parse(config["store"]["amazon"], pathlib.Path(config["data"]["dump"]))
 
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(config["data"]["selenium"]))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 5)
 
     if "slack" not in config:
         raise ValueError("slack 設定がありません")
-    slack_config_parsed = my_lib.notify.slack.parse_config(config["slack"])
+    slack_config_parsed = my_lib.notify.slack.SlackConfig.parse(config["slack"])
     if not isinstance(
         slack_config_parsed,
         my_lib.notify.slack.SlackConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,

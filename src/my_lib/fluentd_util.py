@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import fluent.sender
+import fluent.sender  # type: ignore[import-untyped]
 
 
 def get_handle(tag: str, host: str) -> fluent.sender.FluentSender:

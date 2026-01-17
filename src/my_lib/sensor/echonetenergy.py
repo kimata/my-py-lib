@@ -69,14 +69,14 @@ class EchonetEnergy:
                 except Exception:  # noqa: S110
                     pass
 
-        pan_info = self.get_pan_info_impl()
+        pan_info = self._get_pan_info_impl()
 
         with PAN_DESC_DAT_PATH.open(mode="wb") as f:
             pickle.dump(pan_info, f)
 
         return pan_info
 
-    def get_pan_info_impl(self) -> dict[str, str] | None:
+    def _get_pan_info_impl(self) -> dict[str, str] | None:
         return self.echonet_if.scan_channel()
 
     def connect(self, pan_info: dict[str, str]) -> None:

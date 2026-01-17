@@ -18,7 +18,7 @@ class TestSensorBase:
             from my_lib.sensor.base import SensorBase
 
             with pytest.raises(TypeError, match="abstract"):
-                SensorBase()  # type: ignore
+                SensorBase()  # type: ignore[reportAbstractUsage]
 
     def test_has_name_attribute(self):
         """NAME 属性を持つ"""
@@ -60,7 +60,7 @@ class TestI2CSensorBase:
         from my_lib.sensor.base import I2CSensorBase
 
         with pytest.raises(TypeError, match="abstract"):
-            I2CSensorBase()  # type: ignore
+            I2CSensorBase()  # type: ignore[reportAbstractUsage]
 
     def test_type_is_i2c(self, mock_smbus):
         """TYPE が 'I2C' である"""

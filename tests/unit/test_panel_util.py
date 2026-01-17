@@ -105,7 +105,9 @@ class TestDrawPanelPatiently:
         assert isinstance(result, tuple)
         assert len(result) == 3  # 失敗時は 3 要素
         assert isinstance(result[0], PIL.Image.Image)
-        assert isinstance(result[2], str)
+        # エラー時は 3 要素のタプル
+        error_result: tuple[PIL.Image.Image, float, str] = result  # type: ignore[assignment]
+        assert isinstance(error_result[2], str)
 
     def test_returns_blank_image_when_error_image_disabled(self, temp_dir, mocker):
         """error_image=False の場合は空画像を返す"""

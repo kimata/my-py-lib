@@ -37,18 +37,24 @@ class _ConfigError(Exception):
 
 
 class ConfigValidationError(_ConfigError):
+    """設定ファイルのスキーマ検証に失敗した場合に発生するエラー"""
+
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
 class ConfigParseError(_ConfigError):
+    """YAML ファイルの構文解析に失敗した場合に発生するエラー"""
+
     def __init__(self, message: str, details: str) -> None:
         super().__init__(message)
         self.details = details
 
 
 class ConfigFileNotFoundError(_ConfigError):
+    """設定ファイルが見つからない場合に発生するエラー"""
+
     pass
 
 

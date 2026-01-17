@@ -14,78 +14,19 @@ Options:
 from __future__ import annotations
 
 import logging
-import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.ads_base import ADSBase
 
 
-class ADS1015:
+class ADS1015(ADSBase):
+    """ADS1015 12bit ADC センサー"""
+
     NAME: str = "ADS1015"
-    TYPE: str = "I2C"
     DEV_ADDR: int = 0x4A  # 7bit
 
-    REG_CONFIG: int = 0x01
-    REG_VALUE: int = 0x00
-
-    REG_CONFIG_FSR_0256: int = 5
-    REG_CONFIG_FSR_2048: int = 2
-
-    REG_CONFIG_MUX_01: int = 0
-    REG_CONFIG_MUX_0G: int = 4
-
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
-
-        self.mux: int = self.REG_CONFIG_MUX_01
-        self.pga: int = self.REG_CONFIG_FSR_0256
-
-    def init(self) -> None:
-        os = 1
-        self.i2cbus.i2c_rdwr(
-            self.i2cbus.msg.write(
-                self.dev_addr,
-                [self.REG_CONFIG, (os << 7) | (self.mux << 4) | (self.pga << 1), 0x03],
-            )
-        )
-
-    def set_mux(self, mux: int) -> None:
-        self.mux = mux
-
-    def set_pga(self, pga: int) -> None:
-        self.pga = pga
-
-    def ping(self) -> bool:
-        try:
-            read = self.i2cbus.msg.read(self.dev_addr, 2)
-            self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, [self.REG_CONFIG]), read)
-
-            return bytes(read)[0] != 0
-        except Exception:
-            return False
-
-    def get_value(self) -> list[float]:
-        self.init()
-        time.sleep(0.1)
-
-        read = self.i2cbus.msg.read(self.dev_addr, 2)
-        self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, [self.REG_VALUE]), read)
-
-        raw = int.from_bytes(bytes(read), byteorder="big", signed=True)
-        if self.pga == self.REG_CONFIG_FSR_0256:
-            mvolt = raw * 7.8125 / 1000
-        elif self.pga == self.REG_CONFIG_FSR_2048:
-            mvolt = raw * 62.5 / 1000
-        else:
-            raise ValueError(f"Unsupported PGA value: {self.pga}")
-
-        return [round(mvolt, 3)]
-
-    def get_value_map(self) -> dict[str, float]:
-        value = self.get_value()
-
-        return {"mvolt": value[0]}
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = 0x4A) -> None:
+        super().__init__(bus_id, dev_addr)
 
 
 if __name__ == "__main__":

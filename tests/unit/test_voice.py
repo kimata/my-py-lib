@@ -20,7 +20,7 @@ class TestGetQueryUrl:
 
     def test_builds_url(self):
         """URLを構築する"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         result = my_lib.voice.get_query_url(config, "テスト", 1)
 
@@ -30,7 +30,7 @@ class TestGetQueryUrl:
 
     def test_encodes_text(self):
         """テキストをエンコードする"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         result = my_lib.voice.get_query_url(config, "こんにちは", 1)
 
@@ -42,7 +42,7 @@ class TestGetSynthesisUrl:
 
     def test_builds_url(self):
         """URLを構築する"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         result = my_lib.voice.get_synthesis_url(config, 3)
 
@@ -143,42 +143,42 @@ class TestSynthesize:
 
     def test_raises_for_empty_text(self):
         """空のテキストでエラーを発生させる"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         with pytest.raises(ValueError, match="Text must be a non-empty string"):
             my_lib.voice.synthesize(config, "")
 
     def test_raises_for_whitespace_only_text(self):
         """空白のみのテキストでエラーを発生させる"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         with pytest.raises(ValueError, match="Text must be a non-empty string"):
             my_lib.voice.synthesize(config, "   ")
 
     def test_raises_for_negative_speaker_id(self):
         """負のスピーカー ID でエラーを発生させる"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         with pytest.raises(ValueError, match="Speaker ID must be a non-negative integer"):
             my_lib.voice.synthesize(config, "test", speaker_id=-1)
 
     def test_raises_for_negative_volume(self):
         """負の音量でエラーを発生させる"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         with pytest.raises(ValueError, match="Volume must be a non-negative number"):
             my_lib.voice.synthesize(config, "test", volume=-1)
 
     def test_raises_for_invalid_url(self):
         """無効な URL でエラーを発生させる"""
-        config = {"voice": {"server": {"url": "invalid_url"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "invalid_url"}})
 
         with pytest.raises(ValueError, match="Invalid server URL"):
             my_lib.voice.synthesize(config, "test")
 
     def test_synthesizes_audio(self):
         """音声を合成する"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         mock_query_response = io.BytesIO(b'{"volumeScale": 1.0, "speedScale": 1.0}')
         mock_wav_data = self._create_mock_wav()
@@ -196,7 +196,7 @@ class TestSynthesize:
         """URL エラー時に RuntimeError を発生させる"""
         import urllib.error
 
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         with unittest.mock.patch("urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
@@ -206,7 +206,7 @@ class TestSynthesize:
 
     def test_raises_runtime_error_on_invalid_json(self):
         """無効な JSON 応答時に RuntimeError を発生させる"""
-        config = {"voice": {"server": {"url": "http://localhost:50021"}}}
+        config = my_lib.voice.VoiceConfig.parse({"server": {"url": "http://localhost:50021"}})
 
         mock_response = io.BytesIO(b"not valid json")
 

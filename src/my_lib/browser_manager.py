@@ -37,7 +37,7 @@ class DriverUninitialized:
     pass
 
 
-@dataclass
+@dataclass  # NOTE: _driver_state を更新するため frozen=False
 class BrowserManager:
     """Selenium ブラウザ管理クラス（遅延初期化・単一ドライバー）
 

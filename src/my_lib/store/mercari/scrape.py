@@ -21,6 +21,7 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.captcha
+import my_lib.store.mercari.config
 
 if TYPE_CHECKING:
     import my_lib.store.mercari.progress
@@ -153,18 +154,18 @@ def _execute_item(
     index: int,
     item_func_list: list[Callable[..., Any]],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
-) -> dict[str, Any]:
+) -> my_lib.store.mercari.config.MercariItem:
     item, item_element, item_link = _parse_item(driver, index)
 
     logging.info(
         "[%d/%d] %s [%s] [%s円] [%s view] [%s favorite] を処理します。",
         index,
         item_count,
-        item["name"],
-        item["id"],
-        f"{item['price']:,}",
-        f"{item['view']:,}",
-        f"{item['favorite']:,}",
+        item.name,
+        item.id,
+        f"{item.price:,}",
+        f"{item.view:,}",
+        f"{item.favorite:,}",
     )
 
     if progress_observer is not None:
@@ -183,7 +184,7 @@ def _execute_item(
 
     try:
         wait.until(
-            selenium.webdriver.support.expected_conditions.title_contains(re.sub(" +", " ", item["name"]))
+            selenium.webdriver.support.expected_conditions.title_contains(re.sub(" +", " ", item.name))
         )
     except selenium.common.exceptions.TimeoutException:
         logging.exception("Invalid title: %s", driver.title)
@@ -243,7 +244,7 @@ def _parse_item(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     index: int,
 ) -> tuple[
-    dict[str, Any],
+    my_lib.store.mercari.config.MercariItem,
     selenium.webdriver.remote.webelement.WebElement,
     selenium.webdriver.remote.webelement.WebElement,
 ]:
@@ -311,15 +312,15 @@ def _parse_item(
 
     is_stop = 1 if elements_cache["private"] else 0
 
-    item: dict[str, Any] = {
-        "id": item_id,
-        "url": item_url,
-        "name": name,
-        "price": price,
-        "view": view,
-        "favorite": favorite,
-        "is_stop": is_stop,
-    }
+    item = my_lib.store.mercari.config.MercariItem(
+        id=item_id,
+        url=item_url,
+        name=name,
+        price=price,
+        view=view,
+        favorite=favorite,
+        is_stop=is_stop,
+    )
 
     return item, item_element, elements_cache["link"]
 

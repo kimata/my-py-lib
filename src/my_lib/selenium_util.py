@@ -856,9 +856,10 @@ def _get_chrome_related_processes(driver: WebDriver) -> list[int]:
     chrome_pids = set()
 
     # 1. driver.service.process の子プロセスを検索
+    # NOTE: Chrome/Firefox WebDriver には service 属性があるが、型スタブでは定義されていない
     try:
-        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):  # type: ignore[attr-defined]
-            process = driver.service.process  # type: ignore[attr-defined]
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):  # type: ignore[union-attr]
+            process = driver.service.process  # type: ignore[union-attr]
             if process and hasattr(process, "pid"):
                 chromedriver_pid = process.pid
 
@@ -1094,8 +1095,8 @@ def quit_driver_gracefully(
 
     # ChromeDriverサービスの停止を試行
     try:
-        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):  # type: ignore[attr-defined]
-            driver.service.stop()  # type: ignore[attr-defined]
+        if hasattr(driver, "service") and driver.service and hasattr(driver.service, "stop"):  # type: ignore[union-attr]
+            driver.service.stop()  # type: ignore[union-attr]
     except (ConnectionResetError, OSError):
         # Chrome が既に終了している場合は無視
         logging.debug("Chrome service already stopped")

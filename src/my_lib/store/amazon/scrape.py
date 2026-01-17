@@ -153,10 +153,10 @@ def _fetch_price_impl(
                 slack_config,
                 "価格取得に失敗",
                 f"{item.url}\nprice_text='{price_text}'",
-                {
-                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                    "text": "スクリーンショット",
-                },
+                my_lib.notify.slack.AttachImage(
+                    data=PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                    text="スクリーンショット",
+                ),
             )
             item.price = 0
             return True
@@ -173,10 +173,10 @@ def _fetch_price_impl(
             slack_config,
             "価格取得に失敗",
             f"{item.url}\n{traceback.format_exc()}",
-            {
-                "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                "text": "スクリーンショット",
-            },
+            my_lib.notify.slack.AttachImage(
+                data=PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                text="スクリーンショット",
+            ),
         )
         item.price = 0
         return True
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
 
-    slack_config_parsed = my_lib.notify.slack.parse_config(config.get("slack", {}))
+    slack_config_parsed = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
     slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
         slack_config_parsed
         if isinstance(

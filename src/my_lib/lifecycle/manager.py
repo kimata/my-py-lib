@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from types import FrameType
 
 
-@dataclass
+@dataclass  # NOTE: _workers, _should_terminate 等を更新するため frozen=False
 class LifecycleManager:
     """ワーカーライフサイクル管理クラス
 

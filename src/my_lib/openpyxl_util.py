@@ -4,8 +4,9 @@ from __future__ import annotations
 import logging
 import pathlib
 from collections.abc import Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
+import openpyxl.cell.cell
 import openpyxl.drawing.image
 import openpyxl.drawing.spreadsheet_drawing
 import openpyxl.styles
@@ -101,10 +102,11 @@ def _set_header_cell_style(
     width: float | None,
     style: dict[str, Any],
 ) -> None:
-    sheet.cell(row, col).value = value  # type: ignore[assignment]
-    sheet.cell(row, col).style = "Normal"
-    sheet.cell(row, col).border = style["border"]
-    sheet.cell(row, col).fill = style["fill"]
+    cell = cast(openpyxl.cell.cell.Cell, sheet.cell(row, col))
+    cell.value = value
+    cell.style = "Normal"
+    cell.border = style["border"]
+    cell.fill = style["fill"]
 
     if width is not None:
         sheet.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
@@ -154,13 +156,14 @@ def _set_item_cell_style(
     value: Any,
     style: dict[str, Any],
 ) -> None:
-    sheet.cell(row, col).value = value  # type: ignore[assignment]
-    sheet.cell(row, col).style = "Normal"
-    sheet.cell(row, col).border = style["border"]
-    sheet.cell(row, col).alignment = openpyxl.styles.Alignment(wrap_text=style["text_wrap"], vertical="top")
+    cell = cast(openpyxl.cell.cell.Cell, sheet.cell(row, col))
+    cell.value = value
+    cell.style = "Normal"
+    cell.border = style["border"]
+    cell.alignment = openpyxl.styles.Alignment(wrap_text=style["text_wrap"], vertical="top")
 
     if "text_format" in style:
-        sheet.cell(row, col).number_format = style["text_format"]
+        cell.number_format = style["text_format"]
 
 
 def _insert_table_item(

@@ -27,7 +27,7 @@ def create_app(config_file):
     my_lib.webapp.config.URL_PREFIX = WEBAPP_URL_PREFIX
     my_lib.webapp.config.init(config)
 
-    import data.sample_webapp
+    import data.sample_webapp  # ty: ignore[unresolved-import]
     import my_lib.notify.slack
     import my_lib.webapp.base
     import my_lib.webapp.event
@@ -40,7 +40,7 @@ def create_app(config_file):
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        slack_config = my_lib.notify.slack.parse_config(config.get("slack", {}))
+        slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
         my_lib.webapp.log.init(slack_config)
 
         def notify_terminate():  # pragma: no cover

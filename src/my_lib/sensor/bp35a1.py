@@ -1,12 +1,24 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import annotations
 
 import logging
 import pprint
+from dataclasses import dataclass
 from typing import Any
 
 import serial
+
+
+@dataclass(frozen=True)
+class PanDescriptor:
+    """PANスキャン結果を保持するデータクラス"""
+
+    channel: str
+    pan_id: str
+    addr: str
+    pair_id: str
+
 
 RETRY_COUNT: int = 10
 WAIT_COUNT: int = 30
@@ -74,9 +86,9 @@ class BP35A1:
         command = f"SKSETPWD {len(b_pass):X} {b_pass}"
         self.__send_command(command)
 
-    def scan_channel(self, start_duration: int = 3) -> dict[str, str] | None:
+    def scan_channel(self, start_duration: int = 3) -> PanDescriptor | None:
         duration = start_duration
-        pan_info: dict[str, str] | None = None
+        pan_info: PanDescriptor | None = None
         for _ in range(RETRY_COUNT):
             command = f"SKSCAN 2 {((1 << 32) - 1):X} {duration}"
             self.__send_command(command)
@@ -99,14 +111,14 @@ class BP35A1:
 
         return None
 
-    def connect(self, pan_desc: dict[str, str]) -> str | None:
-        command = f"SKSREG S2 {pan_desc['Channel']}"
+    def connect(self, pan_desc: PanDescriptor) -> str | None:
+        command = f"SKSREG S2 {pan_desc.channel}"
         self.__send_command(command)
 
-        command = f"SKSREG S3 {pan_desc['Pan ID']}"
+        command = f"SKSREG S3 {pan_desc.pan_id}"
         self.__send_command(command)
 
-        command = f"SKLL64 {pan_desc['Addr']}"
+        command = f"SKLL64 {pan_desc.addr}"
         ipv6_addr = self.__send_command_raw(command)
 
         command = f"SKJOIN {ipv6_addr}"
@@ -155,7 +167,7 @@ class BP35A1:
         while self.read().rstrip() != "OK":
             pass
 
-    def __parse_pan_desc(self) -> dict[str, str]:
+    def __parse_pan_desc(self) -> PanDescriptor:
         self.__expect("EPANDESC")
         pan_desc: dict[str, str] = {}
         for _ in range(WAIT_COUNT):
@@ -170,7 +182,12 @@ class BP35A1:
             if parts[0] == "PairID":
                 break
 
-        return pan_desc
+        return PanDescriptor(
+            channel=pan_desc["Channel"],
+            pan_id=pan_desc["Pan ID"],
+            addr=pan_desc["Addr"],
+            pair_id=pan_desc["PairID"],
+        )
 
     def __send_command_raw(self, command: str, echo_back: Any = lambda command: command) -> str:
         self.write(command)

@@ -15,7 +15,7 @@ from typing import Any, ClassVar
 
 def is_rasberry_pi() -> bool:
     try:
-        with pathlib.Path.open(pathlib.Path("/proc/cpuinfo")) as f:
+        with pathlib.Path("/proc/cpuinfo").open() as f:
             cpuinfo = f.read()
 
             if "Raspberry Pi" in cpuinfo:
@@ -42,7 +42,7 @@ else:
         logging.warning("Using dummy GPIO")
 
     # NOTE: 本物の GPIO のように振る舞うダミーのライブラリ
-    class gpio:  # type: ignore[no-redef]
+    class gpio:
         IS_DUMMY: bool = True
         BCM: int = 0
         OUT: int = 0
@@ -59,73 +59,73 @@ else:
             }
         )
 
-        @staticmethod
-        def _validate_pin(pin_num: int) -> None:
-            if pin_num not in gpio.VALID_PINS:
+        @classmethod
+        def _validate_pin(cls, pin_num: int) -> None:
+            if pin_num not in cls.VALID_PINS:
                 raise ValueError(f"Pin {pin_num} is not a valid GPIO pin number")
 
-        @staticmethod
-        def get_state() -> dict[str, Any]:
+        @classmethod
+        def get_state(cls) -> dict[str, Any]:
             # NOTE: Pytest を並列実行できるようにする
             worker = os.environ.get("PYTEST_XDIST_WORKER", "")
-            return gpio.state[worker]
+            return cls.state[worker]
 
         @staticmethod
         def setmode(mode: int) -> None:
             return
 
-        @staticmethod
-        def setup(pin_num: int, direction: int) -> None:
-            gpio._validate_pin(pin_num)
+        @classmethod
+        def setup(cls, pin_num: int, direction: int) -> None:
+            cls._validate_pin(pin_num)
 
-        @staticmethod
-        def hist_get() -> list[dict[str, Any]]:
-            return gpio.get_state()["gpio_hist"]
+        @classmethod
+        def hist_get(cls) -> list[dict[str, Any]]:
+            return cls.get_state()["gpio_hist"]
 
-        @staticmethod
-        def hist_clear() -> None:
-            gpio.get_state()["state"] = collections.defaultdict(lambda: None)
-            gpio.get_state()["time_start"] = collections.defaultdict(lambda: None)
-            gpio.get_state()["time_stop"] = collections.defaultdict(lambda: None)
-            gpio.get_state()["gpio_hist"] = []
+        @classmethod
+        def hist_clear(cls) -> None:
+            cls.get_state()["state"] = collections.defaultdict(lambda: None)
+            cls.get_state()["time_start"] = collections.defaultdict(lambda: None)
+            cls.get_state()["time_stop"] = collections.defaultdict(lambda: None)
+            cls.get_state()["gpio_hist"] = []
 
-        @staticmethod
-        def hist_add(hist: dict[str, Any]) -> None:
-            gpio.get_state()["gpio_hist"].append(hist)
+        @classmethod
+        def hist_add(cls, hist: dict[str, Any]) -> None:
+            cls.get_state()["gpio_hist"].append(hist)
 
-        @staticmethod
-        def output(pin_num: int, value: int) -> None:
-            gpio._validate_pin(pin_num)
+        @classmethod
+        def output(cls, pin_num: int, value: int) -> None:
+            cls._validate_pin(pin_num)
             logging.debug("set gpio.output = %s", value)
             if value == 0:
-                if gpio.get_state()["time_start"][pin_num] is not None:
-                    gpio.hist_add(
+                if cls.get_state()["time_start"][pin_num] is not None:
+                    cls.hist_add(
                         {
                             "pin_num": pin_num,
-                            "state": gpio.level.LOW.name,  # type: ignore[attr-defined]
-                            "high_period": max(int(gpio_time() - gpio.get_state()["time_start"][pin_num]), 1),
+                            "state": cls.level.LOW.name,  # type: ignore[attr-defined]
+                            "high_period": max(int(gpio_time() - cls.get_state()["time_start"][pin_num]), 1),
                         }
                     )
                 else:
-                    gpio.hist_add({"pin_num": pin_num, "state": gpio.level.LOW.name})  # type: ignore[attr-defined]
-                gpio.get_state()["time_start"][pin_num] = None
-                gpio.get_state()["time_stop"][pin_num] = gpio_time()
+                    cls.hist_add({"pin_num": pin_num, "state": cls.level.LOW.name})  # type: ignore[attr-defined]
+                cls.get_state()["time_start"][pin_num] = None
+                cls.get_state()["time_stop"][pin_num] = gpio_time()
             else:
-                gpio.get_state()["time_start"][pin_num] = gpio_time()
-                gpio.get_state()["time_stop"][pin_num] = None
-                gpio.hist_add(
+                cls.get_state()["time_start"][pin_num] = gpio_time()
+                cls.get_state()["time_stop"][pin_num] = None
+                cls.hist_add(
                     {
                         "pin_num": pin_num,
-                        "state": gpio.level.HIGH.name,  # type: ignore[attr-defined]
+                        "state": cls.level.HIGH.name,  # type: ignore[attr-defined]
                     }
                 )
 
-            gpio.get_state()["state"][pin_num] = value
+            cls.get_state()["state"][pin_num] = value
 
-        @staticmethod
-        def input(pin_num: int) -> int | None:
-            gpio._validate_pin(pin_num)
-            return gpio.get_state()["state"][pin_num]
+        @classmethod
+        def input(cls, pin_num: int) -> int | None:
+            cls._validate_pin(pin_num)
+            return cls.get_state()["state"][pin_num]
 
         @staticmethod
         def setwarnings(warnings: bool) -> None:

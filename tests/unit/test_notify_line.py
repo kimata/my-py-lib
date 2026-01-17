@@ -57,13 +57,13 @@ class TestGetMsgConfig:
 
 
 class TestSendImpl:
-    """send_impl 関数のテスト"""
+    """_send_impl 関数のテスト"""
 
     def test_adds_to_history(self, mocker):
         """履歴に追加する"""
         import linebot.v3.messaging
 
-        from my_lib.notify.line import LineChannelConfig, LineConfig, hist_clear, hist_get, send_impl
+        from my_lib.notify.line import LineChannelConfig, LineConfig, _send_impl, hist_clear, hist_get
 
         hist_clear()
 
@@ -84,7 +84,7 @@ class TestSendImpl:
             }
         )
 
-        send_impl(line_config, message)
+        _send_impl(line_config, message)
 
         hist = hist_get()
         assert "test alt text" in hist
@@ -93,14 +93,14 @@ class TestSendImpl:
 class TestSend:
     """send 関数のテスト"""
 
-    def test_calls_send_impl(self, mocker):
-        """send_impl を呼び出す"""
+    def test_calls__send_impl(self, mocker):
+        """_send_impl を呼び出す"""
         from my_lib.notify.line import LineChannelConfig, LineConfig, hist_clear, send
 
         hist_clear()
 
-        # send_impl をモック
-        mock_send_impl = mocker.patch("my_lib.notify.line.send_impl")
+        # _send_impl をモック
+        mock__send_impl = mocker.patch("my_lib.notify.line._send_impl")
 
         line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
         message = {
@@ -115,7 +115,7 @@ class TestSend:
 
         send(line_config, message)
 
-        assert mock_send_impl.called
+        assert mock__send_impl.called
 
 
 class TestError:

@@ -372,7 +372,7 @@ if __name__ == "__main__":
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config = my_lib.config.load(config_file)
-    slack_config = my_lib.notify.slack.parse_config(config["slack"])
+    slack_config = my_lib.notify.slack.SlackConfig.parse(config["slack"])
 
     if not isinstance(
         slack_config,

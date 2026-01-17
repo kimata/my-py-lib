@@ -9,6 +9,8 @@ import my_lib.sensor
 import my_lib.sensor.i2cbus
 
 from .ads1015 import ADS1015 as ads1015
+from .ads1115 import ADS1115 as ads1115
+from .ads_base import ADSBase
 from .apds9250 import APDS9250 as apds9250
 from .base import SensorBase, SensorValue
 from .bp35a1 import BP35A1 as bp35a1
@@ -40,9 +42,11 @@ if TYPE_CHECKING:
 iolink = importlib.import_module(".io_link", __package__)
 
 __all__ = [
+    "ADSBase",
     "SensorBase",
     "SensorValue",
     "ads1015",
+    "ads1115",
     "apds9250",
     "bp35a1",
     "echonetenergy",

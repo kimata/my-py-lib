@@ -27,16 +27,26 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, TypedDict, cast
+from typing import Any, Self
 
 
-class InfluxDBConfig(TypedDict):
+@dataclass(frozen=True)
+class InfluxDBConfig:
     """InfluxDB 接続設定"""
 
     url: str
     token: str
     org: str
     bucket: str
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        return cls(
+            url=data["url"],
+            token=data["token"],
+            org=data["org"],
+            bucket=data["bucket"],
+        )
 
 
 import influxdb_client  # noqa: E402
@@ -216,10 +226,10 @@ def _fetch_data_impl(
 ) -> TableList:
     client = None
     try:
-        token = os.environ.get("INFLUXDB_TOKEN", db_config["token"])
+        token = os.environ.get("INFLUXDB_TOKEN", db_config.token)
 
         query = template.format(
-            bucket=db_config["bucket"],
+            bucket=db_config.bucket,
             measure=measure,
             hostname=hostname,
             field=field,
@@ -233,9 +243,7 @@ def _fetch_data_impl(
             query += " |> last()"
 
         logging.debug("Flux query = %s", query)
-        client = influxdb_client.InfluxDBClient(  # type: ignore[attr-defined]
-            url=db_config["url"], token=token, org=db_config["org"]
-        )
+        client = influxdb_client.InfluxDBClient(url=db_config.url, token=token, org=db_config.org)  # type: ignore[reportPrivateImportUsage]
         query_api = client.query_api()
 
         return query_api.query(query=query)
@@ -527,11 +535,9 @@ def get_equip_mode_period(
     create_empty: bool = True,
 ) -> list[list[Any]]:
     logging.info(
-        (
-            "Get equipment mode period (type: %s, host: %s, field: %s, "
-            "threshold: %.2f, start: %s, stop: %s, every: %dmin, "
-            "window: %dmin, create_empty: %s)",
-        ),
+        "Get equipment mode period (type: %s, host: %s, field: %s, "
+        "threshold: %s, start: %s, stop: %s, every: %dmin, "
+        "window: %dmin, create_empty: %s)",
         measure,
         hostname,
         field,
@@ -771,7 +777,7 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    db_config = cast(InfluxDBConfig, get_config(config, infxlux_db_spec))
+    db_config = InfluxDBConfig.parse(get_config(config, infxlux_db_spec))
     sensor_config = get_config(config, sensor_spec)
 
     logging.info("DB config: %s", my_lib.pretty.format(db_config))

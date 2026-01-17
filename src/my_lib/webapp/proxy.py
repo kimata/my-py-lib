@@ -26,6 +26,7 @@ import requests
 import sseclient  # 使うのは sseclient、sseclient-py ではない
 
 import my_lib.flask_util
+import my_lib.notify.slack
 import my_lib.webapp.config
 
 blueprint = flask.Blueprint("webapp-proxy", __name__)
@@ -240,8 +241,9 @@ if __name__ == "__main__":
     log_port = port + 1
     base_url = {"log": f"http://127.0.0.1:{log_port}/test", "proxy": f"http://127.0.0.1:{port}/test"}
 
+    slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
     log_proc = multiprocessing.Process(
-        target=lambda: my_lib.webapp.log.test_run(config, log_port, debug_mode)
+        target=lambda: my_lib.webapp.log.test_run(slack_config, log_port, debug_mode)
     )
     log_proc.start()
 

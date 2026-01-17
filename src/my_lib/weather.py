@@ -427,7 +427,7 @@ def get_sunset_nao(pref: int) -> SunsetResult:
             tomorrow=get_sunset_date_nao(pref, now + datetime.timedelta(days=1)),
         )
     except Exception:
-        logging.exception("Faile to fetch sunset info.")
+        logging.exception("Failed to fetch sunset info.")
 
         return SunsetResult(today="?", tomorrow="?")
 

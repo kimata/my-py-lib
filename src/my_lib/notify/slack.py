@@ -27,7 +27,7 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol, TypeAlias
 
 import slack_sdk
 import slack_sdk.errors
@@ -60,12 +60,14 @@ _SIMPLE_TMPL = """\
 """
 
 
-class FormattedMessage(TypedDict):
+@dataclass(frozen=True)
+class FormattedMessage:
     text: str
     json: list[dict[str, Any]]
 
 
-class AttachImage(TypedDict):
+@dataclass(frozen=True)
+class AttachImage:
     data: Image.Image
     text: str
 
@@ -178,9 +180,91 @@ class SlackConfig:
     captcha: SlackCaptchaConfig
     error: SlackErrorConfig
 
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> SlackConfigTypes:
+        """Slack 設定をパースする
+
+        存在するフィールドに応じて適切な Config クラスを返す。
+        設定が空または不十分な場合は SlackEmptyConfig を返す。
+        """
+        # 空の設定の場合
+        if not data or "bot_token" not in data:
+            return SlackEmptyConfig()
+
+        has_error = "error" in data
+        has_info = "info" in data
+        has_captcha = "captcha" in data
+
+        # error も captcha もない場合は空として扱う
+        if not has_error and not has_captcha:
+            return SlackEmptyConfig()
+
+        bot_token = data["bot_token"]
+        from_name = data["from"]
+
+        # 全て揃っている場合
+        if has_error and has_info and has_captcha:
+            return cls(
+                bot_token=bot_token,
+                from_name=from_name,
+                info=_parse_slack_info(data["info"]),
+                captcha=_parse_slack_captcha(data["captcha"]),
+                error=_parse_slack_error(data["error"]),
+            )
+
+        # error + info
+        if has_error and has_info and not has_captcha:
+            return SlackErrorInfoConfig(
+                bot_token=bot_token,
+                from_name=from_name,
+                info=_parse_slack_info(data["info"]),
+                error=_parse_slack_error(data["error"]),
+            )
+
+        # error のみ
+        if has_error and not has_info and not has_captcha:
+            return SlackErrorOnlyConfig(
+                bot_token=bot_token,
+                from_name=from_name,
+                error=_parse_slack_error(data["error"]),
+            )
+
+        # captcha のみ
+        if has_captcha and not has_error and not has_info:
+            return SlackCaptchaOnlyConfig(
+                bot_token=bot_token,
+                from_name=from_name,
+                captcha=_parse_slack_captcha(data["captcha"]),
+            )
+
+        # 中途半端なパターン: error + captcha (info なし)
+        if has_error and has_captcha and not has_info:
+            logging.warning(
+                "Slack 設定が不完全です。SlackErrorOnlyConfig として処理します。captcha は無視されます。"
+            )
+            return SlackErrorOnlyConfig(
+                bot_token=bot_token,
+                from_name=from_name,
+                error=_parse_slack_error(data["error"]),
+            )
+
+        # 中途半端なパターン: info + captcha (error なし)
+        if has_info and has_captcha and not has_error:
+            logging.warning(
+                "Slack 設定が不完全です。SlackCaptchaOnlyConfig として処理します。info は無視されます。"
+            )
+            return SlackCaptchaOnlyConfig(
+                bot_token=bot_token,
+                from_name=from_name,
+                captcha=_parse_slack_captcha(data["captcha"]),
+            )
+
+        # info のみ、または何もない場合（ここには到達しないはずだが念のため）
+        return SlackEmptyConfig()
+
 
 # 型エイリアス
-SlackConfigTypes = (
+SlackConfigTypes: TypeAlias = (
     SlackConfig | SlackErrorInfoConfig | SlackErrorOnlyConfig | SlackCaptchaOnlyConfig | SlackEmptyConfig
 )
 
@@ -193,10 +277,10 @@ _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 # NOTE: 公開関数のデフォルト引数で参照されるため、公開関数より前に定義
 def format_simple(title: str, message: str) -> FormattedMessage:
-    return {
-        "text": message,
-        "json": json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
-    }
+    return FormattedMessage(
+        text=message,
+        json=json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
+    )
 
 
 def info(
@@ -260,7 +344,7 @@ def error_with_image(
         if ch_id is None:
             raise ValueError("error channel id is not configured")
 
-        _upload_image(config.bot_token, ch_id, title, attach_img["data"], attach_img["text"], thread_ts)
+        _upload_image(config.bot_token, ch_id, title, attach_img.data, attach_img.text, thread_ts)
 
     my_lib.footprint.update(_NOTIFY_FOOTPRINT)
 
@@ -310,7 +394,7 @@ def notify_error_with_page(
 
     attach_img: AttachImage | None = None
     if screenshot is not None:
-        attach_img = {"data": screenshot, "text": "screenshot"}
+        attach_img = AttachImage(data=screenshot, text="screenshot")
 
     thread_ts = error_with_image(config, title, message, attach_img, formatter)
 
@@ -342,88 +426,6 @@ def _attach_page_source_gzip(
         tmp_path.unlink()
     except Exception:
         logging.debug("Failed to attach page source")
-
-
-def parse_config(data: dict[str, Any]) -> SlackConfigTypes:
-    """Slack 設定をパースする
-
-    存在するフィールドに応じて適切な Config クラスを返す。
-    設定が空または不十分な場合は SlackEmptyConfig を返す。
-    """
-    # 空の設定の場合
-    if not data or "bot_token" not in data:
-        return SlackEmptyConfig()
-
-    has_error = "error" in data
-    has_info = "info" in data
-    has_captcha = "captcha" in data
-
-    # error も captcha もない場合は空として扱う
-    if not has_error and not has_captcha:
-        return SlackEmptyConfig()
-
-    bot_token = data["bot_token"]
-    from_name = data["from"]
-
-    # 全て揃っている場合
-    if has_error and has_info and has_captcha:
-        return SlackConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            info=_parse_slack_info(data["info"]),
-            captcha=_parse_slack_captcha(data["captcha"]),
-            error=_parse_slack_error(data["error"]),
-        )
-
-    # error + info
-    if has_error and has_info and not has_captcha:
-        return SlackErrorInfoConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            info=_parse_slack_info(data["info"]),
-            error=_parse_slack_error(data["error"]),
-        )
-
-    # error のみ
-    if has_error and not has_info and not has_captcha:
-        return SlackErrorOnlyConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            error=_parse_slack_error(data["error"]),
-        )
-
-    # captcha のみ
-    if has_captcha and not has_error and not has_info:
-        return SlackCaptchaOnlyConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            captcha=_parse_slack_captcha(data["captcha"]),
-        )
-
-    # 中途半端なパターン: error + captcha (info なし)
-    if has_error and has_captcha and not has_info:
-        logging.warning(
-            "Slack 設定が不完全です。SlackErrorOnlyConfig として処理します。captcha は無視されます。"
-        )
-        return SlackErrorOnlyConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            error=_parse_slack_error(data["error"]),
-        )
-
-    # 中途半端なパターン: info + captcha (error なし)
-    if has_info and has_captcha and not has_error:
-        logging.warning(
-            "Slack 設定が不完全です。SlackCaptchaOnlyConfig として処理します。info は無視されます。"
-        )
-        return SlackCaptchaOnlyConfig(
-            bot_token=bot_token,
-            from_name=from_name,
-            captcha=_parse_slack_captcha(data["captcha"]),
-        )
-
-    # info のみ、または何もない場合（ここには到達しないはずだが念のため）
-    return SlackEmptyConfig()
 
 
 def send(
@@ -506,8 +508,8 @@ def _send(
 
         kwargs: dict[str, Any] = {
             "channel": ch_name,
-            "text": message["text"],
-            "blocks": message["json"],
+            "text": message.text,
+            "blocks": message.json,
         }
         if thread_ts:
             kwargs["thread_ts"] = thread_ts
@@ -564,8 +566,8 @@ def _split_send(
                 formatted_msg = formatter(split_title, message_content)
                 client.chat_postMessage(
                     channel=ch_name,
-                    text=formatted_msg["text"],
-                    blocks=formatted_msg["json"],
+                    text=formatted_msg.text,
+                    blocks=formatted_msg.json,
                     thread_ts=thread_ts,
                 )
             except slack_sdk.errors.SlackClientError:
@@ -710,7 +712,7 @@ if __name__ == "__main__":
         logging.warning("Slack の設定が記載されていません。")
         sys.exit(-1)
 
-    slack_config = parse_config(raw_config["slack"])
+    slack_config = SlackConfig.parse(raw_config["slack"])
 
     if isinstance(slack_config, SlackConfig | SlackErrorInfoConfig):
         info(slack_config, "Test", "This is test")

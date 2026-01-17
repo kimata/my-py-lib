@@ -136,38 +136,38 @@ class TestFormatSimple:
 
         result = format_simple("Test Title", "Test message")
 
-        assert result["text"] == "Test message"
-        assert isinstance(result["json"], list)
-        assert len(result["json"]) > 0
+        assert result.text == "Test message"
+        assert isinstance(result.json, list)
+        assert len(result.json) > 0
 
 
 class TestParseConfig:
-    """parse_config 関数のテスト"""
+    """SlackConfig.parse() メソッドのテスト"""
 
     def test_returns_empty_config_for_empty_data(self):
         """空のデータは SlackEmptyConfig を返す"""
-        from my_lib.notify.slack import SlackEmptyConfig, parse_config
+        from my_lib.notify.slack import SlackConfig, SlackEmptyConfig
 
-        result = parse_config({})
+        result = SlackConfig.parse({})
         assert isinstance(result, SlackEmptyConfig)
 
     def test_returns_empty_config_without_bot_token(self):
         """bot_token がない場合は SlackEmptyConfig を返す"""
-        from my_lib.notify.slack import SlackEmptyConfig, parse_config
+        from my_lib.notify.slack import SlackConfig, SlackEmptyConfig
 
-        result = parse_config({"from": "bot"})
+        result = SlackConfig.parse({"from": "bot"})
         assert isinstance(result, SlackEmptyConfig)
 
     def test_returns_empty_config_without_error_or_captcha(self):
         """error も captcha もない場合は SlackEmptyConfig を返す"""
-        from my_lib.notify.slack import SlackEmptyConfig, parse_config
+        from my_lib.notify.slack import SlackConfig, SlackEmptyConfig
 
-        result = parse_config({"bot_token": "token", "from": "bot"})
+        result = SlackConfig.parse({"bot_token": "token", "from": "bot"})
         assert isinstance(result, SlackEmptyConfig)
 
     def test_parses_error_only_config(self):
         """error のみの設定をパースする"""
-        from my_lib.notify.slack import SlackErrorOnlyConfig, parse_config
+        from my_lib.notify.slack import SlackConfig, SlackErrorOnlyConfig
 
         data = {
             "bot_token": "xoxb-token",
@@ -178,13 +178,13 @@ class TestParseConfig:
             },
         }
 
-        result = parse_config(data)
+        result = SlackConfig.parse(data)
         assert isinstance(result, SlackErrorOnlyConfig)
         assert result.error.interval_min == 60
 
     def test_parses_error_info_config(self):
         """error + info の設定をパースする"""
-        from my_lib.notify.slack import SlackErrorInfoConfig, parse_config
+        from my_lib.notify.slack import SlackConfig, SlackErrorInfoConfig
 
         data = {
             "bot_token": "xoxb-token",
@@ -196,12 +196,12 @@ class TestParseConfig:
             },
         }
 
-        result = parse_config(data)
+        result = SlackConfig.parse(data)
         assert isinstance(result, SlackErrorInfoConfig)
 
     def test_parses_captcha_only_config(self):
         """captcha のみの設定をパースする"""
-        from my_lib.notify.slack import SlackCaptchaOnlyConfig, parse_config
+        from my_lib.notify.slack import SlackCaptchaOnlyConfig, SlackConfig
 
         data = {
             "bot_token": "xoxb-token",
@@ -209,12 +209,12 @@ class TestParseConfig:
             "captcha": {"channel": {"name": "captcha"}},
         }
 
-        result = parse_config(data)
+        result = SlackConfig.parse(data)
         assert isinstance(result, SlackCaptchaOnlyConfig)
 
     def test_parses_full_config(self):
         """全ての設定をパースする"""
-        from my_lib.notify.slack import SlackConfig, parse_config
+        from my_lib.notify.slack import SlackConfig
 
         data = {
             "bot_token": "xoxb-token",
@@ -227,7 +227,7 @@ class TestParseConfig:
             },
         }
 
-        result = parse_config(data)
+        result = SlackConfig.parse(data)
         assert isinstance(result, SlackConfig)
 
 

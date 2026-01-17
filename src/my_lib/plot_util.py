@@ -5,7 +5,7 @@ import functools
 import logging
 import pathlib
 
-import matplotlib.font_manager
+import matplotlib.font_manager  # type: ignore[import-untyped]
 
 import my_lib.panel_config
 
