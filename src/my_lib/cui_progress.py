@@ -385,3 +385,72 @@ class ProgressManager:
         """
         if not self._console.is_terminal:
             self._console.print(*args, **kwargs)
+
+
+class NullProgressManager:
+    """何もしない ProgressManager（Null Object パターン）
+
+    ProgressManager | None の代わりに使用することで、
+    呼び出し側での None チェックを不要にします。
+
+    Examples:
+        使用例::
+
+            # Before: None チェックが必要
+            progress: ProgressManager | None = None
+            if progress:
+                progress.set_status("処理中...")
+
+            # After: チェック不要
+            progress: ProgressManager | NullProgressManager = NullProgressManager()
+            progress.set_status("処理中...")  # 何もしない
+    """
+
+    def __init__(
+        self,
+        *,
+        console: rich.console.Console | None = None,
+        **_kwargs: Any,
+    ) -> None:
+        self._console = console if console is not None else rich.console.Console()
+
+    @property
+    def console(self) -> rich.console.Console:
+        """Console インスタンスを取得"""
+        return self._console
+
+    @property
+    def is_terminal(self) -> bool:
+        """TTY 環境かどうか（常に False）"""
+        return False
+
+    def start(self) -> None:
+        """何もしない"""
+
+    def stop(self) -> None:
+        """何もしない"""
+
+    def pause_live(self) -> None:
+        """何もしない"""
+
+    def resume_live(self) -> None:
+        """何もしない"""
+
+    def set_progress_bar(self, _desc: str, _total: int) -> None:
+        """何もしない"""
+
+    def update_progress_bar(self, _desc: str, _advance: int = 1) -> None:
+        """何もしない"""
+
+    def remove_progress_bar(self, _desc: str) -> None:
+        """何もしない"""
+
+    def has_progress_bar(self, _desc: str) -> bool:
+        """常に False を返す"""
+        return False
+
+    def set_status(self, _status: str, *, is_error: bool = False) -> None:
+        """何もしない"""
+
+    def print(self, *_args: Any, **_kwargs: Any) -> None:
+        """何もしない"""
