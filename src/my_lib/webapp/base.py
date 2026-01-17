@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from typing import cast
+
 import flask
 
 import my_lib.flask_util
@@ -66,4 +68,4 @@ blueprint_default = flask.Blueprint("webapp-default", __name__)
 @blueprint_default.route("/")
 @my_lib.flask_util.gzipped
 def root() -> flask.Response:
-    return flask.redirect(f"{my_lib.webapp.config.URL_PREFIX}/")  # type: ignore[return-value]
+    return cast(flask.Response, flask.redirect(f"{my_lib.webapp.config.URL_PREFIX}/"))
