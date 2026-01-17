@@ -231,7 +231,7 @@ if __name__ == "__main__":
     import my_lib.webapp.config
 
     my_lib.webapp.config.URL_PREFIX = "/test"
-    my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.from_dict(config["webapp"]))
+    my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.parse(config["webapp"]))
 
     import my_lib.webapp.base
     import my_lib.webapp.log

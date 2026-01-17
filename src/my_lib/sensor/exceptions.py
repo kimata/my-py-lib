@@ -11,12 +11,12 @@ class SensorError(Exception):
 
 
 class SensorCommunicationError(SensorError):
-    """センサー通信エラー"""
+    """センサーとの通信に失敗した場合に発生するエラー"""
 
     pass
 
 
 class SensorCRCError(SensorError):
-    """センサー CRC エラー"""
+    """センサーデータの CRC チェックに失敗した場合に発生するエラー"""
 
     pass

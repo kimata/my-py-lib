@@ -11,7 +11,7 @@ import requests
 import my_lib.footprint
 
 
-@dataclass
+@dataclass(frozen=True)
 class HealthzTarget:
     """Liveness チェック対象を表すデータクラス"""
 
@@ -48,7 +48,7 @@ def check_tcp_port(port: int, address: str = "127.0.0.1") -> bool:
         result = sock.connect_ex((address, port))
         sock.close()
         return result == 0
-    except Exception:
+    except OSError:
         logging.exception("Failed to check TCP port")
         return False
 
@@ -57,7 +57,7 @@ def check_http_port(port: int, address: str = "127.0.0.1") -> bool:
     try:
         if requests.get(f"http://{address}:{port}/", timeout=5).status_code == 200:
             return True
-    except Exception:
+    except requests.RequestException:
         logging.exception("Failed to access Web server")
 
     return False

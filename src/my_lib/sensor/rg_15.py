@@ -15,9 +15,23 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
+from dataclasses import dataclass
 
 import serial
+
+
+@dataclass
+class RainEvent:
+    """降雨イベントの状態を管理するクラス
+
+    状態管理のため frozen=False（状態更新が必要）
+    """
+
+    fall_sum: float = 0.0
+    fall_time_last: float | None = None
+    fall_time_start: float | None = None
+    fall_stop: bool = True
+    fall_start: bool = False
 
 
 class RG_15:
@@ -34,53 +48,48 @@ class RG_15:
         self.dev: str = dev
         self.ser: serial.Serial = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
         self.sum_by_minute: dict[int, float] = {}
-        self.event: dict[str, Any] = {
-            "fall_sum": 0,
-            "fall_time_last": None,
-            "fall_time_start": None,
-            "fall_stop": True,
-            "fall_start": False,
-        }
+        self.event: RainEvent = RainEvent()
 
     def update_stat(self, data: dict[str, float]) -> list[float | bool]:
         minute = int(time.time() / 60)
 
         if data["acc"] == 0:
-            if (not self.event["fall_stop"]) and (
-                (time.time() - self.event["fall_time_last"]) > self.RAIN_STOP_INTERVAL_SEC
+            if (not self.event.fall_stop) and (
+                self.event.fall_time_last is not None
+                and (time.time() - self.event.fall_time_last) > self.RAIN_STOP_INTERVAL_SEC
             ):
                 self.ser.write("O\r\n".encode(encoding="utf-8"))  # noqa: UP012
                 self.ser.flush()
 
-                self.event["fall_stop"] = True
-                self.event["fall_start"] = False
-                self.event["fall_time_start"] = None
-                self.event["fall_sum"] = 0
+                self.event.fall_stop = True
+                self.event.fall_start = False
+                self.event.fall_time_start = None
+                self.event.fall_sum = 0.0
         else:
-            self.event["fall_time_last"] = time.time()
-            self.event["fall_sum"] += data["acc"]
+            self.event.fall_time_last = time.time()
+            self.event.fall_sum += data["acc"]
 
             if minute in self.sum_by_minute:
                 self.sum_by_minute[minute] += data["acc"]
             else:
                 self.sum_by_minute[minute] = data["acc"]
 
-            if self.event["fall_time_start"] is None:
-                self.event["fall_time_start"] = time.time()
+            if self.event.fall_time_start is None:
+                self.event.fall_time_start = time.time()
 
             if (
-                (not self.event["fall_start"])
-                and ((time.time() - self.event["fall_time_start"]) > self.RAIN_START_INTERVAL_SEC)
-                and (self.event["fall_sum"] >= self.RAIN_START_ACC_SUM)
+                (not self.event.fall_start)
+                and self.event.fall_time_start is not None
+                and ((time.time() - self.event.fall_time_start) > self.RAIN_START_INTERVAL_SEC)
+                and (self.event.fall_sum >= self.RAIN_START_ACC_SUM)
             ):
-                self.event["fall_start"] = True
-                self.event["fall_stop"] = False
-                self.event["fall_time_stop"] = None
+                self.event.fall_start = True
+                self.event.fall_stop = False
 
         # NOTE: 直前の1分間降水量を返す
         rain = self.sum_by_minute.get(minute - 1, 0.0)
 
-        return [rain, self.event["fall_start"]]
+        return [rain, self.event.fall_start]
 
     def ping(self) -> bool:
         try:

@@ -266,7 +266,7 @@ class TestConnectionParams:
         params = db_conn._get_connection_params()
 
         assert checkpoint_dir.exists()
-        assert "timeout" in params
+        assert params.timeout is not None
 
 
 class TestNonBlockLocking:

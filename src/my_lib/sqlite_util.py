@@ -21,7 +21,17 @@ import os
 import pathlib
 import sqlite3
 import time
+from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass(frozen=True)
+class SQLiteConnectionParams:
+    """SQLite接続パラメータを保持するデータクラス"""
+
+    timeout: float
+    check_same_thread: bool
+    isolation_level: str
 
 
 def init_persistent(conn: sqlite3.Connection) -> None:
@@ -131,19 +141,17 @@ class DatabaseConnection:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             return True
 
-    def _get_connection_params(self) -> dict[str, Any]:
+    def _get_connection_params(self) -> SQLiteConnectionParams:
         """SQLite接続パラメータを取得"""
-        params: dict[str, Any] = {
-            "timeout": self.timeout,
-            "check_same_thread": False,
-            "isolation_level": "DEFERRED",
-        }
-
         checkpoint_dir = os.environ.get("SQLITE_CHECKPOINT_DIR")
         if checkpoint_dir:
             pathlib.Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
-        return params
+        return SQLiteConnectionParams(
+            timeout=self.timeout,
+            check_same_thread=False,
+            isolation_level="DEFERRED",
+        )
 
     def _create_connection(self) -> sqlite3.Connection:
         """実際の接続処理"""
@@ -167,7 +175,13 @@ class DatabaseConnection:
 
                         try:
                             is_new_db = not self.db_path.exists()
-                            self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
+                            params = self._get_connection_params()
+                            self.conn = sqlite3.connect(
+                                self.db_path,
+                                timeout=params.timeout,
+                                check_same_thread=params.check_same_thread,
+                                isolation_level=params.isolation_level,
+                            )
 
                             if is_new_db:
                                 init_persistent(self.conn)
@@ -189,7 +203,13 @@ class DatabaseConnection:
         else:
             # 既存のデータベースへの接続
             cleanup_stale_files(self.db_path)
-            self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
+            params = self._get_connection_params()
+            self.conn = sqlite3.connect(
+                self.db_path,
+                timeout=params.timeout,
+                check_same_thread=params.check_same_thread,
+                isolation_level=params.isolation_level,
+            )
             init_connection(self.conn, timeout=self.timeout)
             logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
@@ -287,11 +307,11 @@ def recover(db_path: str | pathlib.Path) -> None:
             conn.close()
             logging.info("データベースの整合性チェックが成功しました")
 
-        except Exception:
+        except sqlite3.Error:
             logging.exception("データベースの整合性チェックに失敗")
             backup_path = db_path.with_suffix(f".backup.{int(time.time())}")
             db_path.rename(backup_path)
             logging.warning("破損したデータベースを %s にバックアップし、新規作成します", backup_path)
 
-    except Exception:
+    except OSError:
         logging.exception("データベース復旧中にエラーが発生")
