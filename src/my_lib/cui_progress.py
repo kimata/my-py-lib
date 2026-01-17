@@ -452,5 +452,6 @@ class NullProgressManager:
     def set_status(self, _status: str, *, is_error: bool = False) -> None:
         """何もしない"""
 
-    def print(self, *_args: Any, **_kwargs: Any) -> None:
-        """何もしない"""
+    def print(self, *args: Any, **kwargs: Any) -> None:
+        """コンソールに出力（Live 表示がないため常に出力）"""
+        self._console.print(*args, **kwargs)
