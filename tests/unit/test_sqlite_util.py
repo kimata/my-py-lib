@@ -171,7 +171,7 @@ class TestInit:
 
         db_path = temp_dir / "test.db"
         conn = sqlite3.connect(db_path)
-        my_lib.sqlite_util.init(conn)
+        my_lib.sqlite_util.init_connection(conn)
 
         # synchronous が FULL に設定されていることを確認
         cursor = conn.cursor()
@@ -190,7 +190,7 @@ class TestInit:
 
         db_path = temp_dir / "test_wal.db"
         conn = sqlite3.connect(db_path)
-        my_lib.sqlite_util.init(conn)
+        my_lib.sqlite_util.init_persistent(conn)
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode")
@@ -207,7 +207,7 @@ class TestInit:
 
         db_path = temp_dir / "test_delete.db"
         conn = sqlite3.connect(db_path)
-        my_lib.sqlite_util.init(conn)
+        my_lib.sqlite_util.init_persistent(conn)
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA journal_mode")
@@ -224,7 +224,7 @@ class TestInit:
 
         db_path = temp_dir / "test_exclusive.db"
         conn = sqlite3.connect(db_path)
-        my_lib.sqlite_util.init(conn)
+        my_lib.sqlite_util.init_connection(conn)
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA locking_mode")
@@ -241,7 +241,7 @@ class TestInit:
 
         db_path = temp_dir / "test_mmap.db"
         conn = sqlite3.connect(db_path)
-        my_lib.sqlite_util.init(conn)
+        my_lib.sqlite_util.init_connection(conn)
 
         cursor = conn.cursor()
         cursor.execute("PRAGMA mmap_size")

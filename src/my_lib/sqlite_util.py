@@ -24,52 +24,55 @@ import time
 from typing import Any
 
 
-def init(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
+def init_persistent(conn: sqlite3.Connection) -> None:
     """
-    SQLiteデータベースのテーブル設定を初期化する
+    DBファイルに永続化されるPRAGMA設定を行う（新規作成時のみ）
+
+    Args:
+        conn: SQLiteデータベース接続
+    """
+    # ジャーナルモード: WALモードはNFSでも動作するが、DELETEモードの方が安全な場合もある
+    journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
+    conn.execute(f"PRAGMA journal_mode={journal_mode}")
+
+    # ページサイズ: 標準的な4096バイトを使用
+    conn.execute("PRAGMA page_size=4096")
+
+    conn.commit()
+    logging.info("SQLiteデータベースの永続設定を初期化しました")
+
+
+def init_connection(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
+    """
+    接続ごとに必要なPRAGMA設定を行う（毎回の接続時に呼ぶ）
 
     Args:
         conn: SQLiteデータベース接続
         timeout: データベース接続のタイムアウト時間（秒）
-
     """
-    # Kubernetes manual storage class（ローカルストレージ/NFS）に最適化されたPRAGMA設定
-
-    # ジャーナルモード: WALモードはNFSでも動作するが、DELETEモードの方が安全な場合もある
-    # NFSでのファイルロック問題を回避するため、環境に応じて選択可能にする
-    journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
-    conn.execute(f"PRAGMA journal_mode={journal_mode}")
-
     # 同期モード: NFSやローカルストレージではFULLが最も安全
-    # データ整合性を優先（特にNFSの場合）
     conn.execute("PRAGMA synchronous=FULL")
 
-    # ページサイズ: 標準的な4096バイトを使用（ほとんどのファイルシステムで最適）
-    conn.execute("PRAGMA page_size=4096")
-
     # WALモード使用時の設定
+    journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
     if journal_mode == "WAL":
-        # WALの自動チェックポイント間隔（デフォルト1000）
         conn.execute("PRAGMA wal_autocheckpoint=1000")
-
-        # WALファイルの最大サイズを制限（NFSでの巨大ファイル転送を避ける）
         conn.execute("PRAGMA journal_size_limit=67108864")  # 64MB
 
     # キャッシュサイズ: 控えめに設定（Pod のメモリ制限を考慮）
-    conn.execute("PRAGMA cache_size=-32000")  # 約32MB（負値はKB単位）
+    conn.execute("PRAGMA cache_size=-32000")  # 約32MB
 
-    # テンポラリストレージをメモリに設定（ディスクI/Oを削減）
+    # テンポラリストレージをメモリに設定
     conn.execute("PRAGMA temp_store=MEMORY")
 
-    # mmapサイズ: NFSでは無効化または小さく設定（0で無効化）
-    # NFSでのmmapは問題を起こす可能性があるため
+    # mmapサイズ: NFSでは無効化（0で無効化）
     mmap_size = int(os.environ.get("SQLITE_MMAP_SIZE", "0"))
     conn.execute(f"PRAGMA mmap_size={mmap_size}")
 
-    # ロックタイムアウトを長めに設定（NFSレイテンシを考慮）
+    # ロックタイムアウト（NFSレイテンシを考慮）
     conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
 
-    # 外部キー制約を有効化（データ整合性のため）
+    # 外部キー制約を有効化
     conn.execute("PRAGMA foreign_keys=ON")
 
     # ロックモード: CephFS/NFSでは排他ロックモードが必要
@@ -77,7 +80,28 @@ def init(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
     conn.execute(f"PRAGMA locking_mode={locking_mode}")
 
     conn.commit()
-    logging.info("SQLiteデータベースのテーブル設定を初期化しました")
+    logging.debug("SQLiteデータベースの接続設定を適用しました")
+
+
+def cleanup_stale_files(db_path: pathlib.Path) -> None:
+    """
+    CephFS/NFS環境で残存するWAL/SHMファイルを削除する
+
+    Podクラッシュ後などにこれらのファイルが残っていると
+    「locking protocol」エラーが発生するため、接続前に削除する。
+
+    Args:
+        db_path: データベースファイルのパス
+    """
+    wal_path = db_path.with_suffix(db_path.suffix + "-wal")
+    shm_path = db_path.with_suffix(db_path.suffix + "-shm")
+
+    if wal_path.exists() or shm_path.exists():
+        logging.warning("残存するWAL/SHMファイルを削除します: %s", db_path)
+        with contextlib.suppress(Exception):
+            wal_path.unlink(missing_ok=True)
+        with contextlib.suppress(Exception):
+            shm_path.unlink(missing_ok=True)
 
 
 class DatabaseConnection:
@@ -90,7 +114,6 @@ class DatabaseConnection:
         Args:
             db_path: データベースファイルのパス
             timeout: データベース接続のタイムアウト時間（秒）
-
         """
         self.db_path = pathlib.Path(db_path)
         self.timeout = timeout
@@ -105,7 +128,6 @@ class DatabaseConnection:
             except BlockingIOError:
                 return False
         else:
-            # 通常の排他ロック（ブロッキング）
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             return True
 
@@ -117,7 +139,6 @@ class DatabaseConnection:
             "isolation_level": "DEFERRED",
         }
 
-        # NFSキャッシュ対策: checkpointディレクトリが使われる場合の設定
         checkpoint_dir = os.environ.get("SQLITE_CHECKPOINT_DIR")
         if checkpoint_dir:
             pathlib.Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -128,7 +149,6 @@ class DatabaseConnection:
         """実際の接続処理"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # データベースファイルが存在しない場合のみ初期化を実行
         is_new_db = not self.db_path.exists()
 
         if is_new_db:
@@ -139,33 +159,26 @@ class DatabaseConnection:
 
             while retry_count < max_retries:
                 try:
-                    # ロックファイルを使用して排他制御
                     with lock_path.open("w") as lock_file:
                         if not self._acquire_lock(lock_file):
                             retry_count += 1
-                            time.sleep(0.1 * retry_count)  # 指数バックオフ
+                            time.sleep(0.1 * retry_count)
                             continue
 
                         try:
-                            # ロック取得後、再度存在確認（他のプロセスが作成済みの可能性）
                             is_new_db = not self.db_path.exists()
                             self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
 
                             if is_new_db:
-                                init(self.conn, timeout=self.timeout)
-                                logging.info("新規SQLiteデータベースを作成・初期化しました: %s", self.db_path)
-                            else:
-                                logging.debug(
-                                    "既存のSQLiteデータベースに接続しました（ロック待機後）: %s", self.db_path
-                                )
+                                init_persistent(self.conn)
+                                logging.info("新規SQLiteデータベースを作成しました: %s", self.db_path)
+                            init_connection(self.conn, timeout=self.timeout)
                         finally:
-                            # ロックを解放
                             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
-                    # ロックファイルを削除（エラーは無視）
                     with contextlib.suppress(Exception):
                         lock_path.unlink()
-                    break  # 成功したらループを抜ける
+                    break
 
                 except Exception:
                     retry_count += 1
@@ -175,7 +188,9 @@ class DatabaseConnection:
                     time.sleep(0.1 * retry_count)
         else:
             # 既存のデータベースへの接続
+            cleanup_stale_files(self.db_path)
             self.conn = sqlite3.connect(self.db_path, **self._get_connection_params())
+            init_connection(self.conn, timeout=self.timeout)
             logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
         assert self.conn is not None  # noqa: S101
@@ -188,15 +203,15 @@ class DatabaseConnection:
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
+        _exc_val: BaseException | None,
+        _exc_tb: Any,
     ) -> None:
         """Context Manager として使用する場合のexit"""
         if self.conn is not None:
             if exc_type is None:
-                self.conn.commit()  # 正常終了時はコミット
+                self.conn.commit()
             else:
-                self.conn.rollback()  # 例外発生時はロールバック
+                self.conn.rollback()
             self.conn.close()
 
     def get(self) -> sqlite3.Connection:
@@ -229,7 +244,6 @@ def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseCo
             conn.execute("SELECT * FROM table")
         finally:
             conn.close()
-
     """
     return DatabaseConnection(db_path, timeout=timeout)
 
@@ -239,11 +253,9 @@ def recover(db_path: str | pathlib.Path) -> None:
     try:
         db_path = pathlib.Path(db_path)
 
-        # ジャーナルファイルのパスを取得
         journal_mode = os.environ.get("SQLITE_JOURNAL_MODE", "WAL")
 
         if journal_mode == "WAL":
-            # WALモードの場合
             wal_path = db_path.with_suffix(db_path.suffix + "-wal")
             shm_path = db_path.with_suffix(db_path.suffix + "-shm")
 
@@ -255,23 +267,19 @@ def recover(db_path: str | pathlib.Path) -> None:
                 logging.warning("共有メモリファイル %s を削除します", shm_path)
                 shm_path.unlink()
         else:
-            # その他のジャーナルモードの場合
             journal_path = db_path.with_suffix(db_path.suffix + "-journal")
             if journal_path.exists():
                 logging.warning("ジャーナルファイル %s を削除してデータベースを復旧します", journal_path)
                 journal_path.unlink()
 
-        # データベースの整合性チェック
         try:
             conn = sqlite3.connect(db_path, timeout=5.0)
             result = conn.execute("PRAGMA integrity_check").fetchone()
             if result[0] != "ok":
                 raise sqlite3.DatabaseError(f"整合性チェック失敗: {result[0]}")
 
-            # 追加のチェック: quick_check（より高速）
             conn.execute("PRAGMA quick_check")
 
-            # VACUUM実行（データベースの最適化と修復）
             if os.environ.get("SQLITE_AUTO_VACUUM") == "1":
                 logging.info("データベースのVACUUMを実行します")
                 conn.execute("VACUUM")
@@ -281,7 +289,6 @@ def recover(db_path: str | pathlib.Path) -> None:
 
         except Exception:
             logging.exception("データベースの整合性チェックに失敗")
-            # 最後の手段としてデータベースを再作成
             backup_path = db_path.with_suffix(f".backup.{int(time.time())}")
             db_path.rename(backup_path)
             logging.warning("破損したデータベースを %s にバックアップし、新規作成します", backup_path)
