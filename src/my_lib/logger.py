@@ -80,7 +80,7 @@ def init(
         )
         log_handler.formatter = _log_formatter(name)
         log_handler.namer = _GZipRotator.namer
-        log_handler.rotator = _GZipRotator.rotator  # type: ignore[assignment]
+        log_handler.rotator = _GZipRotator.rotator
 
         logger.addHandler(log_handler)
 
