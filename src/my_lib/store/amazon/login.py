@@ -89,7 +89,7 @@ def _handle_password_input(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptchaConfig | None,
+    slack_config: my_lib.notify.slack.HasCaptchaConfig,
 ) -> None:
     """パスワード入力処理"""
     if not my_lib.selenium_util.xpath_exists(driver, '//input[@id="ap_password"]'):
@@ -236,7 +236,7 @@ def _execute_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptchaConfig | None,
+    slack_config: my_lib.notify.slack.HasCaptchaConfig,
     login_mark_xpath: str,
 ) -> None:
     wait.until(
@@ -253,15 +253,12 @@ def _execute_impl(
         return
 
     if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
-        if slack_config is None:
-            raise ValueError("captcha 設定がありません")
         _resolve_puzzle(driver, wait, slack_config)
 
     _handle_email_input(driver, login_config)
     _handle_password_input(driver, wait, login_config, slack_config)
 
-    if slack_config is not None:
-        _handle_quiz(driver, slack_config, login_config.dump_path)
+    _handle_quiz(driver, slack_config, login_config.dump_path)
     _handle_security_check(driver, login_config.dump_path)
 
     wait.until(
@@ -279,7 +276,7 @@ def execute(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     login_config: AmazonLoginConfig,
-    slack_config: my_lib.notify.slack.HasCaptchaConfig | None = None,
+    slack_config: my_lib.notify.slack.HasCaptchaConfig,
     login_url: str = _LOGIN_URL,
     login_mark_xpath: str = _LOGIN_MARK_XPATH,
     retry: int = 2,
@@ -335,15 +332,15 @@ if __name__ == "__main__":
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(config["data"]["selenium"]))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 5)
 
-    slack_config_parsed = my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
-    slack_config: my_lib.notify.slack.HasCaptchaConfig | None = (
-        slack_config_parsed
-        if isinstance(
-            slack_config_parsed,
-            my_lib.notify.slack.SlackConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,
-        )
-        else None
-    )
+    if "slack" not in config:
+        raise ValueError("slack 設定がありません")
+    slack_config_parsed = my_lib.notify.slack.parse_config(config["slack"])
+    if not isinstance(
+        slack_config_parsed,
+        my_lib.notify.slack.SlackConfig | my_lib.notify.slack.SlackCaptchaOnlyConfig,
+    ):
+        raise ValueError("slack 設定に captcha の設定がありません")
+    slack_config: my_lib.notify.slack.HasCaptchaConfig = slack_config_parsed
 
     try:
         execute(driver, wait, login_config, slack_config)

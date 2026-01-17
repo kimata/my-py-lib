@@ -28,6 +28,7 @@ import time
 import traceback
 import wsgiref.handlers
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import flask
@@ -57,6 +58,18 @@ MAX_RETRY_DELAY_SEC = 5.0
 blueprint = flask.Blueprint("webapp-log", __name__)
 
 
+@dataclass
+class WorkerLogState:
+    """ワーカー毎のログ状態を管理するデータクラス"""
+
+    log_thread: threading.Thread
+    queue_lock: threading.RLock
+    log_manager: multiprocessing.managers.SyncManager
+    log_queue: Any
+    log_event: threading.Event
+    should_terminate: threading.Event
+
+
 class LogManager:
     """ログ管理クラス
 
@@ -65,51 +78,60 @@ class LogManager:
     """
 
     def __init__(self) -> None:
-        self._config: dict[str, Any] | None = None
-        self._log_thread: dict[str | None, threading.Thread] = {}
-        self._queue_lock: dict[str | None, threading.RLock] = {}
-        self._log_queue: dict[str | None, Any] = {}
-        self._log_manager: dict[str | None, multiprocessing.managers.SyncManager] = {}
-        self._log_event: dict[str | None, threading.Event] = {}
-        self._should_terminate: dict[str | None, threading.Event] = {}
+        self._slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
+            my_lib.notify.slack.SlackEmptyConfig()
+        )
+        self._worker_states: dict[str | None, WorkerLogState] = {}
 
     @property
-    def config(self) -> dict[str, Any] | None:
-        """設定 dict"""
-        return self._config
+    def slack_config(self) -> my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig:
+        """Slack 設定"""
+        return self._slack_config
 
-    @config.setter
-    def config(self, value: dict[str, Any] | None) -> None:
-        self._config = value
+    @slack_config.setter
+    def slack_config(
+        self, value: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig
+    ) -> None:
+        self._slack_config = value
 
     @staticmethod
     def get_worker_id() -> str | None:
         """pytest-xdist のワーカー ID を取得する"""
         return os.environ.get("PYTEST_XDIST_WORKER", None)
 
+    def get_worker_state(self) -> WorkerLogState | None:
+        """現在のワーカーの状態を取得する"""
+        return self._worker_states.get(self.get_worker_id())
+
     def get_log_thread(self) -> threading.Thread | None:
         """現在のワーカーのログスレッドを取得する"""
-        return self._log_thread.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.log_thread if state is not None else None
 
     def get_queue_lock(self) -> threading.RLock | None:
         """現在のワーカーのキューロックを取得する"""
-        return self._queue_lock.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.queue_lock if state is not None else None
 
     def get_log_manager(self) -> multiprocessing.managers.SyncManager | None:
         """現在のワーカーのマネージャーを取得する"""
-        return self._log_manager.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.log_manager if state is not None else None
 
     def get_log_queue(self) -> Any:
         """現在のワーカーのログキューを取得する"""
-        return self._log_queue.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.log_queue if state is not None else None
 
     def get_log_event(self) -> threading.Event | None:
         """現在のワーカーのログイベントを取得する"""
-        return self._log_event.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.log_event if state is not None else None
 
     def get_should_terminate(self) -> threading.Event | None:
         """現在のワーカーの終了フラグを取得する"""
-        return self._should_terminate.get(self.get_worker_id(), None)
+        state = self.get_worker_state()
+        return state.should_terminate if state is not None else None
 
     def get_db_path(self) -> pathlib.Path:
         """データベースパスを取得する（ワーカー ID に応じたパスを返す）"""
@@ -127,14 +149,18 @@ class LogManager:
             worker_dir.mkdir(parents=True, exist_ok=True)
             return worker_dir / base_path.name
 
-    def init(self, config: dict[str, Any], is_read_only: bool = False) -> None:
+    def init(
+        self,
+        slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+        is_read_only: bool = False,
+    ) -> None:
         """ログシステムを初期化する
 
         Args:
-            config: 設定 dict
+            slack_config: Slack 設定
             is_read_only: 読み取り専用モード
         """
-        self._config = config
+        self._slack_config = slack_config
 
         db_path = self.get_db_path()
         # 初回のみsqlite_util.connectを使用してデータベースを初期化
@@ -156,22 +182,34 @@ class LogManager:
             log_manager.shutdown()
 
         worker_id = self.get_worker_id()
+        current_state = self.get_worker_state()
 
-        should_terminate = self.get_should_terminate()
-        if should_terminate is not None:
-            should_terminate.clear()
+        # 既存の状態がある場合は should_terminate をクリア
+        if current_state is not None:
+            current_state.should_terminate.clear()
+            queue_lock = current_state.queue_lock
+            should_terminate = current_state.should_terminate
+            log_event = current_state.log_event
         else:
-            self._queue_lock[worker_id] = threading.RLock()
-            self._should_terminate[worker_id] = threading.Event()
-            self._log_event[worker_id] = threading.Event()
+            queue_lock = threading.RLock()
+            should_terminate = threading.Event()
+            log_event = threading.Event()
 
         manager = multiprocessing.Manager()
+        log_queue = manager.Queue()
 
-        self._log_manager[worker_id] = manager
-        self._log_queue[worker_id] = manager.Queue()
+        log_thread = threading.Thread(target=self._worker, args=(log_queue,))
 
-        self._log_thread[worker_id] = threading.Thread(target=self._worker, args=(self.get_log_queue(),))
-        self._log_thread[worker_id].start()
+        self._worker_states[worker_id] = WorkerLogState(
+            log_thread=log_thread,
+            queue_lock=queue_lock,
+            log_manager=manager,
+            log_queue=log_queue,
+            log_event=log_event,
+            should_terminate=should_terminate,
+        )
+
+        log_thread.start()
 
     def term(self, is_read_only: bool = False) -> None:
         """ログシステムを終了する
@@ -182,21 +220,17 @@ class LogManager:
         if is_read_only:
             return
 
-        log_thread = self.get_log_thread()
-        if log_thread is None:
+        state = self.get_worker_state()
+        if state is None:
             return
 
-        should_terminate = self.get_should_terminate()
-        log_event = self.get_log_event()
-        if should_terminate is not None:
-            should_terminate.set()
-        if log_event is not None:
-            log_event.set()
+        state.should_terminate.set()
+        state.log_event.set()
 
         time.sleep(1)
 
-        log_thread.join()
-        del self._log_thread[self.get_worker_id()]
+        state.log_thread.join()
+        del self._worker_states[self.get_worker_id()]
 
     def _execute_with_retry(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
         """リトライ機能付きで関数を実行する"""
@@ -251,15 +285,8 @@ class LogManager:
         my_lib.webapp.event.notify_event(my_lib.webapp.event.EVENT_TYPE.LOG)
 
         if level == LOG_LEVEL.ERROR:
-            if self._config is not None and "slack" in self._config:
-                slack_config = my_lib.notify.slack.parse_config(self._config["slack"])
-                if isinstance(
-                    slack_config,
-                    my_lib.notify.slack.SlackConfig
-                    | my_lib.notify.slack.SlackErrorInfoConfig
-                    | my_lib.notify.slack.SlackErrorOnlyConfig,
-                ):
-                    my_lib.notify.slack.error(slack_config, self._config["slack"]["from"], message)
+            if not isinstance(self._slack_config, my_lib.notify.slack.SlackEmptyConfig):
+                my_lib.notify.slack.error(self._slack_config, self._slack_config.from_name, message)
 
             if (os.environ.get("DUMMY_MODE", "false") == "true") and (
                 os.environ.get("TEST", "false") != "true"
@@ -388,14 +415,17 @@ def _get_worker_id() -> str | None:
     return _manager.get_worker_id()
 
 
-def init(config_: dict[str, Any], is_read_only: bool = False) -> None:
+def init(
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+    is_read_only: bool = False,
+) -> None:
     """ログシステムを初期化する
 
     Args:
-        config_: 設定 dict
+        slack_config: Slack 設定
         is_read_only: 読み取り専用モード
     """
-    _manager.init(config_, is_read_only)
+    _manager.init(slack_config, is_read_only)
 
 
 def _init_impl() -> None:
@@ -561,7 +591,11 @@ def api_log_view() -> flask.Response:
     return response
 
 
-def test_run(config: dict[str, Any], port: int, debug_mode: bool) -> None:
+def test_run(
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
+    port: int,
+    debug_mode: bool,
+) -> None:
     """テスト用サーバを実行する"""
     import flask_cors
 
@@ -570,7 +604,7 @@ def test_run(config: dict[str, Any], port: int, debug_mode: bool) -> None:
     # NOTE: アクセスログは無効にする
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    my_lib.webapp.log.init(config)
+    my_lib.webapp.log.init(slack_config)
 
     flask_cors.CORS(app)
 
@@ -623,8 +657,8 @@ if __name__ == "__main__":
     base_url = f"http://127.0.0.1:{port}/test"
 
     assert config is not None, "Config must be loaded before running test"  # noqa: S101
-    config_: dict[str, Any] = config  # Capture narrowed type for lambda
-    proc = multiprocessing.Process(target=lambda: test_run(config_, port, debug_mode))
+    slack_config = my_lib.notify.slack.parse_config(config.get("slack", {}))
+    proc = multiprocessing.Process(target=lambda: test_run(slack_config, port, debug_mode))
     proc.start()
 
     time.sleep(0.5)

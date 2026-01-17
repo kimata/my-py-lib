@@ -114,6 +114,9 @@ class HasErrorConfig(HasBotToken, Protocol):
     @property
     def error(self) -> SlackErrorConfig: ...
 
+    @property
+    def from_name(self) -> str: ...
+
 
 class HasInfoConfig(HasBotToken, Protocol):
     """Slack 情報通知設定の Protocol"""

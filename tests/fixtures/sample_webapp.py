@@ -28,6 +28,7 @@ def create_app(config_file):
     my_lib.webapp.config.init(config)
 
     import data.sample_webapp
+    import my_lib.notify.slack
     import my_lib.webapp.base
     import my_lib.webapp.event
     import my_lib.webapp.log
@@ -39,7 +40,8 @@ def create_app(config_file):
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        my_lib.webapp.log.init(config)
+        slack_config = my_lib.notify.slack.parse_config(config.get("slack", {}))
+        my_lib.webapp.log.init(slack_config)
 
         def notify_terminate():  # pragma: no cover
             my_lib.webapp.log.info("🏃 アプリを再起動します．")

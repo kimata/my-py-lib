@@ -39,11 +39,14 @@ from my_lib.store.amazon.config import AmazonItem
 if TYPE_CHECKING:
     from typing import Any
 
+# デフォルトのSlack設定（空設定）
+_DEFAULT_SLACK_CONFIG: my_lib.notify.slack.SlackEmptyConfig = my_lib.notify.slack.SlackEmptyConfig()
+
 
 def _fetch_price_impl(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    slack_config: my_lib.notify.slack.HasErrorConfig | None,
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
     item: AmazonItem,
 ) -> bool:
     """価格情報を取得して item を更新する.
@@ -146,16 +149,15 @@ def _fetch_price_impl(
         else:
             logging.warning("Unable to fetch price: %s", item.url)
 
-            if slack_config is not None:
-                my_lib.notify.slack.error_with_image(
-                    slack_config,
-                    "価格取得に失敗",
-                    f"{item.url}\nprice_text='{price_text}'",
-                    {
-                        "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                        "text": "スクリーンショット",
-                    },
-                )
+            my_lib.notify.slack.error_with_image(
+                slack_config,
+                "価格取得に失敗",
+                f"{item.url}\nprice_text='{price_text}'",
+                {
+                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                    "text": "スクリーンショット",
+                },
+            )
             item.price = 0
             return True
 
@@ -167,16 +169,15 @@ def _fetch_price_impl(
     except Exception:
         logging.warning('Unable to parse "%s": %s.', price_text, item.url)
 
-        if slack_config is not None:
-            my_lib.notify.slack.error_with_image(
-                slack_config,
-                "価格取得に失敗",
-                f"{item.url}\n{traceback.format_exc()}",
-                {
-                    "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
-                    "text": "スクリーンショット",
-                },
-            )
+        my_lib.notify.slack.error_with_image(
+            slack_config,
+            "価格取得に失敗",
+            f"{item.url}\n{traceback.format_exc()}",
+            {
+                "data": PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                "text": "スクリーンショット",
+            },
+        )
         item.price = 0
         return True
 
@@ -187,7 +188,8 @@ def fetch_price(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
     item: AmazonItem,
-    slack_config: my_lib.notify.slack.HasErrorConfig | None = None,
+    slack_config: my_lib.notify.slack.HasErrorConfig
+    | my_lib.notify.slack.SlackEmptyConfig = _DEFAULT_SLACK_CONFIG,
     dump_path: pathlib.Path | None = None,
 ) -> AmazonItem:
     try:
@@ -240,8 +242,8 @@ if __name__ == "__main__":
     driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
     wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
 
-    slack_config_parsed = my_lib.notify.slack.parse_config(config["slack"]) if "slack" in config else None
-    slack_config: my_lib.notify.slack.HasErrorConfig | None = (
+    slack_config_parsed = my_lib.notify.slack.parse_config(config.get("slack", {}))
+    slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
         slack_config_parsed
         if isinstance(
             slack_config_parsed,
@@ -249,7 +251,7 @@ if __name__ == "__main__":
             | my_lib.notify.slack.SlackErrorInfoConfig
             | my_lib.notify.slack.SlackErrorOnlyConfig,
         )
-        else None
+        else my_lib.notify.slack.SlackEmptyConfig()
     )
 
     dump_path = (

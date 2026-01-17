@@ -24,24 +24,46 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import wave
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Self
 
 import numpy as np
 import pyaudio  # type: ignore[import-untyped]
 import scipy.signal
 
 
-def get_query_url(config: dict[str, Any], text: str, speaker_id: int) -> str:
+@dataclass(frozen=True)
+class VoiceServerConfig:
+    """VOICEVOX サーバー設定"""
+
+    url: str
+
+
+@dataclass(frozen=True)
+class VoiceConfig:
+    """音声合成設定"""
+
+    server: VoiceServerConfig
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成"""
+        return cls(
+            server=VoiceServerConfig(url=data["server"]["url"]),
+        )
+
+
+def get_query_url(config: VoiceConfig, text: str, speaker_id: int) -> str:
     return urllib.parse.urlunparse(
-        urllib.parse.urlparse(
-            urllib.parse.urljoin(config["voice"]["server"]["url"], "/audio_query")
-        )._replace(query=urllib.parse.urlencode({"text": text, "speaker": speaker_id}))
+        urllib.parse.urlparse(urllib.parse.urljoin(config.server.url, "/audio_query"))._replace(
+            query=urllib.parse.urlencode({"text": text, "speaker": speaker_id})
+        )
     )
 
 
-def get_synthesis_url(config: dict[str, Any], speaker_id: int) -> str:
+def get_synthesis_url(config: VoiceConfig, speaker_id: int) -> str:
     return urllib.parse.urlunparse(
-        urllib.parse.urlparse(urllib.parse.urljoin(config["voice"]["server"]["url"], "/synthesis"))._replace(
+        urllib.parse.urlparse(urllib.parse.urljoin(config.server.url, "/synthesis"))._replace(
             query=urllib.parse.urlencode({"speaker": speaker_id})
         )
     )
@@ -103,7 +125,7 @@ def convert_wav_data(wav_data_in: bytes) -> bytes:
     return out_buf.getvalue()
 
 
-def synthesize(config: dict[str, Any], text: str, speaker_id: int = 3, volume: int | float = 2) -> bytes:
+def synthesize(config: VoiceConfig, text: str, speaker_id: int = 3, volume: int | float = 2) -> bytes:
     if not isinstance(text, str) or len(text.strip()) == 0:
         raise ValueError("Text must be a non-empty string")
     if not isinstance(speaker_id, int) or speaker_id < 0:
@@ -111,8 +133,7 @@ def synthesize(config: dict[str, Any], text: str, speaker_id: int = 3, volume: i
     if not isinstance(volume, int | float) or volume < 0:
         raise ValueError("Volume must be a non-negative number")
 
-    server_url = config["voice"]["server"]["url"]
-    parsed_url = urllib.parse.urlparse(server_url)
+    parsed_url = urllib.parse.urlparse(config.server.url)
     if not parsed_url.scheme or not parsed_url.netloc:
         raise ValueError("Invalid server URL in configuration")
 
@@ -213,8 +234,9 @@ if __name__ == "__main__":
     my_lib.logger.init("my-lib.config", level=logging.DEBUG if debug_mode else logging.INFO)
 
     config = my_lib.config.load(config_file)
+    voice_config = VoiceConfig.parse(config["voice"])
 
-    wav_data = synthesize(config, message, speaker_id)
+    wav_data = synthesize(voice_config, message, speaker_id)
 
     with pathlib.Path(out_file).open("wb") as f:
         f.write(wav_data)

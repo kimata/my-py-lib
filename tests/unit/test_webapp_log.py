@@ -47,11 +47,12 @@ class TestLogManager:
 
     def test_init(self):
         """初期化"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import LogManager
 
         manager = LogManager()
 
-        assert manager.config is None
+        assert isinstance(manager.slack_config, SlackEmptyConfig)
         assert manager.get_log_thread() is None
         assert manager.get_queue_lock() is None
 
@@ -112,11 +113,12 @@ class TestInit:
 
     def test_creates_database(self, log_db_path, monkeypatch):
         """データベースを作成する"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import _manager, init, term
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init({}, is_read_only=False)
+        init(SlackEmptyConfig(), is_read_only=False)
 
         assert log_db_path.exists()
         assert _manager.get_log_thread() is not None
@@ -125,11 +127,12 @@ class TestInit:
 
     def test_read_only_mode(self, log_db_path, monkeypatch):
         """読み取り専用モード"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import _manager, init
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init({}, is_read_only=True)
+        init(SlackEmptyConfig(), is_read_only=True)
 
         assert log_db_path.exists()
         # 読み取り専用モードではスレッドは起動しない
@@ -212,11 +215,12 @@ class TestGet:
 
     def test_returns_empty_list_when_no_logs(self, log_db_path, monkeypatch):
         """ログがない場合は空リストを返す"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import _manager, init
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init({}, is_read_only=True)
+        init(SlackEmptyConfig(), is_read_only=True)
 
         logs = _manager.get()
         assert logs == []
@@ -227,11 +231,12 @@ class TestClear:
 
     def test_clears_database(self, log_db_path, monkeypatch):
         """データベースをクリアする"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import _manager, init
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init({}, is_read_only=True)
+        init(SlackEmptyConfig(), is_read_only=True)
 
         # クリア（例外が発生しなければ OK）
         _manager.clear()
@@ -261,6 +266,7 @@ class TestApiEndpoints:
     def test_api_log_view_returns_json(self, log_db_path, monkeypatch):
         """api_log_view は JSON を返す"""
         import my_lib.webapp.log as log_module
+        from my_lib.notify.slack import SlackEmptyConfig
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
@@ -268,7 +274,7 @@ class TestApiEndpoints:
         app.config["TEST"] = True
         app.register_blueprint(log_module.blueprint)
 
-        log_module.init({}, is_read_only=True)
+        log_module.init(SlackEmptyConfig(), is_read_only=True)
 
         with app.test_client() as client:
             response = client.get("/api/log_view")
@@ -280,6 +286,7 @@ class TestApiEndpoints:
     def test_api_log_add_requires_test_mode(self, log_db_path, monkeypatch):
         """api_log_add はテストモードでないと 403"""
         import my_lib.webapp.log as log_module
+        from my_lib.notify.slack import SlackEmptyConfig
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
@@ -287,7 +294,7 @@ class TestApiEndpoints:
         app.config["TEST"] = False
         app.register_blueprint(log_module.blueprint)
 
-        log_module.init({}, is_read_only=True)
+        log_module.init(SlackEmptyConfig(), is_read_only=True)
 
         with app.test_client() as client:
             response = client.post("/api/log_add", data={"message": "test"})
