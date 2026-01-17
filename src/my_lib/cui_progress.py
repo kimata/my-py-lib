@@ -413,6 +413,7 @@ class NullProgressManager:
         **_kwargs: Any,
     ) -> None:
         self._console = console if console is not None else rich.console.Console()
+        self._start_time: float = time.time()
 
     @property
     def console(self) -> rich.console.Console:
