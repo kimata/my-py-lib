@@ -23,6 +23,16 @@ class LiveDisplayProtocol(Protocol):
     def resume_live(self) -> None: ...
 
 
+class NullLiveDisplay:
+    """Live 表示がない環境用の Null Object"""
+
+    def pause_live(self) -> None:
+        pass
+
+    def resume_live(self) -> None:
+        pass
+
+
 class GracefulShutdown:
     """Graceful shutdown 管理クラス
 
@@ -39,7 +49,7 @@ class GracefulShutdown:
     def __init__(self) -> None:
         """インスタンスを初期化する"""
         self._shutdown_requested: bool = False
-        self._live_display: LiveDisplayProtocol | None = None
+        self._live_display: LiveDisplayProtocol = NullLiveDisplay()
 
     def is_requested(self) -> bool:
         """シャットダウンがリクエストされているかを返す"""
@@ -53,7 +63,7 @@ class GracefulShutdown:
         """シャットダウンフラグをリセットする"""
         self._shutdown_requested = False
 
-    def set_live_display(self, live_display: LiveDisplayProtocol | None) -> None:
+    def set_live_display(self, live_display: LiveDisplayProtocol) -> None:
         """Rich Live 表示オブジェクトを設定する
 
         シグナルハンドラ内で pause_live/resume_live を呼び出すために必要。
@@ -73,8 +83,7 @@ class GracefulShutdown:
 
         try:
             # Rich Live を一時停止して入力を受け付ける
-            if self._live_display is not None:
-                self._live_display.pause_live()
+            self._live_display.pause_live()
 
             response = input("\n終了しますか？(y/N): ").strip().lower()
             if response == "y":
@@ -86,13 +95,11 @@ class GracefulShutdown:
                 logging.info("処理を継続します")
 
             # Rich Live を再開
-            if self._live_display is not None:
-                self._live_display.resume_live()
+            self._live_display.resume_live()
         except EOFError:
             # 入力が取得できない場合は継続
             logging.info("処理を継続します")
-            if self._live_display is not None:
-                self._live_display.resume_live()
+            self._live_display.resume_live()
 
 
 # デフォルトのシングルトンインスタンス
@@ -128,6 +135,6 @@ def setup_signal_handler() -> None:
     get_default().setup_signal_handler()
 
 
-def set_live_display(live_display: LiveDisplayProtocol | None) -> None:
+def set_live_display(live_display: LiveDisplayProtocol) -> None:
     """Rich Live 表示オブジェクトを設定する（デフォルトインスタンス）"""
     get_default().set_live_display(live_display)

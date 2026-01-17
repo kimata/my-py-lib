@@ -22,6 +22,21 @@ if TYPE_CHECKING:
     from selenium.webdriver.support.wait import WebDriverWait
 
 
+@dataclass(frozen=True)
+class DriverInitialized:
+    """ドライバー起動済み状態"""
+
+    driver: WebDriver
+    wait: WebDriverWait
+
+
+@dataclass(frozen=True)
+class DriverUninitialized:
+    """ドライバー未起動状態"""
+
+    pass
+
+
 @dataclass
 class BrowserManager:
     """Selenium ブラウザ管理クラス（遅延初期化・単一ドライバー）
@@ -56,8 +71,9 @@ class BrowserManager:
     max_retry_on_error: int = 1
 
     # 内部状態
-    _driver: WebDriver | None = field(default=None, init=False, repr=False)
-    _wait: WebDriverWait | None = field(default=None, init=False, repr=False)
+    _driver_state: DriverInitialized | DriverUninitialized = field(
+        default_factory=DriverUninitialized, init=False, repr=False
+    )
 
     def get_driver(self) -> tuple[WebDriver, WebDriverWait]:
         """ドライバーを取得（必要に応じて起動）
@@ -75,8 +91,8 @@ class BrowserManager:
             SeleniumError: ドライバーの起動に失敗した場合
 
         """
-        if self._driver is not None and self._wait is not None:
-            return (self._driver, self._wait)
+        if isinstance(self._driver_state, DriverInitialized):
+            return (self._driver_state.driver, self._driver_state.wait)
 
         last_error: Exception | None = None
         max_attempts = self.max_retry_on_error + 1 if self.clear_profile_on_error else 1
@@ -93,17 +109,19 @@ class BrowserManager:
                 else:
                     logging.info("Selenium ドライバーを起動しています (%s)...", self.profile_name)
 
-                self._driver = my_lib.selenium_util.create_driver(
+                driver = my_lib.selenium_util.create_driver(
                     self.profile_name,
                     self.data_dir,
                     use_undetected=self.use_undetected,
                 )
-                self._wait = selenium.webdriver.support.wait.WebDriverWait(self._driver, self.wait_timeout)
+                wait = selenium.webdriver.support.wait.WebDriverWait(driver, self.wait_timeout)
 
-                my_lib.selenium_util.clear_cache(self._driver)
+                my_lib.selenium_util.clear_cache(driver)
+
+                self._driver_state = DriverInitialized(driver=driver, wait=wait)
 
                 logging.info("Selenium ドライバーを起動しました (%s)", self.profile_name)
-                return (self._driver, self._wait)
+                return (driver, wait)
             except Exception as e:
                 last_error = e
                 logging.exception("Selenium ドライバーの起動に失敗しました (%s)", self.profile_name)
@@ -133,7 +151,7 @@ class BrowserManager:
             ドライバーが起動済みの場合 True
 
         """
-        return self._driver is not None
+        return isinstance(self._driver_state, DriverInitialized)
 
     def quit(self, wait_sec: float = 5) -> None:
         """ドライバーを終了
@@ -144,11 +162,10 @@ class BrowserManager:
             wait_sec: 終了待機時間（秒）
 
         """
-        if self._driver is not None:
+        if isinstance(self._driver_state, DriverInitialized):
             logging.info("Selenium ドライバーを終了しています (%s)...", self.profile_name)
-            my_lib.selenium_util.quit_driver_gracefully(self._driver, wait_sec=wait_sec)
-            self._driver = None
-            self._wait = None
+            my_lib.selenium_util.quit_driver_gracefully(self._driver_state.driver, wait_sec=wait_sec)
+            self._driver_state = DriverUninitialized()
             logging.info("Selenium ドライバーを終了しました (%s)", self.profile_name)
 
     def clear_cache(self) -> None:
@@ -157,5 +174,5 @@ class BrowserManager:
         ドライバーが起動していない場合は何もしません。
 
         """
-        if self._driver is not None:
-            my_lib.selenium_util.clear_cache(self._driver)
+        if isinstance(self._driver_state, DriverInitialized):
+            my_lib.selenium_util.clear_cache(self._driver_state.driver)

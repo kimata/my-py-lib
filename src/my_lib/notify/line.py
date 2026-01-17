@@ -17,22 +17,45 @@ from __future__ import annotations
 import collections
 import logging
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Self
 
 import linebot.v3.messaging
+
+
+@dataclass(frozen=True)
+class LineChannelConfig:
+    """LINE チャンネル設定"""
+
+    access_token: str
+
+
+@dataclass(frozen=True)
+class LineConfig:
+    """LINE 設定"""
+
+    channel: LineChannelConfig
+
+    @classmethod
+    def parse(cls, data: dict[str, Any]) -> Self:
+        """辞書からインスタンスを生成"""
+        return cls(
+            channel=LineChannelConfig(access_token=data["channel"]["access_token"]),
+        )
+
 
 # NOTE: テスト用
 notify_hist: collections.defaultdict[str, list[str]] = collections.defaultdict(lambda: [])
 
 
-def get_msg_config(line_config: dict[str, Any]) -> linebot.v3.messaging.Configuration:
+def get_msg_config(line_config: LineConfig) -> linebot.v3.messaging.Configuration:
     return linebot.v3.messaging.Configuration(
-        host="https://api.line.me", access_token=line_config["channel"]["access_token"]
+        host="https://api.line.me", access_token=line_config.channel.access_token
     )
 
 
 def send_impl(
-    line_config: dict[str, Any],
+    line_config: LineConfig,
     message: linebot.v3.messaging.FlexMessage | linebot.v3.messaging.TemplateMessage,
 ) -> None:
     hist_add(message.alt_text)
@@ -49,11 +72,11 @@ def send_impl(
             logging.exception("Failed to send message")
 
 
-def send(line_config: dict[str, Any], message: dict[str, Any]) -> None:
+def send(line_config: LineConfig, message: dict[str, Any]) -> None:
     send_impl(line_config, linebot.v3.messaging.TemplateMessage.from_dict(message))
 
 
-def error(line_config: dict[str, Any], text: str) -> None:
+def error(line_config: LineConfig, text: str) -> None:
     message = linebot.v3.messaging.FlexMessage.from_dict(
         {
             "type": "flex",
@@ -97,7 +120,7 @@ def error(line_config: dict[str, Any], text: str) -> None:
     send_impl(line_config, message)
 
 
-def info(line_config: dict[str, Any], text: str) -> None:
+def info(line_config: LineConfig, text: str) -> None:
     message = linebot.v3.messaging.FlexMessage.from_dict(
         {
             "type": "flex",
@@ -201,5 +224,6 @@ if __name__ == "__main__":
         },
     }
 
-    send(config["notify"]["line"], message)
-    error(config["notify"]["line"], "Test")
+    line_config = LineConfig.parse(config["notify"]["line"])
+    send(line_config, message)
+    error(line_config, "Test")

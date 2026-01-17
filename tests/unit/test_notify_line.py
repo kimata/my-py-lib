@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ruff: noqa: S101
+# ruff: noqa: S101, S106
 """
 my_lib.notify.line モジュールのユニットテスト
 """
@@ -47,9 +47,9 @@ class TestGetMsgConfig:
         """Configuration オブジェクトを返す"""
         import linebot.v3.messaging
 
-        from my_lib.notify.line import get_msg_config
+        from my_lib.notify.line import LineChannelConfig, LineConfig, get_msg_config
 
-        line_config = {"channel": {"access_token": "test-token"}}
+        line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
 
         result = get_msg_config(line_config)
 
@@ -63,7 +63,7 @@ class TestSendImpl:
         """履歴に追加する"""
         import linebot.v3.messaging
 
-        from my_lib.notify.line import hist_clear, hist_get, send_impl
+        from my_lib.notify.line import LineChannelConfig, LineConfig, hist_clear, hist_get, send_impl
 
         hist_clear()
 
@@ -75,7 +75,7 @@ class TestSendImpl:
         mock_client.__enter__ = mocker.MagicMock(return_value=mock_client)
         mock_client.__exit__ = mocker.MagicMock(return_value=False)
 
-        line_config = {"channel": {"access_token": "test-token"}}
+        line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
         message = linebot.v3.messaging.FlexMessage.from_dict(
             {
                 "type": "flex",
@@ -95,14 +95,14 @@ class TestSend:
 
     def test_calls_send_impl(self, mocker):
         """send_impl を呼び出す"""
-        from my_lib.notify.line import hist_clear, send
+        from my_lib.notify.line import LineChannelConfig, LineConfig, hist_clear, send
 
         hist_clear()
 
         # send_impl をモック
         mock_send_impl = mocker.patch("my_lib.notify.line.send_impl")
 
-        line_config = {"channel": {"access_token": "test-token"}}
+        line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
         message = {
             "type": "template",
             "altText": "test",
@@ -123,7 +123,7 @@ class TestError:
 
     def test_adds_to_history(self, mocker):
         """履歴に追加する"""
-        from my_lib.notify.line import error, hist_clear, hist_get
+        from my_lib.notify.line import LineChannelConfig, LineConfig, error, hist_clear, hist_get
 
         hist_clear()
 
@@ -135,7 +135,7 @@ class TestError:
         mock_client.__enter__ = mocker.MagicMock(return_value=mock_client)
         mock_client.__exit__ = mocker.MagicMock(return_value=False)
 
-        line_config = {"channel": {"access_token": "test-token"}}
+        line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
         error(line_config, "Error occurred")
 
         hist = hist_get()
@@ -147,7 +147,7 @@ class TestInfo:
 
     def test_adds_to_history(self, mocker):
         """履歴に追加する"""
-        from my_lib.notify.line import hist_clear, hist_get, info
+        from my_lib.notify.line import LineChannelConfig, LineConfig, hist_clear, hist_get, info
 
         hist_clear()
 
@@ -159,7 +159,7 @@ class TestInfo:
         mock_client.__enter__ = mocker.MagicMock(return_value=mock_client)
         mock_client.__exit__ = mocker.MagicMock(return_value=False)
 
-        line_config = {"channel": {"access_token": "test-token"}}
+        line_config = LineConfig(channel=LineChannelConfig(access_token="test-token"))
         info(line_config, "Information message")
 
         hist = hist_get()
