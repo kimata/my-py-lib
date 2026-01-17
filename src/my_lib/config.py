@@ -30,6 +30,89 @@ import yaml.scanner
 CONFIG_PATH: str = "config.yaml"
 
 
+class ConfigAccessor:
+    """型安全な設定アクセスを提供するラッパークラス."""
+
+    def __init__(self, config: dict[str, Any]) -> None:
+        self._config = config
+
+    def get(self, *keys: str, default: Any = None) -> Any:
+        """ネストしたキーパスを辿って値を取得.
+
+        Args:
+            *keys: アクセスするキーのパス (例: "prometheus", "url")
+            default: 値が見つからない場合のデフォルト値
+
+        Returns:
+            取得した値、または default
+
+        Example:
+            cfg = ConfigAccessor(config)
+            url = cfg.get("prometheus", "url")  # config["prometheus"]["url"]
+        """
+        current: Any = self._config
+        for key in keys:
+            if not isinstance(current, dict):
+                return default
+            current = current.get(key)
+            if current is None:
+                return default
+        return current
+
+    def get_list(self, *keys: str) -> list:
+        """リストとして値を取得.
+
+        Args:
+            *keys: アクセスするキーのパス
+
+        Returns:
+            取得したリスト、または空リスト
+        """
+        result = self.get(*keys, default=[])
+        return result if isinstance(result, list) else []
+
+    def get_dict(self, *keys: str) -> dict:
+        """辞書として値を取得.
+
+        Args:
+            *keys: アクセスするキーのパス
+
+        Returns:
+            取得した辞書、または空辞書
+        """
+        result = self.get(*keys, default={})
+        return result if isinstance(result, dict) else {}
+
+    def get_str(self, *keys: str, default: str = "") -> str:
+        """文字列として値を取得.
+
+        Args:
+            *keys: アクセスするキーのパス
+            default: 値が見つからない場合のデフォルト値
+
+        Returns:
+            取得した文字列、または default
+        """
+        result = self.get(*keys, default=default)
+        return str(result) if result is not None else default
+
+
+def accessor(config: dict[str, Any]) -> ConfigAccessor:
+    """ConfigAccessor を作成するファクトリ関数.
+
+    Args:
+        config: 設定辞書
+
+    Returns:
+        ConfigAccessor インスタンス
+
+    Example:
+        cfg = my_lib.config.accessor(config)
+        url = cfg.get("prometheus", "url")
+    """
+    return ConfigAccessor(config)
+
+
 class _ConfigError(Exception):
     """設定関連エラーの基底クラス"""
 
