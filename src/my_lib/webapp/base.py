@@ -29,10 +29,11 @@ def _get_file_path(filename: str) -> str | None:
 @my_lib.flask_util.gzipped
 def webapp(filename: str) -> flask.Response:
     try:
-        if my_lib.webapp.config.STATIC_DIR_PATH is None:
+        static_dir_path = my_lib.webapp.config.STATIC_DIR_PATH
+        if static_dir_path is None:
             flask.abort(500)
 
-        static_dir = my_lib.webapp.config.STATIC_DIR_PATH.resolve()
+        static_dir = static_dir_path.resolve()
         requested_path = (static_dir / filename).resolve()
 
         if not str(requested_path).startswith(str(static_dir)):

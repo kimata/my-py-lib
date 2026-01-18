@@ -311,7 +311,7 @@ def _format_additional_properties_error(
 ) -> None:
     """Format additionalProperties error."""
     schema: Any = error.schema
-    allowed = set(schema.get("properties", {}))
+    allowed = set(schema.get("properties", {})) if isinstance(schema, dict) else set()
     if isinstance(error.instance, dict):
         extra = [k for k in error.instance if k not in allowed]
         extra_str = ", ".join(f'"{k}"' for k in extra)
