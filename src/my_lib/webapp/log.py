@@ -295,37 +295,39 @@ class LogManager:
 
     def _worker(self, log_queue: Any) -> None:
         """ログキューを監視するワーカー"""
-        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
-            while True:
-                should_terminate = self.get_should_terminate()
-                if should_terminate is not None and should_terminate.is_set():
-                    break
+        while True:
+            should_terminate = self.get_should_terminate()
+            if should_terminate is not None and should_terminate.is_set():
+                break
 
-                # NOTE: とりあえず、イベントを待つ
-                log_event = self.get_log_event()
-                if log_event is None or not log_event.wait(CHECK_INTERVAL_SEC):
+            # NOTE: とりあえず、イベントを待つ
+            log_event = self.get_log_event()
+            if log_event is None or not log_event.wait(CHECK_INTERVAL_SEC):
+                continue
+
+            try:
+                queue_lock = self.get_queue_lock()
+                if queue_lock is None:
                     continue
+                with queue_lock:  # NOTE: クリア処理と排他したい
+                    log_event.clear()
 
-                try:
-                    queue_lock = self.get_queue_lock()
-                    if queue_lock is None:
-                        continue
-                    with queue_lock:  # NOTE: クリア処理と排他したい
-                        log_event.clear()
-
-                        while not log_queue.empty():
-                            logging.debug("Found %d log message(s)", log_queue.qsize())
-                            log = log_queue.get()
+                    while not log_queue.empty():
+                        logging.debug("Found %d log message(s)", log_queue.qsize())
+                        log = log_queue.get()
+                        # NOTE: 各ログ書き込みごとに接続を開閉することで、
+                        # トランザクションの保持時間を最小化し、ロック競合を防ぐ
+                        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
                             self._log_impl(sqlite, log["message"], log["level"])
-                except OverflowError:  # pragma: no cover
-                    # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
-                    logging.debug(traceback.format_exc())
-                except (ValueError, BrokenPipeError, EOFError, OSError):  # pragma: no cover
-                    # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこれらの例外が
-                    # 発生する。マネージャーがシャットダウンされた場合は BrokenPipeError が発生する。
-                    logging.debug("Queue connection closed, terminating worker")
-                    break
-            logging.info("Terminate worker")
+            except OverflowError:  # pragma: no cover
+                # NOTE: テストする際、time_machine を使って日付をいじるとこの例外が発生する。
+                logging.debug(traceback.format_exc())
+            except (ValueError, BrokenPipeError, EOFError, OSError):  # pragma: no cover
+                # NOTE: 終了時、queue が close された後に empty() や get() を呼ぶとこれらの例外が
+                # 発生する。マネージャーがシャットダウンされた場合は BrokenPipeError が発生する。
+                logging.debug("Queue connection closed, terminating worker")
+                break
+        logging.info("Terminate worker")
 
     def add(self, message: str, level: LOG_LEVEL) -> None:
         """ログを追加する
