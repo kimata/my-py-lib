@@ -29,6 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeAlias
 
+import dacite
 import slack_sdk
 import slack_sdk.errors
 import slack_sdk.web.slack_response
@@ -182,10 +183,12 @@ class SlackConfig:
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> SlackConfigTypes:
-        """Slack 設定をパースする
+        """
+        Slack 設定をパースする.
 
         存在するフィールドに応じて適切な Config クラスを返す。
         設定が空または不十分な場合は SlackEmptyConfig を返す。
+        dacite を使用して辞書から dataclass への変換を行う。
         """
         # 空の設定の場合
         if not data or "bot_token" not in data:
@@ -199,68 +202,19 @@ class SlackConfig:
         if not has_error and not has_captcha:
             return SlackEmptyConfig()
 
-        bot_token = data["bot_token"]
-        from_name = data["from"]
+        # 辞書を前処理: "from" → "from_name" にリネーム
+        normalized_data = _normalize_slack_data(data)
 
-        # 全て揃っている場合
-        if has_error and has_info and has_captcha:
-            return cls(
-                bot_token=bot_token,
-                from_name=from_name,
-                info=_parse_slack_info(data["info"]),
-                captcha=_parse_slack_captcha(data["captcha"]),
-                error=_parse_slack_error(data["error"]),
-            )
+        # 設定の組み合わせに応じて適切な型を決定
+        config_type = _determine_slack_config_type(has_error, has_info, has_captcha)
+        if config_type is None:
+            return SlackEmptyConfig()
 
-        # error + info
-        if has_error and has_info and not has_captcha:
-            return SlackErrorInfoConfig(
-                bot_token=bot_token,
-                from_name=from_name,
-                info=_parse_slack_info(data["info"]),
-                error=_parse_slack_error(data["error"]),
-            )
-
-        # error のみ
-        if has_error and not has_info and not has_captcha:
-            return SlackErrorOnlyConfig(
-                bot_token=bot_token,
-                from_name=from_name,
-                error=_parse_slack_error(data["error"]),
-            )
-
-        # captcha のみ
-        if has_captcha and not has_error and not has_info:
-            return SlackCaptchaOnlyConfig(
-                bot_token=bot_token,
-                from_name=from_name,
-                captcha=_parse_slack_captcha(data["captcha"]),
-            )
-
-        # 中途半端なパターン: error + captcha (info なし)
-        if has_error and has_captcha and not has_info:
-            logging.warning(
-                "Slack 設定が不完全です。SlackErrorOnlyConfig として処理します。captcha は無視されます。"
-            )
-            return SlackErrorOnlyConfig(
-                bot_token=bot_token,
-                from_name=from_name,
-                error=_parse_slack_error(data["error"]),
-            )
-
-        # 中途半端なパターン: info + captcha (error なし)
-        if has_info and has_captcha and not has_error:
-            logging.warning(
-                "Slack 設定が不完全です。SlackCaptchaOnlyConfig として処理します。info は無視されます。"
-            )
-            return SlackCaptchaOnlyConfig(
-                bot_token=bot_token,
-                from_name=from_name,
-                captcha=_parse_slack_captcha(data["captcha"]),
-            )
-
-        # info のみ、または何もない場合（ここには到達しないはずだが念のため）
-        return SlackEmptyConfig()
+        return dacite.from_dict(
+            data_class=config_type,
+            data=normalized_data,
+            config=dacite.Config(strict=False),
+        )
 
 
 # 型エイリアス
@@ -478,26 +432,64 @@ def attach_file(
     return _upload_file(config.bot_token, ch_id, file_path, title, initial_comment, thread_ts)
 
 
-def _parse_slack_channel(data: dict[str, Any]) -> SlackChannelConfig:
-    return SlackChannelConfig(
-        name=data["name"],
-        id=data.get("id"),
-    )
+def _normalize_slack_data(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Slack 設定辞書を正規化する.
+
+    "from" キーを "from_name" にリネームし、
+    不要なキー（info, captcha など）を必要に応じて除外する。
+    """
+    result = dict(data)
+
+    # "from" → "from_name" にリネーム（Python の予約語を回避）
+    if "from" in result:
+        result["from_name"] = result.pop("from")
+
+    return result
 
 
-def _parse_slack_info(data: dict[str, Any]) -> SlackInfoConfig:
-    return SlackInfoConfig(channel=_parse_slack_channel(data["channel"]))
+def _determine_slack_config_type(
+    has_error: bool, has_info: bool, has_captcha: bool
+) -> type[SlackConfig | SlackErrorInfoConfig | SlackErrorOnlyConfig | SlackCaptchaOnlyConfig] | None:
+    """
+    設定の組み合わせに応じて適切な Slack 設定クラスを返す.
 
+    Returns:
+        適切な設定クラス。不正な組み合わせの場合は None。
 
-def _parse_slack_captcha(data: dict[str, Any]) -> SlackCaptchaConfig:
-    return SlackCaptchaConfig(channel=_parse_slack_channel(data["channel"]))
+    """
+    # 全て揃っている場合
+    if has_error and has_info and has_captcha:
+        return SlackConfig
 
+    # error + info
+    if has_error and has_info and not has_captcha:
+        return SlackErrorInfoConfig
 
-def _parse_slack_error(data: dict[str, Any]) -> SlackErrorConfig:
-    return SlackErrorConfig(
-        channel=_parse_slack_channel(data["channel"]),
-        interval_min=data["interval_min"],
-    )
+    # error のみ
+    if has_error and not has_info and not has_captcha:
+        return SlackErrorOnlyConfig
+
+    # captcha のみ
+    if has_captcha and not has_error and not has_info:
+        return SlackCaptchaOnlyConfig
+
+    # 中途半端なパターン: error + captcha (info なし)
+    if has_error and has_captcha and not has_info:
+        logging.warning(
+            "Slack 設定が不完全です。SlackErrorOnlyConfig として処理します。captcha は無視されます。"
+        )
+        return SlackErrorOnlyConfig
+
+    # 中途半端なパターン: info + captcha (error なし)
+    if has_info and has_captcha and not has_error:
+        logging.warning(
+            "Slack 設定が不完全です。SlackCaptchaOnlyConfig として処理します。info は無視されます。"
+        )
+        return SlackCaptchaOnlyConfig
+
+    # info のみ、または何もない場合
+    return None
 
 
 def _send(
