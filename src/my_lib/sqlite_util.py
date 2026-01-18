@@ -20,9 +20,15 @@ import logging
 import os
 import pathlib
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Literal
+
+# スレッドセーフなクリーンアップ管理
+# 同一プロセス内で同じ DB パスに対して1回だけクリーンアップを実行する
+_cleanup_lock = threading.Lock()
+_cleaned_up_paths: set[pathlib.Path] = set()
 
 # sqlite3.connect の isolation_level パラメータの型
 IsolationLevel = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
@@ -103,18 +109,31 @@ def cleanup_stale_files(db_path: pathlib.Path) -> None:
     Podクラッシュ後などにこれらのファイルが残っていると
     「locking protocol」エラーが発生するため、接続前に削除する。
 
+    注意: 同一プロセス内では同じ DB パスに対して1回だけクリーンアップを実行する。
+    これにより、複数スレッドが同時に接続する場合（例: ワーカースレッドと API ハンドラ）に
+    アクティブな接続の WAL ファイルを削除してしまう問題を防ぐ。
+
     Args:
         db_path: データベースファイルのパス
     """
-    wal_path = db_path.with_suffix(db_path.suffix + "-wal")
-    shm_path = db_path.with_suffix(db_path.suffix + "-shm")
+    resolved_path = db_path.resolve()
 
-    if wal_path.exists() or shm_path.exists():
-        logging.warning("残存するWAL/SHMファイルを削除します: %s", db_path)
-        with contextlib.suppress(Exception):
-            wal_path.unlink(missing_ok=True)
-        with contextlib.suppress(Exception):
-            shm_path.unlink(missing_ok=True)
+    with _cleanup_lock:
+        if resolved_path in _cleaned_up_paths:
+            logging.debug("既にクリーンアップ済み: %s", db_path)
+            return
+
+        wal_path = db_path.with_suffix(db_path.suffix + "-wal")
+        shm_path = db_path.with_suffix(db_path.suffix + "-shm")
+
+        if wal_path.exists() or shm_path.exists():
+            logging.warning("残存するWAL/SHMファイルを削除します: %s", db_path)
+            with contextlib.suppress(Exception):
+                wal_path.unlink(missing_ok=True)
+            with contextlib.suppress(Exception):
+                shm_path.unlink(missing_ok=True)
+
+        _cleaned_up_paths.add(resolved_path)
 
 
 class DatabaseConnection:
