@@ -22,6 +22,7 @@ import multiprocessing
 import multiprocessing.managers
 import os
 import pathlib
+import queue
 import sqlite3
 import threading
 import time
@@ -64,8 +65,8 @@ class WorkerLogState:
 
     log_thread: threading.Thread
     queue_lock: threading.RLock
-    log_manager: multiprocessing.managers.SyncManager
-    log_queue: Any
+    log_manager: multiprocessing.managers.SyncManager | None  # NOTE: 後方互換性のため残す
+    log_queue: queue.Queue[dict[str, Any]]
     log_event: threading.Event
     should_terminate: threading.Event
 
@@ -172,11 +173,6 @@ class LogManager:
 
     def _init_impl(self) -> None:
         """ワーカースレッドを初期化する"""
-        # NOTE: atexit とかでログを出したい場合もあるので、Queue はここで閉じる。
-        log_manager = self.get_log_manager()
-        if log_manager is not None:
-            log_manager.shutdown()
-
         worker_id = self.get_worker_id()
         current_state = self.get_worker_state()
 
@@ -191,15 +187,17 @@ class LogManager:
             should_terminate = threading.Event()
             log_event = threading.Event()
 
-        manager = multiprocessing.Manager()
-        log_queue = manager.Queue()
+        # NOTE: queue.Queue() を使用（スレッドセーフで IPC オーバーヘッドなし）
+        # multiprocessing.Manager().Queue() は IPC 通信が必要で、
+        # 高並列環境でブロッキングの原因となるため使用しない。
+        log_queue: queue.Queue[dict[str, Any]] = queue.Queue()
 
         log_thread = threading.Thread(target=self._worker, args=(log_queue,))
 
         self._worker_states[worker_id] = WorkerLogState(
             log_thread=log_thread,
             queue_lock=queue_lock,
-            log_manager=manager,
+            log_manager=None,  # NOTE: SyncManager は不要
             log_queue=log_queue,
             log_event=log_event,
             should_terminate=should_terminate,
@@ -309,12 +307,19 @@ class LogManager:
                 queue_lock = self.get_queue_lock()
                 if queue_lock is None:
                     continue
+
+                # NOTE: ロック保持時間を最小化するため、キューからの取得のみをロック内で行い、
+                # SQLite書き込みはロック外で実行する。これにより add() のブロッキングを防ぐ。
+                logs_to_process: list[dict[str, Any]] = []
                 with queue_lock:  # NOTE: クリア処理と排他したい
                     log_event.clear()
-
                     while not log_queue.empty():
-                        logging.debug("Found %d log message(s)", log_queue.qsize())
-                        log = log_queue.get()
+                        logs_to_process.append(log_queue.get())
+
+                # NOTE: ロック解放後にSQLite書き込みを行う（遅い処理）
+                if logs_to_process:
+                    logging.debug("Processing %d log message(s)", len(logs_to_process))
+                    for log in logs_to_process:
                         # NOTE: 各ログ書き込みごとに接続を開閉することで、
                         # トランザクションの保持時間を最小化し、ロック競合を防ぐ
                         with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
@@ -336,18 +341,17 @@ class LogManager:
             message: ログメッセージ
             level: ログレベル
         """
-        queue_lock = self.get_queue_lock()
         log_queue = self.get_log_queue()
         log_event = self.get_log_event()
 
-        if queue_lock is None or log_queue is None or log_event is None:
+        if log_queue is None or log_event is None:
             logging.warning("Log system not initialized, skipping log: %s", message)
             return
 
-        with queue_lock:  # NOTE: クリア処理と排他したい
-            # NOTE: 実際のログ記録は別スレッドに任せて、すぐにリターンする
-            log_queue.put({"message": message, "level": level})
-            log_event.set()
+        # NOTE: queue.Queue.put() と threading.Event.set() は両方スレッドセーフなため、
+        # ロックなしで安全に呼び出せる。これによりブロッキングを完全に回避する。
+        log_queue.put({"message": message, "level": level})
+        log_event.set()
 
     def error(self, message: str) -> None:
         """エラーログを記録する"""
