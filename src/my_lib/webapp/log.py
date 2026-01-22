@@ -36,6 +36,7 @@ import flask
 
 import my_lib.flask_util
 import my_lib.notify.slack
+import my_lib.pytest_util
 import my_lib.sqlite_util
 import my_lib.time
 import my_lib.webapp.config
@@ -92,9 +93,9 @@ class LogManager:
         self._slack_config = value
 
     @staticmethod
-    def get_worker_id() -> str | None:
+    def get_worker_id() -> str:
         """pytest-xdist のワーカー ID を取得する"""
-        return os.environ.get("PYTEST_XDIST_WORKER", None)
+        return my_lib.pytest_util.get_worker_id()
 
     def get_worker_state(self) -> WorkerLogState | None:
         """現在のワーカーの状態を取得する"""

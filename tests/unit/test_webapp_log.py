@@ -62,9 +62,9 @@ class TestLogManager:
 
         manager = LogManager()
 
-        # 環境変数がない場合
+        # 環境変数がない場合はデフォルト値 "main" を返す
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert manager.get_worker_id() is None
+        assert manager.get_worker_id() == "main"
 
         # 環境変数がある場合
         monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
@@ -76,9 +76,10 @@ class TestLogManager:
 
         manager = LogManager()
 
-        # ワーカー ID がない場合
+        # 環境変数がない場合はデフォルトワーカー ID "main" が使われる
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert manager.get_db_path() == log_db_path
+        db_path = manager.get_db_path()
+        assert "test_worker_main" in str(db_path)
 
     def test_get_db_path_with_worker_id(self, log_db_path, monkeypatch):
         """ワーカー ID がある場合のデータベースパスの取得"""
@@ -120,7 +121,9 @@ class TestInit:
 
         init(SlackEmptyConfig(), is_read_only=False)
 
-        assert log_db_path.exists()
+        # ワーカー ID がデフォルトで "main" になるため、test_worker_main ディレクトリに作成される
+        db_path = _manager.get_db_path()
+        assert db_path.exists()
         assert _manager.get_log_thread() is not None
 
         term()
@@ -134,7 +137,9 @@ class TestInit:
 
         init(SlackEmptyConfig(), is_read_only=True)
 
-        assert log_db_path.exists()
+        # ワーカー ID がデフォルトで "main" になるため、test_worker_main ディレクトリに作成される
+        db_path = _manager.get_db_path()
+        assert db_path.exists()
         # 読み取り専用モードではスレッドは起動しない
         assert _manager.get_log_thread() is None
 
@@ -250,14 +255,15 @@ class TestModuleFunctions:
         from my_lib.webapp.log import _get_worker_id
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert _get_worker_id() is None
+        assert _get_worker_id() == "main"
 
     def test_get_db_path(self, log_db_path, monkeypatch):
         """_get_db_path が動作する"""
         from my_lib.webapp.log import _get_db_path
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-        assert _get_db_path() == log_db_path
+        db_path = _get_db_path()
+        assert "test_worker_main" in str(db_path)
 
 
 class TestApiEndpoints:
