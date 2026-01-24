@@ -166,6 +166,10 @@ class BrowserManager:
             logging.info("Selenium ドライバーを終了しています (%s)...", self.profile_name)
             my_lib.selenium_util.quit_driver_gracefully(self._driver_state.driver, wait_sec=wait_sec)
             self._driver_state = DriverUninitialized()
+
+            # Chrome が正常終了してもロックファイルが残ることがあるためクリーンアップ
+            my_lib.chrome_util.cleanup_profile_lock(self.profile_name, self.data_dir)
+
             logging.info("Selenium ドライバーを終了しました (%s)", self.profile_name)
 
     def clear_cache(self) -> None:
