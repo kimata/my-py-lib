@@ -215,6 +215,21 @@ def _get_actual_profile_name(profile_name: str) -> str:
     return profile_name + ("." + suffix if suffix is not None else "")
 
 
+def cleanup_profile_lock(profile_name: str, data_path: pathlib.Path) -> None:
+    """Chrome プロファイルのロックファイルを削除する
+
+    ドライバー終了後に残ったロックファイルをクリーンアップします。
+
+    Args:
+        profile_name: プロファイル名
+        data_path: データディレクトリのパス
+
+    """
+    actual_profile_name = _get_actual_profile_name(profile_name)
+    profile_path = data_path / "chrome" / actual_profile_name
+    _cleanup_profile_lock(profile_path)
+
+
 def delete_profile(profile_name: str, data_path: pathlib.Path) -> bool:
     """Chrome プロファイルを削除する
 
