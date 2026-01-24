@@ -32,7 +32,7 @@ test-typecheck:
           paths:
               - ${UV_CACHE_DIR}
 
-test-walk-through:
+test-pytest:
     stage: test
 
     needs: []
