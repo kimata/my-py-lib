@@ -190,6 +190,9 @@ def _create_driver_impl(
     # CDP を使って日本語ロケールを強制設定
     set_japanese_locale(driver)
 
+    # ボット検出回避のための設定を適用
+    set_stealth_mode(driver)
+
     return driver
 
 
@@ -542,6 +545,59 @@ def set_japanese_locale(driver: WebDriver) -> None:
         logging.debug("Japanese locale set via CDP")
     except Exception:
         logging.warning("Failed to set Japanese locale via CDP")
+
+
+def _get_stealth_user_agent(driver: WebDriver) -> str:
+    """ブラウザの User-Agent を取得し、ボット検出回避用に修正.
+
+    - OS 部分を Windows に変更
+    - HeadlessChrome を Chrome に変更
+
+    Args:
+        driver: WebDriver インスタンス
+
+    Returns:
+        修正された User-Agent 文字列
+
+    """
+    original_ua = driver.execute_script("return navigator.userAgent")
+    logging.debug("Original User-Agent: %s", original_ua)
+
+    # OS 部分を Windows に変更
+    pattern = r"\([^)]*(?:Linux|Macintosh|X11)[^)]*\)"
+    replacement = "(Windows NT 10.0; Win64; x64)"
+    modified_ua = re.sub(pattern, replacement, original_ua)
+
+    # HeadlessChrome を Chrome に変更
+    modified_ua = modified_ua.replace("HeadlessChrome", "Chrome")
+
+    logging.debug("Modified User-Agent: %s", modified_ua)
+    return modified_ua
+
+
+def set_stealth_mode(driver: WebDriver) -> None:
+    """ボット検出回避のための CDP 設定を適用.
+
+    ヨドバシ等のボット検出は User-Agent をチェックしているため、
+    OS を Windows に偽装し、HeadlessChrome を Chrome に変更することで回避できる。
+
+    Args:
+        driver: WebDriver インスタンス
+
+    """
+    try:
+        modified_ua = _get_stealth_user_agent(driver)
+        driver.execute_cdp_cmd(
+            "Network.setUserAgentOverride",
+            {
+                "userAgent": modified_ua,
+                "acceptLanguage": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+                "platform": "Win32",
+            },
+        )
+        logging.debug("Stealth mode enabled (User-Agent override applied)")
+    except Exception:
+        logging.warning("Failed to enable stealth mode")
 
 
 def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
