@@ -36,6 +36,7 @@ import flask
 
 import my_lib.flask_util
 import my_lib.notify.slack
+import my_lib.pytest_util
 import my_lib.sqlite_util
 import my_lib.time
 import my_lib.webapp.config
@@ -132,19 +133,12 @@ class LogManager:
 
     def get_db_path(self) -> pathlib.Path:
         """データベースパスを取得する（ワーカー ID に応じたパスを返す）"""
-        worker_id = self.get_worker_id()
         base_path = my_lib.webapp.config.LOG_DIR_PATH
 
         if base_path is None:
             raise RuntimeError("LOG_DIR_PATH is not initialized. Call init() first.")
 
-        if worker_id is None:
-            return base_path
-        else:
-            # ワーカー毎に別ディレクトリを作成
-            worker_dir = base_path.parent / f"test_worker_{worker_id}"
-            worker_dir.mkdir(parents=True, exist_ok=True)
-            return worker_dir / base_path.name
+        return my_lib.pytest_util.get_path(base_path)
 
     def init(
         self,
