@@ -34,7 +34,7 @@ class YahooItem:
     name: str
     url: str
     price: int
-    image_url: str | None = None
+    thumb_url: str | None = None
     review_rate: float | None = None
     review_count: int | None = None
     in_stock: bool | None = None
@@ -43,9 +43,22 @@ class YahooItem:
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         """API レスポンスの hits 要素から YahooItem を生成する."""
-        image_url = None
+        # 価格の優先順位: premiumPrice > discountedPrice > (defaultPrice = price)
+        price_data = data.get("priceLabel", {})
+        price: int | None = None
+        if price_data.get("premiumPrice") is not None:
+            price = int(price_data["premiumPrice"])
+        elif price_data.get("discountedPrice") is not None:
+            price = int(price_data["discountedPrice"])
+        elif price_data.get("defaultPrice") is not None:
+            price = int(price_data["defaultPrice"])
+        else:
+            price = int(data["price"])
+
+        # サムネイル画像 URL
+        thumb_url = None
         if data.get("image"):
-            image_url = data["image"].get("medium") or data["image"].get("small")
+            thumb_url = data["image"].get("medium") or data["image"].get("small")
 
         review_rate = None
         review_count = None
@@ -60,8 +73,8 @@ class YahooItem:
         return cls(
             name=data["name"],
             url=data["url"],
-            price=int(data["price"]),
-            image_url=image_url,
+            price=price,
+            thumb_url=thumb_url,
             review_rate=review_rate,
             review_count=review_count,
             in_stock=data.get("inStock"),
