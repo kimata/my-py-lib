@@ -402,6 +402,5 @@ if __name__ == "__main__":
             logging.info("    URL: %s", result.url)
     finally:
         my_lib.selenium_util.quit_driver_gracefully(driver)
-        driver = None
         # NOTE: undetected_chromedriver の __del__ で ImportError が出ることがあるが、
         # ドライバは正常終了済みのため実害なし（ライブラリ側の既知の問題）
