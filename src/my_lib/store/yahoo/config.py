@@ -12,7 +12,7 @@ class YahooApiConfig:
     """Yahoo!ショッピング API 用の設定."""
 
     client_id: str
-    secret: str | None = None
+    secret: str
 
     @classmethod
     def parse(cls, yahoo_config: dict[str, Any]) -> Self:
@@ -23,7 +23,7 @@ class YahooApiConfig:
         """
         return cls(
             client_id=yahoo_config["client_id"],
-            secret=yahoo_config.get("secret"),
+            secret=yahoo_config["secret"],
         )
 
 

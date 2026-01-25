@@ -6,19 +6,11 @@ https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch を使用して�
 タイトル、URL、価格のリストを取得します。
 
 Usage:
-  search.py [-c CONFIG] [-k KEYWORD] [-m MIN] [-M MAX] [-n COUNT]
-            [-s SORT] [--in-stock] [--new-only] [-D]
+  api.py [-c CONFIG] [-k KEYWORD] [-D]
 
 Options:
   -c CONFIG       : 設定ファイル。[default: config.yaml]
   -k KEYWORD      : 検索キーワード。[default: iPhone]
-  -m MIN          : 最低価格。
-  -M MAX          : 最高価格。
-  -n COUNT        : 取得する最大件数。[default: 10]
-  -s SORT         : ソート順（-score, +price, -price, -review_count）。
-                    [default: -score]
-  --in-stock      : 在庫ありのみ。
-  --new-only      : 新品のみ。
   -D              : デバッグモードで動作します。
 """
 
@@ -28,14 +20,11 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 import requests
 
 from my_lib.store.yahoo.config import YahooApiConfig, YahooItem
-
-if TYPE_CHECKING:
-    pass
 
 
 class SortOrder(Enum):
@@ -245,8 +234,6 @@ def search(
 
 if __name__ == "__main__":
     # TEST Code
-    import pathlib
-
     import docopt
 
     import my_lib.config
@@ -257,55 +244,15 @@ if __name__ == "__main__":
 
     config_file = args["-c"]
     keyword = args["-k"]
-    price_min_str = args["-m"]
-    price_max_str = args["-M"]
-    max_count_str = args["-n"]
-    sort_str = args["-s"]
-    in_stock = args["--in-stock"]
-    new_only = args["--new-only"]
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
 
-    # 設定ファイルを読み込み
-    config_path = pathlib.Path(config_file)
-    if not config_path.exists():
-        logging.error("設定ファイルが見つかりません: %s", config_file)
-        raise SystemExit(1)
+    config: dict[str, Any] = my_lib.config.load(config_file)
 
-    raw_config = my_lib.config.load(config_path)
-    api_config = YahooApiConfig.parse(raw_config["store"]["yahoo"])
-
-    # 検索条件を構築
-    price_min = int(price_min_str) if price_min_str else None
-    price_max = int(price_max_str) if price_max_str else None
-    max_count = int(max_count_str) if max_count_str else 10
-    sort = SortOrder(sort_str) if sort_str else SortOrder.SCORE
-    condition_enum = Condition.NEW if new_only else Condition.ALL
-
-    search_condition = SearchCondition(
-        keyword=keyword,
-        price_min=price_min,
-        price_max=price_max,
-        sort=sort,
-        in_stock=in_stock,
-        condition=condition_enum,
+    logging.info(
+        search(
+            YahooApiConfig.parse(config["store"]["yahoo"]),
+            SearchCondition(keyword=keyword),
+        )
     )
-
-    logging.info("検索条件: %s", search_condition)
-    logging.info("API設定: client_id=%s...", api_config.client_id[:20])
-
-    results = search(api_config, search_condition, max_items=max_count)
-
-    logging.info("=" * 60)
-    logging.info("検索結果: %d 件", len(results))
-    logging.info("=" * 60)
-
-    for i, item in enumerate(results, 1):
-        logging.info("[%d] %s", i, item.name)
-        logging.info("    価格: ¥%s", f"{item.price:,}")
-        logging.info("    URL: %s", item.url)
-        if item.seller_name:
-            logging.info("    店舗: %s", item.seller_name)
-        if item.review_rate is not None:
-            logging.info("    評価: %.1f (%d件)", item.review_rate, item.review_count or 0)
