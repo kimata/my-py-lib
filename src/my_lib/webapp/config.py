@@ -46,15 +46,13 @@ class WebappDataConfig:
 class WebappConfig:
     """webapp セクションの設定"""
 
-    static_dir_path: pathlib.Path | None = None
+    static_dir_path: pathlib.Path
     data: WebappDataConfig | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
-            static_dir_path=(
-                pathlib.Path(data["static_dir_path"]).resolve() if "static_dir_path" in data else None
-            ),
+            static_dir_path=pathlib.Path(data["static_dir_path"]).resolve(),
             data=WebappDataConfig.parse(data["data"]) if "data" in data else None,
         )
 
