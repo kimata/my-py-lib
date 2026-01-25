@@ -43,17 +43,18 @@ class YahooItem:
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         """API レスポンスの hits 要素から YahooItem を生成する."""
-        # 価格の優先順位: premiumPrice > discountedPrice > (defaultPrice = price)
+        # 有効な価格の中で最も安いものを採用
         price_data = data.get("priceLabel", {})
-        price: int | None = None
+        prices: list[int] = []
         if price_data.get("premiumPrice") is not None:
-            price = int(price_data["premiumPrice"])
-        elif price_data.get("discountedPrice") is not None:
-            price = int(price_data["discountedPrice"])
-        elif price_data.get("defaultPrice") is not None:
-            price = int(price_data["defaultPrice"])
-        else:
-            price = int(data["price"])
+            prices.append(int(price_data["premiumPrice"]))
+        if price_data.get("discountedPrice") is not None:
+            prices.append(int(price_data["discountedPrice"]))
+        if price_data.get("defaultPrice") is not None:
+            prices.append(int(price_data["defaultPrice"]))
+        if data.get("price") is not None:
+            prices.append(int(data["price"]))
+        price = min(prices) if prices else int(data["price"])
 
         # サムネイル画像 URL
         thumb_url = None
