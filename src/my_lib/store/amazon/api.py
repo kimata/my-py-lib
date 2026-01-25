@@ -190,9 +190,17 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
     return price_map
 
 
+_PAAPI_CALL_INTERVAL_SEC: int = 5
+
+
 def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     price_map = _fetch_price_outlet(config, asin_list)
-    price_map |= fetch_price_new(config, list(set(asin_list) - set(price_map.keys())))
+
+    # PA-API のレート制限対策として呼び出し間隔を確保
+    remaining_asin_list = list(set(asin_list) - set(price_map.keys()))
+    if remaining_asin_list:
+        time.sleep(_PAAPI_CALL_INTERVAL_SEC)
+        price_map |= fetch_price_new(config, remaining_asin_list)
 
     return price_map
 
