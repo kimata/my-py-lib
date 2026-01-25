@@ -93,7 +93,8 @@ class SearchResult:
 
 
 _SEARCH_BASE_URL: str = "https://jp.mercari.com/search"
-_ITEM_LIST_XPATH: str = '//li[@data-testid="item-cell"]'
+# item-grid 内のアイテムのみを取得（関連商品やおすすめ商品を除外）
+_ITEM_LIST_XPATH: str = '//div[@id="item-grid"]//li[@data-testid="item-cell"]'
 
 
 def build_search_url(condition: SearchCondition) -> str:
@@ -177,6 +178,7 @@ def _parse_search_item(
 
     Returns:
         パース結果。パースに失敗した場合は None
+        PR（広告）アイテムの場合も None を返す
 
     """
     import re
@@ -184,6 +186,15 @@ def _parse_search_item(
     by_xpath = selenium.webdriver.common.by.By.XPATH
 
     try:
+        # PR（広告）アイテムをスキップ
+        # <p class="merText ...">PR</p> があれば除外
+        pr_elements = item_element.find_elements(
+            by_xpath, './/p[contains(@class, "merText") and text()="PR"]'
+        )
+        if pr_elements:
+            logging.debug("PR（広告）アイテムをスキップ")
+            return None
+
         # URL を取得
         link_elements = item_element.find_elements(by_xpath, ".//a")
         if not link_elements:
