@@ -131,6 +131,7 @@ def _create_driver_impl(
     is_headless: bool,
     use_subprocess: bool,
     use_undetected: bool,
+    stealth_mode: bool,
 ) -> WebDriver:
     """WebDriver を作成する内部実装
 
@@ -140,6 +141,7 @@ def _create_driver_impl(
         is_headless: ヘッドレスモードで起動するか
         use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
         use_undetected: undetected_chromedriver を使用するか
+        stealth_mode: ボット検出回避のための User-Agent 偽装を行うか
 
     Returns:
         WebDriver インスタンス
@@ -190,8 +192,9 @@ def _create_driver_impl(
     # CDP を使って日本語ロケールを強制設定
     set_japanese_locale(driver)
 
-    # ボット検出回避のための設定を適用
-    set_stealth_mode(driver)
+    # ボット検出回避のための設定を適用（オプション）
+    if stealth_mode:
+        set_stealth_mode(driver)
 
     return driver
 
@@ -204,6 +207,7 @@ def create_driver(
     auto_recover: bool = True,
     use_undetected: bool = True,
     use_subprocess: bool = False,
+    stealth_mode: bool = True,
 ) -> WebDriver:
     """Chrome WebDriver を作成する
 
@@ -215,6 +219,7 @@ def create_driver(
         auto_recover: プロファイル破損時に自動リカバリするか
         use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
         use_subprocess: サブプロセスで Chrome を起動するか（undetected_chromedriver のみ）
+        stealth_mode: ボット検出回避のための User-Agent 偽装を行うか（デフォルト: True）
 
     Raises:
         ValueError: use_undetected=False かつ use_subprocess=True の場合
@@ -254,7 +259,9 @@ def create_driver(
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess, use_undetected)
+        return _create_driver_impl(
+            profile_name, data_path, is_headless, use_subprocess, use_undetected, stealth_mode
+        )
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
 
@@ -270,7 +277,9 @@ def create_driver(
             logging.warning("Profile still corrupted after first attempt, recovering")
             my_lib.chrome_util._recover_corrupted_profile(profile_path)
 
-        return _create_driver_impl(profile_name, data_path, is_headless, use_subprocess, use_undetected)
+        return _create_driver_impl(
+            profile_name, data_path, is_headless, use_subprocess, use_undetected, stealth_mode
+        )
 
 
 def xpath_exists(driver: WebDriver, xpath: str) -> bool:
