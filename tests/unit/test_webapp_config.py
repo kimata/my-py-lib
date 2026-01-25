@@ -51,9 +51,10 @@ class TestInit:
         import my_lib.webapp.config
 
         config_dict = {
+            "static_dir_path": str(temp_dir / "static"),
             "data": {
                 "schedule_file_path": str(temp_dir / "schedule.yaml"),
-            }
+            },
         }
         config = my_lib.webapp.config.WebappConfig.parse(config_dict)
 
@@ -66,9 +67,10 @@ class TestInit:
         import my_lib.webapp.config
 
         config_dict = {
+            "static_dir_path": str(temp_dir / "static"),
             "data": {
                 "log_file_path": str(temp_dir / "log.db"),
-            }
+            },
         }
         config = my_lib.webapp.config.WebappConfig.parse(config_dict)
 
@@ -81,9 +83,10 @@ class TestInit:
         import my_lib.webapp.config
 
         config_dict = {
+            "static_dir_path": str(temp_dir / "static"),
             "data": {
                 "stat_dir_path": str(temp_dir / "stat"),
-            }
+            },
         }
         config = my_lib.webapp.config.WebappConfig.parse(config_dict)
 
