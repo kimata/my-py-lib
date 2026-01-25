@@ -76,10 +76,10 @@ class TestLogManager:
 
         manager = LogManager()
 
-        # 環境変数がない場合はデフォルトワーカー ID "main" が使われる
+        # 環境変数がない場合はパスがそのまま返される
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
         db_path = manager.get_db_path()
-        assert "test_worker_main" in str(db_path)
+        assert db_path == log_db_path
 
     def test_get_db_path_with_worker_id(self, log_db_path, monkeypatch):
         """ワーカー ID がある場合のデータベースパスの取得"""
@@ -89,7 +89,7 @@ class TestLogManager:
 
         monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw1")
         db_path = manager.get_db_path()
-        assert "test_worker_gw1" in str(db_path)
+        assert str(db_path).endswith(".gw1")
 
     def test_get_db_path_raises_without_init(self, monkeypatch):
         """LOG_DIR_PATH が未設定の場合はエラー"""
@@ -263,7 +263,7 @@ class TestModuleFunctions:
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
         db_path = _get_db_path()
-        assert "test_worker_main" in str(db_path)
+        assert db_path == log_db_path
 
 
 class TestApiEndpoints:
