@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-01-25
+
+### Added
+
+- `my_lib.pydantic.base` モジュール（Pydantic ベーススキーマ）
+- `my_lib.selenium_util.set_stealth_mode()` 関数（ボット検知回避用）
+
+### Fixed
+
+- PA-API のアウトレット/新品価格取得間に5秒のウェイトを追加
+- 本番環境でログが `test_worker_main/` に保存される問題を修正
+- Chrome 終了時にロックファイルをクリーンアップ
+- `pytest_util.get_path()` の新仕様に合わせてテストを修正
+
+### Changed
+
+- CI ジョブ `test-walk-through` を `test-pytest` に名称変更
+
 ## [0.2.1] - 2026-01-24
 
 ### Added
