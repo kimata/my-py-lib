@@ -48,14 +48,21 @@ def _set_item_category(item: AmazonItem, data: Any) -> None:
     try:
         item.category = data.item_info.classifications.product_group.display_value
     except Exception:
-        logging.warning("Unable to get category.")
+        logging.warning("[Amazon] カテゴリ取得失敗: ASIN=%s", item.asin)
+
+
+def _format_asin_list(asin_list: list[str], max_display: int = 3) -> str:
+    """ASIN リストをログ用にフォーマットする"""
+    if len(asin_list) <= max_display:
+        return ", ".join(asin_list)
+    return ", ".join(asin_list[:max_display]) + f"... (他 {len(asin_list) - max_display} 件)"
 
 
 def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
-    logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
+    logging.info("[Amazon] 検索開始 (アウトレット): ASIN=%s", _format_asin_list(asin_list))
 
     default_api = _get_paapi(config)
 
@@ -124,7 +131,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
     if len(asin_list) == 0:
         return {}
 
-    logging.info("PA-API GetItems: ASIN = [ %s ]", ", ".join(asin_list))
+    logging.info("[Amazon] 検索開始 (新品): ASIN=%s", _format_asin_list(asin_list))
 
     default_api = _get_paapi(config)
 
@@ -172,7 +179,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
                             price = fetched_price
                         break
                     except Exception:
-                        logging.exception("Failed to fetch price: %s", item_data.asin)
+                        logging.exception("[Amazon] 価格取得失敗: ASIN=%s", item_data.asin)
 
                 if price is None:
                     continue
@@ -202,6 +209,11 @@ def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, Amaz
         time.sleep(_PAAPI_CALL_INTERVAL_SEC)
         price_map |= fetch_price_new(config, remaining_asin_list)
 
+    if len(price_map) == 0:
+        logging.info("[Amazon] 該当なし")
+    else:
+        logging.info("[Amazon] 検索完了: %d 件", len(price_map))
+
     return price_map
 
 
@@ -217,7 +229,7 @@ def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> lis
                 item.stock = 0
         return item_list
     except Exception:
-        logging.exception("Failed to fetch price")
+        logging.exception("[Amazon] 価格取得エラー")
         return []
 
 
