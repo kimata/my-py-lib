@@ -45,7 +45,6 @@ class SortOrder(Enum):
 class Condition(Enum):
     """商品状態"""
 
-    ALL = ""  # すべて
     NEW = "new"  # 新品
     USED = "used"  # 中古
 
@@ -60,7 +59,7 @@ class SearchCondition:
     price_max: int | None = None
     sort: SortOrder = SortOrder.PRICE_ASC
     in_stock: bool = True
-    condition: Condition = Condition.ALL
+    condition: Condition = Condition.NEW
     genre_category_id: str | None = None
     brand_id: str | None = None
 
@@ -70,8 +69,8 @@ class SearchCondition:
         sort_value = data.get("sort", "+price")
         sort = SortOrder(sort_value) if sort_value else SortOrder.PRICE_ASC
 
-        condition_value = data.get("condition", "")
-        condition = Condition(condition_value) if condition_value else Condition.ALL
+        condition_value = data.get("condition", "new")
+        condition = Condition(condition_value) if condition_value else Condition.NEW
 
         return cls(
             keyword=data["keyword"],
@@ -130,8 +129,7 @@ def _build_params(
     if condition.in_stock:
         params["in_stock"] = "true"
 
-    if condition.condition != Condition.ALL:
-        params["condition"] = condition.condition.value
+    params["condition"] = condition.condition.value
 
     if condition.genre_category_id:
         params["genre_category_id"] = condition.genre_category_id
@@ -271,7 +269,7 @@ if __name__ == "__main__":
     price_min = int(price_min_str) if price_min_str else None
     price_max = int(price_max_str) if price_max_str else None
     max_count = int(max_count_str) if max_count_str else 10
-    condition = Condition(condition_str) if condition_str else Condition.ALL
+    condition = Condition(condition_str) if condition_str else Condition.NEW
 
     search_condition = SearchCondition(
         keyword=keyword,
