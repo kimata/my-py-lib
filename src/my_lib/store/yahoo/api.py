@@ -165,7 +165,7 @@ def _fetch_page(
     """
     params = _build_params(config, condition, results, start)
 
-    logging.debug("API リクエスト: %s, params=%s", _API_ENDPOINT, params)
+    logging.debug("[Yahoo] API リクエスト: %s, params=%s", _API_ENDPOINT, params)
 
     response = requests.get(_API_ENDPOINT, params=params, timeout=30)
     response.raise_for_status()
@@ -192,6 +192,8 @@ def search(
     if max_items is None:
         max_items = _MAX_RESULTS_PER_REQUEST
 
+    logging.info("[Yahoo] 検索開始: keyword=%s", condition.keyword)
+
     # API 制限: start + results <= 1000
     max_start = 1000 - _MAX_RESULTS_PER_REQUEST
 
@@ -205,18 +207,17 @@ def search(
         try:
             response = _fetch_page(config, condition, fetch_count, start)
         except requests.RequestException:
-            logging.exception("API 呼び出しに失敗しました")
+            logging.exception("[Yahoo] API エラー")
             break
 
         hits = response.get("hits", [])
         if not hits:
-            logging.debug("検索結果が0件です")
+            logging.info("[Yahoo] 該当なし")
             break
 
         total_results = response.get("totalResultsAvailable", 0)
         logging.debug(
-            "取得: start=%d, 件数=%d, 総件数=%d",
-            start,
+            "[Yahoo] API応答: %d/%d 件取得",
             len(hits),
             total_results,
         )
@@ -228,7 +229,7 @@ def search(
                 item = YahooItem.parse(hit)
                 results.append(item)
             except (KeyError, ValueError):
-                logging.exception("商品情報のパースに失敗しました: %s", hit.get("name", "unknown"))
+                logging.exception("[Yahoo] パース失敗: name=%s", hit.get("name", "unknown"))
                 continue
 
         # 次のページがない場合は終了
@@ -240,7 +241,7 @@ def search(
         # レート制限対策
         time.sleep(_RATE_LIMIT_WAIT_SEC)
 
-    logging.info("検索完了: %d 件", len(results))
+    logging.info("[Yahoo] 検索完了: %d 件", len(results))
     return results
 
 

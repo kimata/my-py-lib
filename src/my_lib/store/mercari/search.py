@@ -159,12 +159,12 @@ def _wait_for_search_results(
         # 検索結果が0件の場合のチェック
         no_result_xpath = '//p[contains(text(), "新着のお知らせを受け取る")]'
         if my_lib.selenium_util.xpath_exists(driver, no_result_xpath):
-            logging.info("検索結果が0件です")
+            logging.info("[Mercari] 該当なし")
             return False
 
         return True
     except selenium.common.exceptions.TimeoutException:
-        logging.warning("検索結果の読み込みがタイムアウトしました")
+        logging.warning("[Mercari] 読み込みタイムアウト")
         return False
 
 
@@ -192,17 +192,17 @@ def _parse_search_item(
             by_xpath, './/p[contains(@class, "merText") and text()="PR"]'
         )
         if pr_elements:
-            logging.debug("PR（広告）アイテムをスキップ")
+            logging.debug("[Mercari] 広告アイテムをスキップ")
             return None
 
         # URL を取得
         link_elements = item_element.find_elements(by_xpath, ".//a")
         if not link_elements:
-            logging.debug("パース失敗: リンク要素なし")
+            logging.debug("[Mercari] パース失敗: リンク要素なし")
             return None
         url_raw = link_elements[0].get_attribute("href")
         if url_raw is None:
-            logging.debug("パース失敗: URL取得失敗")
+            logging.debug("[Mercari] パース失敗: URL取得失敗")
             return None
         # 相対パスの場合はフルURLに変換
         url = f"https://jp.mercari.com{url_raw}" if url_raw.startswith("/") else url_raw
@@ -256,13 +256,13 @@ def _parse_search_item(
             aria_debug = None
             if img_elements:
                 aria_debug = img_elements[0].get_attribute("aria-label")
-            logging.debug("パース失敗: title=%s, price=%s, aria_label=%s", title, price, aria_debug)
+            logging.debug("[Mercari] パース失敗: title=%s, price=%s, aria_label=%s", title, price, aria_debug)
             return None
 
         return SearchResult(title=title, url=url, price=price)
 
     except Exception:
-        logging.exception("商品情報のパースに失敗しました")
+        logging.exception("[Mercari] パース失敗")
         return None
 
 
@@ -287,7 +287,8 @@ def search(
 
     """
     url = build_search_url(condition)
-    logging.info("検索URL: %s", url)
+    logging.info("[Mercari] 検索開始: keyword=%s", condition.keyword)
+    logging.debug("[Mercari] 検索URL: %s", url)
 
     driver.get(url)
 
@@ -300,11 +301,11 @@ def search(
     parsed_urls: set[str] = set()  # 重複防止用
 
     item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
-    logging.debug("発見した要素数: %d 件", len(item_elements))
+    logging.debug("[Mercari] ページ解析: %d 件発見", len(item_elements))
 
     for i, item_element in enumerate(item_elements):
         if max_items is not None and len(results) >= max_items:
-            logging.info("パース成功: %d 件（目標達成）", len(results))
+            logging.info("[Mercari] 検索完了: %d 件", len(results))
             return results
 
         # スクロールが有効な場合、要素をビューポートにスクロールしてコンテンツをロード
@@ -319,7 +320,7 @@ def search(
                 if i >= 20:  # 最初の20件以降はロードに時間がかかる
                     time.sleep(0.3)
             except selenium.common.exceptions.StaleElementReferenceException:
-                logging.debug("要素 %d がStale、スキップ", i + 1)
+                logging.debug("[Mercari] 要素 %d がStale、スキップ", i + 1)
                 continue
 
         result = _parse_search_item(item_element)
@@ -327,7 +328,7 @@ def search(
             results.append(result)
             parsed_urls.add(result.url)
 
-    logging.info("パース成功: %d 件", len(results))
+    logging.info("[Mercari] 検索完了: %d 件", len(results))
     return results
 
 
