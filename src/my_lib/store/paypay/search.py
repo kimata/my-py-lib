@@ -31,9 +31,7 @@ import logging
 import re
 import time
 import urllib.parse
-from dataclasses import dataclass
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
@@ -46,62 +44,17 @@ if TYPE_CHECKING:
     import selenium.webdriver.support.wait
 
 
-class ItemCondition(Enum):
-    """商品の状態"""
-
-    NEW = 1  # 新品・未使用
-    LIKE_NEW = 2  # 未使用に近い
-    GOOD = 3  # 目立った傷や汚れなし
-    FAIR = 4  # やや傷や汚れあり
-    POOR = 5  # 傷や汚れあり
-    BAD = 6  # 全体的に状態が悪い
-
+import my_lib.store.flea_market
 
 # PayPayフリマの商品状態パラメータ対応
-_CONDITION_PARAM_MAP: dict[ItemCondition, str] = {
-    ItemCondition.NEW: "1",
-    ItemCondition.LIKE_NEW: "2",
-    ItemCondition.GOOD: "3",
-    ItemCondition.FAIR: "4",
-    ItemCondition.POOR: "5",
-    ItemCondition.BAD: "6",
+_CONDITION_PARAM_MAP: dict[my_lib.store.flea_market.ItemCondition, str] = {
+    my_lib.store.flea_market.ItemCondition.NEW: "1",
+    my_lib.store.flea_market.ItemCondition.LIKE_NEW: "2",
+    my_lib.store.flea_market.ItemCondition.GOOD: "3",
+    my_lib.store.flea_market.ItemCondition.FAIR: "4",
+    my_lib.store.flea_market.ItemCondition.POOR: "5",
+    my_lib.store.flea_market.ItemCondition.BAD: "6",
 }
-
-
-@dataclass(frozen=True)
-class SearchCondition:
-    """検索条件"""
-
-    keyword: str
-    exclude_keyword: str | None = None
-    price_min: int | None = None
-    price_max: int | None = None
-    item_conditions: list[ItemCondition] | None = None
-
-    @classmethod
-    def parse(cls, data: dict[str, Any]) -> Self:
-        """辞書からインスタンスを生成"""
-        conditions = data.get("item_conditions")
-        item_conditions = None
-        if conditions:
-            item_conditions = [ItemCondition(c) for c in conditions]
-
-        return cls(
-            keyword=data["keyword"],
-            exclude_keyword=data.get("exclude_keyword"),
-            price_min=data.get("price_min"),
-            price_max=data.get("price_max"),
-            item_conditions=item_conditions,
-        )
-
-
-@dataclass(frozen=True)
-class SearchResult:
-    """検索結果の商品情報"""
-
-    title: str
-    url: str
-    price: int
 
 
 _SEARCH_BASE_URL: str = "https://paypayfleamarket.yahoo.co.jp/search"
@@ -110,7 +63,7 @@ _SEARCH_BASE_URL: str = "https://paypayfleamarket.yahoo.co.jp/search"
 _ITEM_LIST_XPATH: str = '//div[@id="itm"]//a[contains(@href, "/item/")]'
 
 
-def build_search_url(condition: SearchCondition) -> str:
+def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str:
     """検索条件から検索 URL を生成する
 
     Args:
@@ -232,7 +185,7 @@ def _select_sort_order(
 
 def _parse_search_item(
     item_element: Any,
-) -> SearchResult | None:
+) -> my_lib.store.flea_market.SearchResult | None:
     """検索結果の1件をパースする
 
     Args:
@@ -300,7 +253,7 @@ def _parse_search_item(
             logging.debug("[PayPay] パース失敗: title=%s, price=%s, text=%s", title, price, debug_text)
             return None
 
-        return SearchResult(title=title, url=url, price=price)
+        return my_lib.store.flea_market.SearchResult(title=title, url=url, price=price)
 
     except Exception:
         logging.exception("[PayPay] パース失敗")
@@ -310,10 +263,10 @@ def _parse_search_item(
 def search(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
-    condition: SearchCondition,
+    condition: my_lib.store.flea_market.SearchCondition,
     max_items: int | None = None,
     scroll_to_load: bool = False,
-) -> list[SearchResult]:
+) -> list[my_lib.store.flea_market.SearchResult]:
     """PayPayフリマで商品を検索する
 
     Args:
@@ -338,7 +291,7 @@ def search(
 
     by_xpath = selenium.webdriver.common.by.By.XPATH
 
-    results: list[SearchResult] = []
+    results: list[my_lib.store.flea_market.SearchResult] = []
     parsed_urls: set[str] = set()
 
     item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
@@ -404,11 +357,13 @@ if __name__ == "__main__":
     if max_count is not None and max_count > 20:
         scroll_to_load = True
 
-    item_conditions: list[ItemCondition] | None = None
+    item_conditions: list[my_lib.store.flea_market.ItemCondition] | None = None
     if conditions_str:
-        item_conditions = [ItemCondition(int(c.strip())) for c in conditions_str.split(",")]
+        item_conditions = [
+            my_lib.store.flea_market.ItemCondition(int(c.strip())) for c in conditions_str.split(",")
+        ]
 
-    condition = SearchCondition(
+    condition = my_lib.store.flea_market.SearchCondition(
         keyword=keyword,
         exclude_keyword=exclude_keyword,
         price_min=price_min,
