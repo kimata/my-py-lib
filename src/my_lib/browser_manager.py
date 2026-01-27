@@ -51,6 +51,7 @@ class BrowserManager:
         use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
         clear_profile_on_error: 起動エラー時にプロファイルを削除するか（デフォルト: False）
         max_retry_on_error: 起動エラー時のリトライ回数（デフォルト: 1）
+        stealth_mode: ボット検出回避のための User-Agent 偽装を行うか（デフォルト: True）
 
     Example:
         >>> manager = BrowserManager(
@@ -69,6 +70,7 @@ class BrowserManager:
     use_undetected: bool = True
     clear_profile_on_error: bool = False
     max_retry_on_error: int = 1
+    stealth_mode: bool = True
 
     # 内部状態
     _driver_state: DriverInitialized | DriverUninitialized = field(
@@ -113,6 +115,7 @@ class BrowserManager:
                     self.profile_name,
                     self.data_dir,
                     use_undetected=self.use_undetected,
+                    stealth_mode=self.stealth_mode,
                 )
                 wait = selenium.webdriver.support.wait.WebDriverWait(driver, self.wait_timeout)
 

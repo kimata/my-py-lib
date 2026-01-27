@@ -77,6 +77,7 @@ class TestGetDriver:
                 "TestProfile",
                 temp_dir,
                 use_undetected=True,
+                stealth_mode=True,
             )
             mock_clear.assert_called_once_with(mock_driver)
             assert driver is mock_driver
