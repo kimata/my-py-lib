@@ -136,7 +136,7 @@ def _wait_for_search_results(
         return True
     except selenium.common.exceptions.TimeoutException:
         logging.warning("[Rakuma] 読み込みタイムアウト")
-        return False
+        raise
 
 
 def _parse_search_item(
