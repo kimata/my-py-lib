@@ -48,12 +48,14 @@ class WebappConfig:
 
     static_dir_path: pathlib.Path
     data: WebappDataConfig | None = None
+    external_url: str | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
             static_dir_path=pathlib.Path(data["static_dir_path"]).resolve(),
             data=WebappDataConfig.parse(data["data"]) if "data" in data else None,
+            external_url=data.get("external_url"),
         )
 
 
