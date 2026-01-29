@@ -22,6 +22,12 @@ class TestEventType:
 
         assert EVENT_TYPE.SCHEDULE.value == "schedule"
 
+    def test_has_content(self):
+        """CONTENT を持つ"""
+        from my_lib.webapp.event import EVENT_TYPE
+
+        assert EVENT_TYPE.CONTENT.value == "content"
+
     def test_has_log(self):
         """LOG を持つ"""
         from my_lib.webapp.event import EVENT_TYPE
@@ -33,8 +39,9 @@ class TestEventType:
         from my_lib.webapp.event import EVENT_TYPE
 
         assert EVENT_TYPE.CONTROL.index == 0
-        assert EVENT_TYPE.SCHEDULE.index == 1
-        assert EVENT_TYPE.LOG.index == 2
+        assert EVENT_TYPE.CONTENT.index == 1
+        assert EVENT_TYPE.SCHEDULE.index == 2
+        assert EVENT_TYPE.LOG.index == 3
 
 
 class TestNotifyEvent:
@@ -200,6 +207,48 @@ class TestEventManager:
         result = next(stream)
 
         assert "data: schedule" in result
+
+
+class TestDbStateWatcher:
+    """DB 監視ヘルパのテスト"""
+
+    def test_notifies_on_state_change(self, tmp_path):
+        """状態変化時に通知される"""
+        import sqlite3
+        import time
+
+        from my_lib.webapp.event import EVENT_TYPE, _manager, start_db_state_watcher, stop_db_state_watcher
+
+        db_path = tmp_path / "test.db"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS state (value TEXT)")
+            conn.execute("INSERT INTO state (value) VALUES ('a')")
+            conn.commit()
+
+        def _get_state(path):
+            with sqlite3.connect(path) as conn:
+                cursor = conn.execute("SELECT MAX(value) FROM state")
+                row = cursor.fetchone()
+                return row[0] if row else None
+
+        initial = _manager.event_count[EVENT_TYPE.CONTROL.index]
+
+        stop_event, thread = start_db_state_watcher(
+            db_path,
+            _get_state,
+            EVENT_TYPE.CONTROL,
+            interval_sec=0.05,
+        )
+
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("INSERT INTO state (value) VALUES ('b')")
+            conn.commit()
+
+        time.sleep(0.2)
+
+        stop_db_state_watcher(stop_event, thread)
+
+        assert _manager.event_count[EVENT_TYPE.CONTROL.index] >= initial + 1
 
 
 class TestApiEvent:

@@ -5,10 +5,11 @@ import enum
 import logging
 import multiprocessing
 import multiprocessing.queues
+import pathlib
 import threading
 import time
 import traceback
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from typing import Any
 
 import flask
@@ -21,7 +22,6 @@ class EVENT_TYPE(enum.Enum):
     CONTENT = "content"
     SCHEDULE = "schedule"
     LOG = "log"
-    DATA = "data"
 
     @property
     def index(self) -> int:
@@ -183,6 +183,84 @@ def notify_event(event_type: EVENT_TYPE) -> None:
         event_type: 通知するイベントタイプ
     """
     _manager.notify_event(event_type)
+
+
+def start_db_state_watcher(
+    db_path: pathlib.Path,
+    state_getter: Callable[[pathlib.Path], Any | None],
+    event_type: EVENT_TYPE,
+    *,
+    interval_sec: float = 1.0,
+    notify_on_first: bool = False,
+    keepalive_sec: float | None = None,
+) -> tuple[threading.Event, threading.Thread]:
+    """DB ファイルの変更を監視し、状態変化があれば SSE イベント通知を行う.
+
+    Args:
+        db_path: 監視する DB ファイルパス
+        state_getter: DB から現在状態を取得する関数
+        event_type: 通知するイベントタイプ
+        interval_sec: 監視間隔（秒）
+        notify_on_first: 初回取得時にも通知するかどうか
+        keepalive_sec: 最終通知からの経過時間で通知する閾値（秒）
+
+    Returns:
+        (stop_event, thread) のタプル
+    """
+    stop_event = threading.Event()
+
+    def _watch() -> None:
+        last_mtime: float = 0.0
+        last_state: Any | None = None
+        last_notify_time = time.time()
+
+        if db_path.exists():
+            last_mtime = db_path.stat().st_mtime
+
+        while not stop_event.wait(interval_sec):
+            try:
+                if not db_path.exists():
+                    continue
+
+                current_mtime = db_path.stat().st_mtime
+                if current_mtime <= last_mtime:
+                    continue
+
+                last_mtime = current_mtime
+
+                current_state = state_getter(db_path)
+                should_notify = False
+
+                if last_state is None:
+                    should_notify = notify_on_first
+                elif current_state != last_state:
+                    should_notify = True
+                elif keepalive_sec is not None and (time.time() - last_notify_time) >= keepalive_sec:
+                    should_notify = True
+
+                if should_notify:
+                    logging.debug("DB state changed, notifying clients")
+                    notify_event(event_type)
+                    last_notify_time = time.time()
+
+                last_state = current_state
+            except Exception:
+                logging.exception("Error checking db file")
+
+    thread = threading.Thread(target=_watch, daemon=True)
+    thread.start()
+    return (stop_event, thread)
+
+
+def stop_db_state_watcher(stop_event: threading.Event, thread: threading.Thread) -> None:
+    """DB 監視スレッドを停止する.
+
+    Args:
+        stop_event: 監視停止用イベント
+        thread: 監視スレッド
+    """
+    stop_event.set()
+    thread.join(timeout=5.0)
 
 
 @blueprint.route("/api/event", methods=["GET"])

@@ -80,6 +80,26 @@ class TestCheckLiveness:
 
         assert not my_lib.healthz.check_liveness(target)
 
+    def test_returns_elapsed_when_stale(self, temp_dir):
+        """古すぎるファイルに対して経過秒を返す"""
+        import my_lib.footprint
+        import my_lib.healthz
+        from my_lib.healthz import HealthzTarget
+
+        liveness_file = temp_dir / "liveness"
+        old_time = time.time() - 3600
+        my_lib.footprint.update(liveness_file, mtime=old_time)
+
+        target = HealthzTarget(
+            name="test",
+            liveness_file=liveness_file,
+            interval=60.0,
+        )
+
+        elapsed = my_lib.healthz.check_liveness_elapsed(target)
+        assert elapsed is not None
+        assert elapsed > 0
+
 
 class TestCheckLivenessAll:
     """check_liveness_all 関数のテスト"""
@@ -119,6 +139,26 @@ class TestCheckLivenessAll:
 
         result = my_lib.healthz.check_liveness_all(targets)
         assert result == ["unhealthy"]
+
+
+class TestCheckLivenessAllWithPorts:
+    """check_liveness_all_with_ports 関数のテスト"""
+
+    def test_returns_port_failure(self, temp_dir):
+        """HTTPポートチェックが失敗する場合に失敗リストへ追加"""
+        import my_lib.footprint
+        import my_lib.healthz
+        from my_lib.healthz import HealthzTarget
+
+        liveness_file = temp_dir / "liveness"
+        my_lib.footprint.update(liveness_file)
+
+        targets = [
+            HealthzTarget(name="target", liveness_file=liveness_file, interval=60.0),
+        ]
+
+        result = my_lib.healthz.check_liveness_all_with_ports(targets, http_port=59999)
+        assert "http_port" in result
 
 
 class TestCheckTcpPort:

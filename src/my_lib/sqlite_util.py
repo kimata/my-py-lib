@@ -290,6 +290,82 @@ def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseCo
     return DatabaseConnection(db_path, timeout=timeout)
 
 
+def load_schema(schema_path: str | pathlib.Path) -> str:
+    """スキーマファイルの内容を読み込む
+
+    Args:
+        schema_path: スキーマファイルのパス
+
+    Returns:
+        スキーマ SQL
+    """
+    schema_path = pathlib.Path(schema_path)
+    return schema_path.read_text(encoding="utf-8")
+
+
+def exec_schema(conn: sqlite3.Connection, schema_sql: str) -> None:
+    """スキーマ SQL を実行する
+
+    Args:
+        conn: SQLite 接続
+        schema_sql: 実行する SQL
+    """
+    conn.executescript(schema_sql)
+
+
+def exec_schema_from_file(conn: sqlite3.Connection, schema_path: str | pathlib.Path) -> None:
+    """スキーマファイルから SQL を読み込み実行する
+
+    Args:
+        conn: SQLite 接続
+        schema_path: スキーマファイルのパス
+    """
+    schema_sql = load_schema(schema_path)
+    exec_schema(conn, schema_sql)
+
+
+def init_schema_from_file(
+    db_path: str | pathlib.Path,
+    schema_path: str | pathlib.Path,
+    *,
+    timeout: float = 60.0,
+) -> None:
+    """SQLite スキーマをファイルから初期化する
+
+    Args:
+        db_path: データベースファイルのパス
+        schema_path: スキーマファイルのパス
+        timeout: DB 接続タイムアウト（秒）
+    """
+    with connect(db_path, timeout=timeout) as conn:
+        exec_schema_from_file(conn, schema_path)
+
+
+def init_table_from_schema(
+    conn: sqlite3.Connection,
+    table_name: str,
+    schema_path: str | pathlib.Path,
+) -> None:
+    """スキーマファイルから指定テーブルの定義のみ初期化する
+
+    Args:
+        conn: SQLite 接続
+        table_name: 初期化するテーブル名
+        schema_path: スキーマファイルのパス
+    """
+    schema_content = load_schema(schema_path)
+
+    statements = [s.strip() for s in schema_content.split(";") if s.strip()]
+    for statement in statements:
+        lines = [line for line in statement.split("\n") if not line.strip().startswith("--")]
+        clean_statement = "\n".join(lines).strip()
+        if not clean_statement:
+            continue
+
+        if f"TABLE IF NOT EXISTS {table_name}" in statement or f"ON {table_name}" in statement:
+            conn.execute(statement)
+
+
 def recover(db_path: str | pathlib.Path) -> None:
     """データベースの復旧を試みる"""
     try:
