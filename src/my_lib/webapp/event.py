@@ -18,6 +18,7 @@ YIELD_TIMEOUT = 100
 
 class EVENT_TYPE(enum.Enum):
     CONTROL = "control"
+    CONTENT = "content"
     SCHEDULE = "schedule"
     LOG = "log"
     DATA = "data"
