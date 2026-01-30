@@ -12,6 +12,74 @@ import my_lib.browser_manager
 import my_lib.selenium_util
 
 
+class TestBrowserProfile:
+    """BrowserProfile のテスト"""
+
+    def test_creates_with_required_params(self, temp_dir: pathlib.Path):
+        """必須パラメータのみで作成できる"""
+        profile = my_lib.browser_manager.BrowserProfile(
+            name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        assert profile.name == "TestProfile"
+        assert profile.data_dir == temp_dir
+        assert profile.headless is True
+        assert profile.wait_timeout == 5.0
+        assert profile.use_undetected is True
+        assert profile.stealth_mode is True
+        assert profile.clear_profile_on_error is False
+        assert profile.max_retry == 1
+
+    def test_creates_with_all_params(self, temp_dir: pathlib.Path):
+        """全パラメータを指定して作成できる"""
+        profile = my_lib.browser_manager.BrowserProfile(
+            name="CustomProfile",
+            data_dir=temp_dir,
+            headless=False,
+            wait_timeout=10.0,
+            use_undetected=False,
+            stealth_mode=False,
+            clear_profile_on_error=True,
+            max_retry=3,
+        )
+
+        assert profile.name == "CustomProfile"
+        assert profile.headless is False
+        assert profile.wait_timeout == 10.0
+        assert profile.use_undetected is False
+        assert profile.stealth_mode is False
+        assert profile.clear_profile_on_error is True
+        assert profile.max_retry == 3
+
+
+class TestBrowserManagerFromProfile:
+    """BrowserManager.from_profile のテスト"""
+
+    def test_creates_from_profile(self, temp_dir: pathlib.Path):
+        """BrowserProfile から BrowserManager を作成できる"""
+        profile = my_lib.browser_manager.BrowserProfile(
+            name="ProfileTest",
+            data_dir=temp_dir,
+            wait_timeout=15.0,
+            use_undetected=False,
+            stealth_mode=False,
+            clear_profile_on_error=True,
+            max_retry=5,
+        )
+
+        manager = my_lib.browser_manager.BrowserManager.from_profile(profile)
+
+        assert manager.profile_name == "ProfileTest"
+        assert manager.data_dir == temp_dir
+        assert manager.wait_timeout == 15.0
+        assert manager.use_undetected is False
+        assert manager.stealth_mode is False
+        assert manager.clear_profile_on_error is True
+        assert manager.max_retry_on_error == 5
+        assert manager.has_driver() is False
+
+
 class TestBrowserManagerInit:
     """BrowserManager 初期化のテスト"""
 
@@ -308,3 +376,140 @@ class TestHasDriver:
             manager.quit()
 
             assert manager.has_driver() is False
+
+
+class TestContextManager:
+    """context manager のテスト"""
+
+    def test_context_manager_quits_on_exit(self, temp_dir: pathlib.Path):
+        """context manager 終了時に quit が呼ばれる"""
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock") as mock_cleanup,
+        ):
+            with my_lib.browser_manager.BrowserManager(
+                profile_name="TestProfile",
+                data_dir=temp_dir,
+            ) as manager:
+                manager.get_driver()
+                assert manager.has_driver() is True
+
+            mock_quit.assert_called_once()
+            # quit() 内で cleanup_profile_lock が呼ばれる
+            mock_cleanup.assert_called_with("TestProfile", temp_dir)
+
+    def test_context_manager_returns_self(self, temp_dir: pathlib.Path):
+        """context manager は self を返す"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully"),
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock"),
+            manager as ctx,
+        ):
+            assert ctx is manager
+
+    def test_context_manager_quits_on_exception(self, temp_dir: pathlib.Path):
+        """例外発生時も quit が呼ばれる"""
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock") as mock_cleanup,
+        ):
+            with (
+                pytest.raises(ValueError, match="test error"),
+                my_lib.browser_manager.BrowserManager(
+                    profile_name="TestProfile",
+                    data_dir=temp_dir,
+                ) as manager,
+            ):
+                manager.get_driver()
+                raise ValueError("test error")
+
+            mock_quit.assert_called_once()
+            # quit() 内で cleanup_profile_lock が呼ばれる
+            mock_cleanup.assert_called()
+
+
+class TestDriverContextManager:
+    """driver() コンテキストマネージャのテスト"""
+
+    def test_driver_context_yields_driver(self, temp_dir: pathlib.Path):
+        """driver() はドライバーを yield する"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            manager.driver() as driver,
+        ):
+            assert driver is mock_driver
+
+    def test_driver_context_clears_cache_on_exit(self, temp_dir: pathlib.Path):
+        """driver() 終了時にキャッシュをクリアする"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache") as mock_clear,
+        ):
+            with manager.driver():
+                mock_clear.reset_mock()  # get_driver 内での呼び出しをリセット
+
+            mock_clear.assert_called_once_with(mock_driver)
+
+    def test_driver_context_does_not_quit(self, temp_dir: pathlib.Path):
+        """driver() は終了時に quit しない（複数回使用可能）"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+        ):
+            with manager.driver():
+                pass
+
+            mock_quit.assert_not_called()
+            assert manager.has_driver() is True
+
+
+class TestCleanupProfileLock:
+    """cleanup_profile_lock メソッドのテスト"""
+
+    def test_calls_chrome_util(self, temp_dir: pathlib.Path):
+        """chrome_util.cleanup_profile_lock を呼び出す"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        with unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock") as mock_cleanup:
+            manager.cleanup_profile_lock()
+
+            mock_cleanup.assert_called_once_with("TestProfile", temp_dir)
