@@ -7,6 +7,7 @@ Selenium ブラウザ管理クラス
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import pathlib
 from dataclasses import dataclass, field
@@ -18,8 +19,49 @@ import my_lib.chrome_util
 import my_lib.selenium_util
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from selenium.webdriver.remote.webdriver import WebDriver
     from selenium.webdriver.support.wait import WebDriverWait
+
+
+@dataclass(frozen=True)
+class BrowserProfile:
+    """ブラウザ設定プロファイル
+
+    BrowserManager の設定を集約するクラスです。
+    複数のプロジェクトで共通の設定パターンを再利用できます。
+
+    Attributes:
+        name: Chrome プロファイル名
+        data_dir: Selenium データディレクトリのパス
+        headless: ヘッドレスモードで起動するか（デフォルト: True）
+        wait_timeout: WebDriverWait のタイムアウト秒数（デフォルト: 5.0）
+        use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
+        stealth_mode: ボット検出回避のための User-Agent 偽装を行うか（デフォルト: True）
+        clear_profile_on_error: 起動エラー時にプロファイルを削除するか（デフォルト: False）
+        max_retry: 起動エラー時のリトライ回数（デフォルト: 1）
+
+    Example:
+        >>> profile = BrowserProfile(
+        ...     name="MyProfile",
+        ...     data_dir=pathlib.Path("data/selenium"),
+        ...     headless=True,
+        ...     clear_profile_on_error=True,
+        ...     max_retry=3,
+        ... )
+        >>> manager = BrowserManager(profile=profile)
+
+    """
+
+    name: str
+    data_dir: pathlib.Path
+    headless: bool = True
+    wait_timeout: float = 5.0
+    use_undetected: bool = True
+    stealth_mode: bool = True
+    clear_profile_on_error: bool = False
+    max_retry: int = 1
 
 
 @dataclass(frozen=True)
@@ -54,13 +96,31 @@ class BrowserManager:
         stealth_mode: ボット検出回避のための User-Agent 偽装を行うか（デフォルト: True）
 
     Example:
-        >>> manager = BrowserManager(
-        ...     profile_name="MyProfile",
-        ...     data_dir=pathlib.Path("data/selenium"),
-        ... )
-        >>> driver, wait = manager.get_driver()
-        >>> # ... 操作 ...
-        >>> manager.quit()
+        個別パラメータで作成::
+
+            >>> manager = BrowserManager(
+            ...     profile_name="MyProfile",
+            ...     data_dir=pathlib.Path("data/selenium"),
+            ... )
+            >>> driver, wait = manager.get_driver()
+            >>> # ... 操作 ...
+            >>> manager.quit()
+
+        BrowserProfile で作成::
+
+            >>> profile = BrowserProfile(
+            ...     name="MyProfile",
+            ...     data_dir=pathlib.Path("data/selenium"),
+            ...     clear_profile_on_error=True,
+            ... )
+            >>> manager = BrowserManager.from_profile(profile)
+
+        context manager として使用::
+
+            >>> with BrowserManager.from_profile(profile) as manager:
+            ...     driver, wait = manager.get_driver()
+            ...     driver.get("https://example.com")
+            ... # 自動的に quit() が呼ばれる
 
     """
 
@@ -76,6 +136,27 @@ class BrowserManager:
     _driver_state: DriverInitialized | DriverUninitialized = field(
         default_factory=DriverUninitialized, init=False, repr=False
     )
+
+    @classmethod
+    def from_profile(cls, profile: BrowserProfile) -> BrowserManager:
+        """BrowserProfile からインスタンスを作成
+
+        Args:
+            profile: ブラウザ設定プロファイル
+
+        Returns:
+            BrowserManager インスタンス
+
+        """
+        return cls(
+            profile_name=profile.name,
+            data_dir=profile.data_dir,
+            wait_timeout=profile.wait_timeout,
+            use_undetected=profile.use_undetected,
+            clear_profile_on_error=profile.clear_profile_on_error,
+            max_retry_on_error=profile.max_retry,
+            stealth_mode=profile.stealth_mode,
+        )
 
     def get_driver(self) -> tuple[WebDriver, WebDriverWait]:
         """ドライバーを取得（必要に応じて起動）
@@ -183,3 +264,56 @@ class BrowserManager:
         """
         if isinstance(self._driver_state, DriverInitialized):
             my_lib.selenium_util.clear_cache(self._driver_state.driver)
+
+    def cleanup_profile_lock(self) -> None:
+        """プロファイルのロックファイルをクリーンアップ
+
+        Chrome が正常終了してもロックファイルが残ることがあるため、
+        明示的にクリーンアップします。
+
+        """
+        my_lib.chrome_util.cleanup_profile_lock(self.profile_name, self.data_dir)
+
+    @contextlib.contextmanager
+    def driver(self) -> Iterator[WebDriver]:
+        """ドライバーを取得するコンテキストマネージャ
+
+        ドライバーを取得し、ブロック終了後にキャッシュをクリアします。
+        ドライバー自体は終了しません（複数回使用可能）。
+
+        Yields:
+            WebDriver インスタンス
+
+        Example:
+            >>> with manager.driver() as driver:
+            ...     driver.get("https://example.com")
+
+        """
+        driver, _ = self.get_driver()
+        try:
+            yield driver
+        finally:
+            self.clear_cache()
+
+    def __enter__(self) -> BrowserManager:
+        """コンテキストマネージャのエントリーポイント
+
+        Returns:
+            self
+
+        """
+        return self
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: object,
+    ) -> None:
+        """コンテキストマネージャの終了処理
+
+        ドライバーを終了し、ロックファイルをクリーンアップします。
+        （quit() 内で cleanup_profile_lock も呼ばれる）
+
+        """
+        self.quit()
