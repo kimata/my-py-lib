@@ -240,11 +240,20 @@ class TestDbStateWatcher:
             interval_sec=0.05,
         )
 
+        # NOTE: 初回チェックで last_state が設定される（notify_on_first=False のため通知されない）
+        # 状態変化を検出するには、2回状態を変更する必要がある
         with sqlite3.connect(db_path) as conn:
             conn.execute("INSERT INTO state (value) VALUES ('b')")
             conn.commit()
 
-        time.sleep(0.2)
+        time.sleep(0.15)
+
+        # 2回目の状態変更で通知される
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("INSERT INTO state (value) VALUES ('c')")
+            conn.commit()
+
+        time.sleep(0.15)
 
         stop_db_state_watcher(stop_event, thread)
 

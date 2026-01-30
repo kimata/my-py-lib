@@ -32,6 +32,7 @@ def webapp(filename: str) -> flask.Response:
         static_dir_path = my_lib.webapp.config.STATIC_DIR_PATH
         if static_dir_path is None:
             flask.abort(500)
+            return cast(flask.Response, None)  # NoReturn だが型チェッカー用
 
         static_dir = static_dir_path.resolve()
         requested_path = (static_dir / filename).resolve()

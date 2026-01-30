@@ -243,7 +243,7 @@ def _fetch_data_impl(
             query += " |> last()"
 
         logging.debug("Flux query = %s", query)
-        client = influxdb_client.InfluxDBClient(url=db_config.url, token=token, org=db_config.org)  # type: ignore[reportPrivateImportUsage]
+        client = influxdb_client.InfluxDBClient(url=db_config.url, token=token, org=db_config.org)  # pyright: ignore[reportPrivateImportUsage]
         query_api = client.query_api()
 
         return query_api.query(query=query)
