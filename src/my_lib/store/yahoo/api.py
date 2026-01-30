@@ -114,7 +114,7 @@ def _build_params(
         "results": min(results, _MAX_RESULTS_PER_REQUEST),
         "start": start,
         "sort": condition.sort.value,
-        "image_size": 300,
+        "image_size": 600,
     }
 
     if condition.jan:
