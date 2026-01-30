@@ -24,7 +24,6 @@ class TestBrowserProfile:
 
         assert profile.name == "TestProfile"
         assert profile.data_dir == temp_dir
-        assert profile.headless is True
         assert profile.wait_timeout == 5.0
         assert profile.use_undetected is True
         assert profile.stealth_mode is True
@@ -36,7 +35,6 @@ class TestBrowserProfile:
         profile = my_lib.browser_manager.BrowserProfile(
             name="CustomProfile",
             data_dir=temp_dir,
-            headless=False,
             wait_timeout=10.0,
             use_undetected=False,
             stealth_mode=False,
@@ -45,7 +43,6 @@ class TestBrowserProfile:
         )
 
         assert profile.name == "CustomProfile"
-        assert profile.headless is False
         assert profile.wait_timeout == 10.0
         assert profile.use_undetected is False
         assert profile.stealth_mode is False
