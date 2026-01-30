@@ -35,7 +35,6 @@ class BrowserProfile:
     Attributes:
         name: Chrome プロファイル名
         data_dir: Selenium データディレクトリのパス
-        headless: ヘッドレスモードで起動するか（デフォルト: True）
         wait_timeout: WebDriverWait のタイムアウト秒数（デフォルト: 5.0）
         use_undetected: undetected_chromedriver を使用するか（デフォルト: True）
         stealth_mode: ボット検出回避のための User-Agent 偽装を行うか（デフォルト: True）
@@ -46,17 +45,15 @@ class BrowserProfile:
         >>> profile = BrowserProfile(
         ...     name="MyProfile",
         ...     data_dir=pathlib.Path("data/selenium"),
-        ...     headless=True,
         ...     clear_profile_on_error=True,
         ...     max_retry=3,
         ... )
-        >>> manager = BrowserManager(profile=profile)
+        >>> manager = BrowserManager.from_profile(profile)
 
     """
 
     name: str
     data_dir: pathlib.Path
-    headless: bool = True
     wait_timeout: float = 5.0
     use_undetected: bool = True
     stealth_mode: bool = True
