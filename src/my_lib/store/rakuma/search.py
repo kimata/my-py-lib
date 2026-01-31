@@ -46,13 +46,14 @@ if TYPE_CHECKING:
 import my_lib.store.flea_market
 
 # ラクマの商品状態パラメータ名とID対応
+# ラクマは独自の状態ID: 5=新品, 4=未使用に近い, 6=目立った傷なし, 3=やや傷あり, 2=傷あり, 1=状態悪い
 _CONDITION_PARAM_MAP: dict[my_lib.store.flea_market.ItemCondition, str] = {
-    my_lib.store.flea_market.ItemCondition.NEW: "1",
-    my_lib.store.flea_market.ItemCondition.LIKE_NEW: "2",
-    my_lib.store.flea_market.ItemCondition.GOOD: "3",
-    my_lib.store.flea_market.ItemCondition.FAIR: "4",
-    my_lib.store.flea_market.ItemCondition.POOR: "5",
-    my_lib.store.flea_market.ItemCondition.BAD: "6",
+    my_lib.store.flea_market.ItemCondition.NEW: "5",
+    my_lib.store.flea_market.ItemCondition.LIKE_NEW: "4",
+    my_lib.store.flea_market.ItemCondition.GOOD: "6",
+    my_lib.store.flea_market.ItemCondition.FAIR: "3",
+    my_lib.store.flea_market.ItemCondition.POOR: "2",
+    my_lib.store.flea_market.ItemCondition.BAD: "1",
 }
 
 
@@ -78,6 +79,9 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
         "order": "desc",
     }
 
+    if condition.exclude_keyword:
+        params["excluded_query"] = condition.exclude_keyword
+
     if condition.price_min is not None:
         params["min"] = condition.price_min
 
@@ -89,20 +93,10 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
         query_parts.append(f"{urllib.parse.quote(key)}={urllib.parse.quote(str(value))}")
 
     if condition.item_conditions:
-        query_parts.extend(
-            f"condition_id%5B%5D={_CONDITION_PARAM_MAP[cond]}" for cond in condition.item_conditions
-        )
+        cond_values = ",".join(_CONDITION_PARAM_MAP[cond] for cond in condition.item_conditions)
+        query_parts.append(f"statuses={cond_values}")
 
-    url = f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
-
-    # 除外キーワードは検索キーワードに「-除外ワード」を付与して対応
-    # ラクマには専用の除外パラメータがないため
-    if condition.exclude_keyword:
-        logging.info(
-            "[Rakuma] 除外キーワードは検索キーワードに含めて処理します: -%s", condition.exclude_keyword
-        )
-
-    return url
+    return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
 
 def _wait_for_search_results(

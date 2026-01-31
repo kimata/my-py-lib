@@ -76,13 +76,14 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     if condition.price_max is not None:
         params["price_max"] = condition.price_max
 
-    # 商品状態は複数指定可能なため、リストで追加
+    # 商品状態は複数指定可能なため、カンマ区切りで追加
     query_parts: list[str] = []
     for key, value in params.items():
         query_parts.append(f"{urllib.parse.quote(key)}={urllib.parse.quote(str(value))}")
 
     if condition.item_conditions:
-        query_parts.extend(f"item_condition_id%5B%5D={cond.value}" for cond in condition.item_conditions)
+        cond_values = ",".join(str(cond.value) for cond in condition.item_conditions)
+        query_parts.append(f"item_condition_id={urllib.parse.quote(cond_values)}")
 
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
