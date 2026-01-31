@@ -135,12 +135,42 @@ class HasCaptchaConfig(HasBotToken, Protocol):
     def captcha(self) -> SlackCaptchaConfig: ...
 
 
+# === NullObject パターン用のダミー設定 ===
+_EMPTY_CHANNEL = SlackChannelConfig(name="", id=None)
+_EMPTY_INFO = SlackInfoConfig(channel=_EMPTY_CHANNEL)
+_EMPTY_CAPTCHA = SlackCaptchaConfig(channel=_EMPTY_CHANNEL)
+_EMPTY_ERROR = SlackErrorConfig(channel=_EMPTY_CHANNEL, interval_min=0)
+
+
 # === 具象クラス ===
 @dataclass(frozen=True)
 class SlackEmptyConfig:
-    """Slack 設定が存在しない場合のプレースホルダー"""
+    """Slack 設定が存在しない場合のプレースホルダー.
 
-    pass
+    NullObject パターンを実装し、各プロパティにアクセスしても
+    エラーにならないようにダミー値を返します。
+    これにより呼び出し側での isinstance チェックが不要になります。
+    """
+
+    @property
+    def bot_token(self) -> str:
+        return ""
+
+    @property
+    def from_name(self) -> str:
+        return ""
+
+    @property
+    def info(self) -> SlackInfoConfig:
+        return _EMPTY_INFO
+
+    @property
+    def captcha(self) -> SlackCaptchaConfig:
+        return _EMPTY_CAPTCHA
+
+    @property
+    def error(self) -> SlackErrorConfig:
+        return _EMPTY_ERROR
 
 
 @dataclass(frozen=True)
