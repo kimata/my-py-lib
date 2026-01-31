@@ -47,13 +47,14 @@ if TYPE_CHECKING:
 import my_lib.store.flea_market
 
 # PayPayフリマの商品状態パラメータ対応
+# PayPay フリマは5段階: NEW, USED10, USED20, USED40, USED60
 _CONDITION_PARAM_MAP: dict[my_lib.store.flea_market.ItemCondition, str] = {
-    my_lib.store.flea_market.ItemCondition.NEW: "1",
-    my_lib.store.flea_market.ItemCondition.LIKE_NEW: "2",
-    my_lib.store.flea_market.ItemCondition.GOOD: "3",
-    my_lib.store.flea_market.ItemCondition.FAIR: "4",
-    my_lib.store.flea_market.ItemCondition.POOR: "5",
-    my_lib.store.flea_market.ItemCondition.BAD: "6",
+    my_lib.store.flea_market.ItemCondition.NEW: "NEW",
+    my_lib.store.flea_market.ItemCondition.LIKE_NEW: "USED10",
+    my_lib.store.flea_market.ItemCondition.GOOD: "USED20",
+    my_lib.store.flea_market.ItemCondition.FAIR: "USED40",
+    my_lib.store.flea_market.ItemCondition.POOR: "USED60",
+    my_lib.store.flea_market.ItemCondition.BAD: "USED60",  # PayPay には6段階目がないため USED60 にマッピング
 }
 
 
@@ -86,14 +87,14 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     }
 
     if condition.price_min is not None:
-        params["price_min"] = str(condition.price_min)
+        params["minPrice"] = str(condition.price_min)
 
     if condition.price_max is not None:
-        params["price_max"] = str(condition.price_max)
+        params["maxPrice"] = str(condition.price_max)
 
     if condition.item_conditions:
-        for cond in condition.item_conditions:
-            params[f"conditions[{_CONDITION_PARAM_MAP[cond]}]"] = "1"
+        cond_values = ",".join(_CONDITION_PARAM_MAP[cond] for cond in condition.item_conditions)
+        params["conditions"] = cond_values
 
     if params:
         query_parts = [f"{urllib.parse.quote(k)}={urllib.parse.quote(v)}" for k, v in params.items()]
