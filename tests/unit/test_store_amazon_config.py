@@ -192,6 +192,62 @@ class TestAmazonItem:
         assert "stock" not in result
 
 
+class TestSearchResultItem:
+    """SearchResultItem データクラスのテスト"""
+
+    def test_creates_instance(self):
+        """インスタンスを作成できる"""
+        from my_lib.store.amazon.config import SearchResultItem
+
+        item = SearchResultItem(
+            title="テスト商品",
+            asin="B0G3SXHCLJ",
+            price=1000,
+            thumb_url="https://example.com/thumb.jpg",
+        )
+
+        assert item.title == "テスト商品"
+        assert item.asin == "B0G3SXHCLJ"
+        assert item.price == 1000
+        assert item.thumb_url == "https://example.com/thumb.jpg"
+
+    def test_creates_instance_with_none_values(self):
+        """price と thumb_url が None でもインスタンスを作成できる"""
+        from my_lib.store.amazon.config import SearchResultItem
+
+        item = SearchResultItem(
+            title="テスト商品",
+            asin="B0G3SXHCLJ",
+            price=None,
+            thumb_url=None,
+        )
+
+        assert item.title == "テスト商品"
+        assert item.asin == "B0G3SXHCLJ"
+        assert item.price is None
+        assert item.thumb_url is None
+
+    def test_is_frozen(self):
+        """frozen=True であることを確認"""
+        import dataclasses
+
+        from my_lib.store.amazon.config import SearchResultItem
+
+        item = SearchResultItem(
+            title="テスト商品",
+            asin="B0G3SXHCLJ",
+            price=1000,
+            thumb_url="https://example.com/thumb.jpg",
+        )
+
+        assert dataclasses.is_dataclass(item)
+
+        import pytest
+
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            item.price = 2000  # type: ignore[misc]
+
+
 class TestDummyAmazonItem:
     """DUMMY_AMAZON_ITEM 定数のテスト"""
 

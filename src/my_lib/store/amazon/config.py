@@ -58,6 +58,16 @@ class AmazonLoginConfig:
         )
 
 
+@dataclass(frozen=True)
+class SearchResultItem:
+    """キーワード検索結果の商品情報."""
+
+    title: str
+    asin: str
+    price: int | None
+    thumb_url: str | None
+
+
 @dataclass  # NOTE: scrape.py で price/category を更新するため frozen=False
 class AmazonItem:
     """Amazon 商品情報."""

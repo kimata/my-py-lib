@@ -25,8 +25,10 @@ import paapi5_python_sdk.get_items_request
 import paapi5_python_sdk.get_items_resource
 import paapi5_python_sdk.merchant
 import paapi5_python_sdk.partner_type
+import paapi5_python_sdk.search_items_request
+import paapi5_python_sdk.search_items_resource
 
-from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem
+from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem, SearchResultItem
 from my_lib.store.amazon.util import get_item_url
 
 if TYPE_CHECKING:
@@ -231,6 +233,83 @@ def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> lis
     except Exception:
         logging.exception("[Amazon] 価格取得エラー")
         return []
+
+
+def search_items(
+    config: AmazonApiConfig,
+    keywords: str,
+    item_count: int = 10,
+) -> list[SearchResultItem]:
+    """キーワードで Amazon 商品を検索する.
+
+    Args:
+        config: PA-API 設定
+        keywords: 検索キーワード
+        item_count: 取得件数（1-10、デフォルト10）
+
+    Returns:
+        検索結果リスト
+    """
+    logging.info("[Amazon] キーワード検索開始: %s", keywords)
+
+    default_api = _get_paapi(config)
+
+    request = paapi5_python_sdk.search_items_request.SearchItemsRequest(
+        partner_tag=config.associate,
+        partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
+        keywords=keywords,
+        item_count=item_count,
+        resources=[
+            paapi5_python_sdk.search_items_resource.SearchItemsResource.ITEMINFO_TITLE,
+            paapi5_python_sdk.search_items_resource.SearchItemsResource.OFFERS_LISTINGS_PRICE,
+            paapi5_python_sdk.search_items_resource.SearchItemsResource.IMAGES_PRIMARY_SMALL,
+        ],
+    )
+
+    results: list[SearchResultItem] = []
+
+    try:
+        resp: Any = default_api.search_items(request)
+
+        if resp.search_result is not None:
+            for item_data in resp.search_result.items:
+                title: str | None = None
+                price: int | None = None
+                thumb_url: str | None = None
+
+                try:
+                    title = item_data.item_info.title.display_value
+                except Exception:
+                    logging.warning("[Amazon] 商品名取得失敗: ASIN=%s", item_data.asin)
+
+                if title is None:
+                    continue
+
+                try:
+                    if item_data.offers and item_data.offers.listings:
+                        price = int(item_data.offers.listings[0].price.amount)
+                except Exception:
+                    logging.debug("[Amazon] 価格取得失敗: ASIN=%s", item_data.asin)
+
+                try:
+                    thumb_url = item_data.images.primary.small.url
+                except Exception:
+                    logging.debug("[Amazon] サムネイル取得失敗: ASIN=%s", item_data.asin)
+
+                results.append(
+                    SearchResultItem(
+                        title=title,
+                        asin=item_data.asin,
+                        price=price,
+                        thumb_url=thumb_url,
+                    )
+                )
+    except Exception:
+        logging.exception("[Amazon] キーワード検索エラー: %s", keywords)
+
+    logging.info("[Amazon] キーワード検索完了: %d 件", len(results))
+
+    return results
 
 
 if __name__ == "__main__":
