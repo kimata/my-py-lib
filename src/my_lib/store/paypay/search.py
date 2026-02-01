@@ -82,9 +82,13 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     encoded_keyword = urllib.parse.quote(keyword)
     url = f"{_SEARCH_BASE_URL}/{encoded_keyword}"
 
-    params: dict[str, str] = {
-        "open": "1",  # 販売中のみ
-    }
+    params: dict[str, str] = {}
+
+    # 販売状態（None は全て）
+    if condition.sale_status == my_lib.store.flea_market.SaleStatus.ON_SALE:
+        params["open"] = "1"
+    elif condition.sale_status == my_lib.store.flea_market.SaleStatus.SOLD_OUT:
+        params["sold"] = "1"
 
     if condition.price_min is not None:
         params["minPrice"] = str(condition.price_min)
