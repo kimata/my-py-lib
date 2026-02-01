@@ -49,7 +49,7 @@ class SearchCondition:
     """検索条件"""
 
     keyword: str
-    ng_keyword: str | None = None
+    exclude_keyword: str | None = None
     price_min: int | None = None
     price_max: int | None = None
     sort: SortOrder = SortOrder.PRICE_ASC
@@ -64,7 +64,7 @@ class SearchCondition:
 
         return cls(
             keyword=data["keyword"],
-            ng_keyword=data.get("ng_keyword"),
+            exclude_keyword=data.get("exclude_keyword"),
             price_min=data.get("price_min"),
             price_max=data.get("price_max"),
             sort=sort,
@@ -112,8 +112,8 @@ def _build_params(
     if affiliate_id:
         params["affiliateId"] = affiliate_id
 
-    if condition.ng_keyword:
-        params["NGKeyword"] = condition.ng_keyword
+    if condition.exclude_keyword:
+        params["NGKeyword"] = condition.exclude_keyword
 
     if condition.price_min is not None:
         params["minPrice"] = condition.price_min
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 
     search_condition = SearchCondition(
         keyword=keyword,
-        ng_keyword=exclude_keyword,
+        exclude_keyword=exclude_keyword,
         price_min=price_min,
         price_max=price_max,
     )

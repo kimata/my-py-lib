@@ -62,7 +62,7 @@ class AmazonLoginConfig:
 class SearchResultItem:
     """キーワード検索結果の商品情報."""
 
-    title: str
+    name: str
     asin: str
     price: int | None
     thumb_url: str | None

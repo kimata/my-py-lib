@@ -38,16 +38,16 @@ class SearchCondition:
     exclude_keyword: str | None = None
     price_min: int | None = None
     price_max: int | None = None
-    item_conditions: list[ItemCondition] | None = None
+    condition: list[ItemCondition] | None = None
     sale_status: SaleStatus | None = SaleStatus.ON_SALE  # None は全て
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         """辞書からインスタンスを生成"""
-        conditions = data.get("item_conditions")
-        item_conditions = None
+        conditions = data.get("condition")
+        condition_list = None
         if conditions:
-            item_conditions = [ItemCondition(c) for c in conditions]
+            condition_list = [ItemCondition(c) for c in conditions]
 
         sale_status_str = data.get("sale_status")
         sale_status: SaleStatus | None = SaleStatus.ON_SALE
@@ -61,7 +61,7 @@ class SearchCondition:
             exclude_keyword=data.get("exclude_keyword"),
             price_min=data.get("price_min"),
             price_max=data.get("price_max"),
-            item_conditions=item_conditions,
+            condition=condition_list,
             sale_status=sale_status,
         )
 
@@ -70,6 +70,6 @@ class SearchCondition:
 class SearchResult:
     """検索結果の商品情報"""
 
-    title: str
+    name: str
     url: str
     price: int

@@ -38,7 +38,7 @@ class YahooItem:
     review_rate: float | None = None
     review_count: int | None = None
     in_stock: bool | None = None
-    seller_name: str | None = None
+    shop_name: str | None = None
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
@@ -67,9 +67,9 @@ class YahooItem:
             review_rate = data["review"].get("rate")
             review_count = data["review"].get("count")
 
-        seller_name = None
+        shop_name = None
         if data.get("seller"):
-            seller_name = data["seller"].get("name")
+            shop_name = data["seller"].get("name")
 
         return cls(
             name=data["name"],
@@ -79,5 +79,5 @@ class YahooItem:
             review_rate=review_rate,
             review_count=review_count,
             in_stock=data.get("inStock"),
-            seller_name=seller_name,
+            shop_name=shop_name,
         )
