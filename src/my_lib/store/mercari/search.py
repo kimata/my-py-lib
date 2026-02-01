@@ -86,8 +86,8 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     for key, value in params.items():
         query_parts.append(f"{urllib.parse.quote(key)}={urllib.parse.quote(str(value))}")
 
-    if condition.item_conditions:
-        cond_values = ",".join(str(cond.value) for cond in condition.item_conditions)
+    if condition.condition:
+        cond_values = ",".join(str(cond.value) for cond in condition.condition)
         query_parts.append(f"item_condition_id={urllib.parse.quote(cond_values)}")
 
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
@@ -279,7 +279,7 @@ def _parse_search_item(
             logging.debug("[Mercari] パース失敗: title=%s, price=%s, aria_label=%s", title, price, aria_debug)
             return None
 
-        return my_lib.store.flea_market.SearchResult(title=title, url=url, price=price)
+        return my_lib.store.flea_market.SearchResult(name=title, url=url, price=price)
 
     except Exception:
         logging.exception("[Mercari] パース失敗")
@@ -393,9 +393,9 @@ if __name__ == "__main__":
     if max_count is not None and max_count > 20:
         scroll_to_load = True
 
-    item_conditions: list[my_lib.store.flea_market.ItemCondition] | None = None
+    item_condition_list: list[my_lib.store.flea_market.ItemCondition] | None = None
     if conditions_str:
-        item_conditions = [
+        item_condition_list = [
             my_lib.store.flea_market.ItemCondition(int(c.strip())) for c in conditions_str.split(",")
         ]
 
@@ -404,7 +404,7 @@ if __name__ == "__main__":
         exclude_keyword=exclude_keyword,
         price_min=price_min,
         price_max=price_max,
-        item_conditions=item_conditions,
+        condition=item_condition_list,
     )
 
     logging.info("検索条件: %s", condition)
@@ -436,7 +436,7 @@ if __name__ == "__main__":
         logging.info("=" * 60)
 
         for i, result in enumerate(results, 1):
-            logging.info("[%d] %s", i, result.title)
+            logging.info("[%d] %s", i, result.name)
             logging.info("    価格: ¥%s", f"{result.price:,}")
             logging.info("    URL: %s", result.url)
     finally:

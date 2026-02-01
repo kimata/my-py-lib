@@ -33,7 +33,7 @@ class RakutenItem:
     url: str
     price: int
     thumb_url: str | None = None
-    review_average: float | None = None
+    review_rate: float | None = None
     review_count: int | None = None
     shop_name: str | None = None
     shop_code: str | None = None
@@ -61,7 +61,7 @@ class RakutenItem:
             url=data["itemUrl"],
             price=int(data["itemPrice"]),
             thumb_url=thumb_url,
-            review_average=data.get("reviewAverage"),
+            review_rate=data.get("reviewAverage"),
             review_count=data.get("reviewCount"),
             shop_name=data.get("shopName"),
             shop_code=data.get("shopCode"),

@@ -295,5 +295,5 @@ if __name__ == "__main__":
         logging.info("[%d] %s", i, item.name)
         logging.info("    価格: ¥%s", f"{item.price:,}")
         logging.info("    URL: %s", item.url)
-        if item.seller_name:
-            logging.info("    店舗: %s", item.seller_name)
+        if item.shop_name:
+            logging.info("    店舗: %s", item.shop_name)

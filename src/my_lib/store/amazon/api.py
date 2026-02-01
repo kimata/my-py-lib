@@ -298,7 +298,7 @@ def search_items(
 
                 results.append(
                     SearchResultItem(
-                        title=title,
+                        name=title,
                         asin=item_data.asin,
                         price=price,
                         thumb_url=thumb_url,

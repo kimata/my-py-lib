@@ -200,13 +200,13 @@ class TestSearchResultItem:
         from my_lib.store.amazon.config import SearchResultItem
 
         item = SearchResultItem(
-            title="テスト商品",
+            name="テスト商品",
             asin="B0G3SXHCLJ",
             price=1000,
             thumb_url="https://example.com/thumb.jpg",
         )
 
-        assert item.title == "テスト商品"
+        assert item.name == "テスト商品"
         assert item.asin == "B0G3SXHCLJ"
         assert item.price == 1000
         assert item.thumb_url == "https://example.com/thumb.jpg"
@@ -216,13 +216,13 @@ class TestSearchResultItem:
         from my_lib.store.amazon.config import SearchResultItem
 
         item = SearchResultItem(
-            title="テスト商品",
+            name="テスト商品",
             asin="B0G3SXHCLJ",
             price=None,
             thumb_url=None,
         )
 
-        assert item.title == "テスト商品"
+        assert item.name == "テスト商品"
         assert item.asin == "B0G3SXHCLJ"
         assert item.price is None
         assert item.thumb_url is None
@@ -234,7 +234,7 @@ class TestSearchResultItem:
         from my_lib.store.amazon.config import SearchResultItem
 
         item = SearchResultItem(
-            title="テスト商品",
+            name="テスト商品",
             asin="B0G3SXHCLJ",
             price=1000,
             thumb_url="https://example.com/thumb.jpg",
