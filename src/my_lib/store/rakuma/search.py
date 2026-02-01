@@ -74,10 +74,15 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     """
     params: dict[str, Any] = {
         "query": condition.keyword,
-        "transaction": "selling",
         "sort": "created_at",
         "order": "desc",
     }
+
+    # 販売状態（None は全て）
+    if condition.sale_status == my_lib.store.flea_market.SaleStatus.ON_SALE:
+        params["transaction"] = "selling"
+    elif condition.sale_status == my_lib.store.flea_market.SaleStatus.SOLD_OUT:
+        params["transaction"] = "soldout"
 
     if condition.exclude_keyword:
         params["excluded_query"] = condition.exclude_keyword

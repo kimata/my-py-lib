@@ -12,6 +12,13 @@ from enum import Enum
 from typing import Any, Self
 
 
+class SaleStatus(Enum):
+    """販売状態"""
+
+    ON_SALE = "on_sale"  # 販売中
+    SOLD_OUT = "sold_out"  # 売り切れ
+
+
 class ItemCondition(Enum):
     """商品の状態"""
 
@@ -32,6 +39,7 @@ class SearchCondition:
     price_min: int | None = None
     price_max: int | None = None
     item_conditions: list[ItemCondition] | None = None
+    sale_status: SaleStatus | None = SaleStatus.ON_SALE  # None は全て
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
@@ -41,12 +49,20 @@ class SearchCondition:
         if conditions:
             item_conditions = [ItemCondition(c) for c in conditions]
 
+        sale_status_str = data.get("sale_status")
+        sale_status: SaleStatus | None = SaleStatus.ON_SALE
+        if sale_status_str is None:
+            sale_status = None
+        elif sale_status_str:
+            sale_status = SaleStatus(sale_status_str)
+
         return cls(
             keyword=data["keyword"],
             exclude_keyword=data.get("exclude_keyword"),
             price_min=data.get("price_min"),
             price_max=data.get("price_max"),
             item_conditions=item_conditions,
+            sale_status=sale_status,
         )
 
 
