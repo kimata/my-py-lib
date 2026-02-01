@@ -21,10 +21,10 @@ jobs:
                 python-version: ["3.11", "3.12", "3.13"]
 
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
             - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v6
+              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
               with:
                   python-version: ${{ matrix.python-version }}
 
@@ -33,13 +33,13 @@ jobs:
                   sudo locale-gen ja_JP.UTF-8
 
             - name: Install uv
-              uses: astral-sh/setup-uv@v7
+              uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7
               with:
                   enable-cache: true
 
             - name: Cache python modules
               id: cache-python-modules
-              uses: actions/cache@v5
+              uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
               env:
                   cache-name: cache-python-modules
               with:
@@ -59,14 +59,14 @@ jobs:
               run: uv run pytest tests/unit/
 
             - name: Upload coverage to Coveralls
-              uses: coverallsapp/github-action@v2
+              uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
               if: matrix.python-version == '3.12'
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   path-to-lcov: reports/coverage.lcov
 
             - name: Publish Test Results
-              uses: dorny/test-reporter@v2
+              uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
               if: success() || failure()
               with:
                   name: test results
@@ -74,14 +74,14 @@ jobs:
                   reporter: java-junit
 
             - name: Upload coverage file
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               if: always()
               with:
                   name: pytest-${{ matrix.python-version }}
                   path: reports
 
             - name: Upload artifact
-              uses: actions/upload-pages-artifact@v3
+              uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
               if: matrix.python-version == '3.12'
               with:
                   path: reports
@@ -96,4 +96,4 @@ jobs:
         steps:
             - name: Deploy to GitHub Pages
               id: deployment
-              uses: actions/deploy-pages@v4
+              uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
