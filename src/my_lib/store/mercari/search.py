@@ -88,6 +88,67 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
 
+def _apply_normal_listing_filter(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> bool:
+    """絞り込みUIで出品形式「通常出品」を選択する
+
+    Args:
+        driver: WebDriver インスタンス
+        wait: WebDriverWait インスタンス
+
+    Returns:
+        フィルタ適用に成功した場合は True
+
+    """
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+
+    try:
+        # PC版: 左側パネルに直接フィルタが表示されている
+        # 「出品形式」セクションを探す
+        logging.debug("[Mercari] 出品形式セクションを探索中...")
+        listing_type_xpath = '//div[@data-testid="出品形式"]'
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                (by_xpath, listing_type_xpath)
+            )
+        )
+
+        # アコーディオンが閉じていれば展開
+        accordion_button_xpath = '//div[@data-testid="出品形式"]//button[@id="accordion_button"]'
+        accordion_buttons = driver.find_elements(by_xpath, accordion_button_xpath)
+        if accordion_buttons:
+            accordion_button = accordion_buttons[0]
+            if accordion_button.get_attribute("aria-expanded") == "false":
+                accordion_button.click()
+                logging.debug("[Mercari] 出品形式セクションを展開")
+                time.sleep(0.3)
+
+        # 「通常出品」チェックボックスのラベルをクリック
+        logging.debug("[Mercari] 通常出品チェックボックスを探索中...")
+        normal_listing_xpath = '//div[@data-testid="出品形式"]//label[.//span[text()="通常出品"]]'
+        wait.until(
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
+                (by_xpath, normal_listing_xpath)
+            )
+        )
+        normal_listing_label = driver.find_element(by_xpath, normal_listing_xpath)
+        normal_listing_label.click()
+        logging.debug("[Mercari] 通常出品をクリック")
+        time.sleep(0.5)
+
+        logging.info("[Mercari] 出品形式「通常出品」フィルタを適用")
+        return True
+
+    except selenium.common.exceptions.TimeoutException:
+        logging.warning("[Mercari] 絞り込みUIの操作に失敗（タイムアウト）")
+        return False
+    except selenium.common.exceptions.NoSuchElementException:
+        logging.warning("[Mercari] 絞り込みUIの要素が見つかりません")
+        return False
+
+
 def _wait_for_search_results(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
@@ -247,6 +308,11 @@ def search(
     driver.get(url)
 
     if not _wait_for_search_results(driver, wait):
+        return []
+
+    # 出品形式「通常出品」に絞り込み
+    # フィルタ適用後、検索結果の再読み込みを待機
+    if _apply_normal_listing_filter(driver, wait) and not _wait_for_search_results(driver, wait):
         return []
 
     by_xpath = selenium.webdriver.common.by.By.XPATH
