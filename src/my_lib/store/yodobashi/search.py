@@ -50,6 +50,7 @@ class SearchResult:
     name: str
     url: str
     price: int | None = None
+    thumb_url: str | None = None
 
 
 def build_search_url(keyword: str) -> str:
@@ -160,11 +161,29 @@ def _parse_product_page(
                 except ValueError:
                     continue
 
+        # サムネイル画像を取得
+        thumb_url: str | None = None
+        thumb_selectors = [
+            '//img[@id="mainImg"]/@src',
+            '//div[contains(@class, "productPhoto")]//img/@src',
+            '//img[@itemprop="image"]/@src',
+        ]
+        for selector in thumb_selectors:
+            elements = driver.find_elements(by_xpath, selector)
+            if elements:
+                thumb_url = (
+                    elements[0].get_attribute("src")
+                    if hasattr(elements[0], "get_attribute")
+                    else str(elements[0])
+                )
+                if thumb_url:
+                    break
+
         if not name:
             logging.debug("[Yodobashi] 商品ページパース失敗: 商品名取得失敗")
             return None
 
-        return SearchResult(name=name, url=url, price=price)
+        return SearchResult(name=name, url=url, price=price, thumb_url=thumb_url)
 
     except Exception:
         logging.exception("[Yodobashi] 商品ページパース失敗")
@@ -195,6 +214,15 @@ def _parse_search_item(
         # 商品名を取得（リンクのテキスト）
         name = item_element.text.strip() if item_element.text else None
 
+        # サムネイル画像を取得（リンク内の img タグから）
+        thumb_url: str | None = None
+        try:
+            img_elements = item_element.find_elements(by_xpath, ".//img")
+            if img_elements:
+                thumb_url = img_elements[0].get_attribute("src")
+        except selenium.common.exceptions.NoSuchElementException:
+            pass
+
         if not name:
             # 親要素から商品名を探す
             try:
@@ -209,7 +237,7 @@ def _parse_search_item(
             logging.debug("[Yodobashi] パース失敗: 商品名取得失敗 url=%s", url)
             return None
 
-        return SearchResult(name=name, url=url, price=None)
+        return SearchResult(name=name, url=url, price=None, thumb_url=thumb_url)
 
     except Exception:
         logging.exception("[Yodobashi] パース失敗")
