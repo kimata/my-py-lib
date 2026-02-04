@@ -7,7 +7,7 @@ https://webservice.rakuten.co.jp/documentation/ichiba-item-search を使用し�
 
 Usage:
   api.py [-c CONFIG] [-k KEYWORD] [-e EXCLUDE] [-m MIN] [-M MAX]
-         [-n COUNT] [-a AFFILIATE] [-D]
+         [-n COUNT] [-D]
 
 Options:
   -c CONFIG           : 設定ファイル。[default: config.yaml]
@@ -16,7 +16,6 @@ Options:
   -m MIN              : 最低価格。
   -M MAX              : 最高価格。
   -n COUNT            : 取得する最大件数。[default: 10]
-  -a AFFILIATE        : アフィリエイトID。
   -D                  : デバッグモードで動作します。
 """
 
@@ -84,7 +83,6 @@ def _build_params(
     condition: SearchCondition,
     hits: int,
     page: int,
-    affiliate_id: str | None = None,
 ) -> dict[str, Any]:
     """API リクエストパラメータを構築する
 
@@ -93,7 +91,6 @@ def _build_params(
         condition: 検索条件
         hits: 取得件数
         page: ページ番号
-        affiliate_id: アフィリエイトID（オプション）
 
     Returns:
         API パラメータ辞書
@@ -109,8 +106,8 @@ def _build_params(
         "imageFlag": 1,
     }
 
-    if affiliate_id:
-        params["affiliateId"] = affiliate_id
+    if config.affiliate_id:
+        params["affiliateId"] = config.affiliate_id
 
     if condition.exclude_keyword:
         params["NGKeyword"] = condition.exclude_keyword
@@ -135,7 +132,6 @@ def _fetch_page(
     condition: SearchCondition,
     hits: int,
     page: int,
-    affiliate_id: str | None = None,
 ) -> dict[str, Any]:
     """API を呼び出して1ページ分の結果を取得する
 
@@ -144,7 +140,6 @@ def _fetch_page(
         condition: 検索条件
         hits: 取得件数
         page: ページ番号
-        affiliate_id: アフィリエイトID（オプション）
 
     Returns:
         API レスポンス（JSON）
@@ -153,7 +148,7 @@ def _fetch_page(
         requests.RequestException: API 呼び出しに失敗した場合
 
     """
-    params = _build_params(config, condition, hits, page, affiliate_id)
+    params = _build_params(config, condition, hits, page)
 
     logging.debug("[Rakuten] API リクエスト: %s, params=%s", _API_ENDPOINT, params)
 
@@ -167,7 +162,6 @@ def search(
     config: RakutenApiConfig,
     condition: SearchCondition,
     max_items: int | None = None,
-    affiliate_id: str | None = None,
 ) -> list[RakutenItem]:
     """楽天市場で商品を検索する
 
@@ -175,7 +169,6 @@ def search(
         config: API 設定
         condition: 検索条件
         max_items: 取得する最大件数（None の場合は 30 件）
-        affiliate_id: アフィリエイトID（オプション）
 
     Returns:
         検索結果のリスト
@@ -194,7 +187,7 @@ def search(
         fetch_count = min(remaining, _MAX_RESULTS_PER_REQUEST)
 
         try:
-            response = _fetch_page(config, condition, fetch_count, page, affiliate_id)
+            response = _fetch_page(config, condition, fetch_count, page)
         except requests.RequestException:
             logging.exception("[Rakuten] API エラー")
             break
@@ -253,7 +246,6 @@ if __name__ == "__main__":
     price_min_str = args["-m"]
     price_max_str = args["-M"]
     max_count_str = args["-n"]
-    affiliate_id = args["-a"]
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
@@ -277,7 +269,6 @@ if __name__ == "__main__":
         RakutenApiConfig.parse(config["store"]["rakuten"]),
         search_condition,
         max_items=max_count,
-        affiliate_id=affiliate_id,
     )
 
     logging.info("=" * 60)

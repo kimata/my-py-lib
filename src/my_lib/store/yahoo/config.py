@@ -13,6 +13,8 @@ class YahooApiConfig:
 
     client_id: str
     secret: str
+    affiliate_type: str | None = None
+    affiliate_id: str | None = None
 
     @classmethod
     def parse(cls, yahoo_config: dict[str, Any]) -> Self:
@@ -24,6 +26,8 @@ class YahooApiConfig:
         return cls(
             client_id=yahoo_config["client_id"],
             secret=yahoo_config["secret"],
+            affiliate_type=yahoo_config.get("affiliate_type"),
+            affiliate_id=yahoo_config.get("affiliate_id"),
         )
 
 

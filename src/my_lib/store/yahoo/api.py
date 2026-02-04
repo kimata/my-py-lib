@@ -137,6 +137,12 @@ def _build_params(
     if condition.brand_id:
         params["brand_id"] = condition.brand_id
 
+    if config.affiliate_type:
+        params["affiliate_type"] = config.affiliate_type
+
+    if config.affiliate_id:
+        params["affiliate_id"] = config.affiliate_id
+
     return params
 
 
