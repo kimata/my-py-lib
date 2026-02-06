@@ -253,6 +253,38 @@ class BrowserManager:
 
             logging.info("Selenium ドライバーを終了しました (%s)", self.profile_name)
 
+    def restart_with_clean_profile(self) -> tuple[WebDriver, WebDriverWait]:
+        """プロファイルを削除してドライバーを再起動
+
+        連続エラー発生時などにプロファイルをクリーンにして再起動するために使用します。
+        ドライバーが起動していない場合も、プロファイル削除→新規起動を行います。
+
+        Returns:
+            (WebDriver, WebDriverWait) のタプル
+
+        Raises:
+            SeleniumError: ドライバーの起動に失敗した場合
+
+        Example:
+            >>> # 連続タイムアウト発生時のリカバリ
+            >>> if consecutive_timeout_count >= 10:
+            ...     driver, wait = manager.restart_with_clean_profile()
+
+        """
+        logging.warning(
+            "プロファイルを削除してドライバーを再起動します (%s)",
+            self.profile_name,
+        )
+
+        # 既存ドライバーを終了
+        self.quit()
+
+        # プロファイルを削除
+        my_lib.chrome_util.delete_profile(self.profile_name, self.data_dir)
+
+        # 新しいドライバーを起動
+        return self.get_driver()
+
     def clear_cache(self) -> None:
         """ブラウザキャッシュをクリア
 

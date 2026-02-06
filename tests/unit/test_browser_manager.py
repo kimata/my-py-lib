@@ -510,3 +510,100 @@ class TestCleanupProfileLock:
             manager.cleanup_profile_lock()
 
             mock_cleanup.assert_called_once_with("TestProfile", temp_dir)
+
+
+class TestRestartWithCleanProfile:
+    """restart_with_clean_profile メソッドのテスト"""
+
+    def test_quits_deletes_and_restarts(self, temp_dir: pathlib.Path):
+        """quit → delete_profile → get_driver の順で呼ばれる"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver = unittest.mock.MagicMock()
+        call_order = []
+
+        def track_quit(*args, **kwargs):
+            call_order.append("quit")
+
+        def track_delete(*args, **kwargs):
+            call_order.append("delete")
+
+        def track_create(*args, **kwargs):
+            call_order.append("create")
+            return mock_driver
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully", side_effect=track_quit),
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock"),
+            unittest.mock.patch("my_lib.chrome_util.delete_profile", side_effect=track_delete) as mock_delete,
+            unittest.mock.patch("my_lib.selenium_util.create_driver", side_effect=track_create),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+        ):
+            # 最初にドライバを作成
+            manager.get_driver()
+            call_order.clear()
+
+            # restart を呼ぶ
+            driver, wait = manager.restart_with_clean_profile()
+
+            # quit → delete → create の順で呼ばれる
+            assert call_order == ["quit", "delete", "create"]
+            assert driver is mock_driver
+            mock_delete.assert_called_once_with("TestProfile", temp_dir)
+
+    def test_works_without_existing_driver(self, temp_dir: pathlib.Path):
+        """ドライバー未起動でも動作する"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver = unittest.mock.MagicMock()
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock"),
+            unittest.mock.patch("my_lib.chrome_util.delete_profile") as mock_delete,
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+        ):
+            # ドライバー未起動の状態で restart
+            driver, wait = manager.restart_with_clean_profile()
+
+            # quit は呼ばれない（未起動のため）
+            mock_quit.assert_not_called()
+            # delete_profile は呼ばれる
+            mock_delete.assert_called_once_with("TestProfile", temp_dir)
+            assert driver is mock_driver
+
+    def test_resets_driver_state(self, temp_dir: pathlib.Path):
+        """ドライバー状態がリセットされる"""
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TestProfile",
+            data_dir=temp_dir,
+        )
+
+        mock_driver_1 = unittest.mock.MagicMock()
+        mock_driver_2 = unittest.mock.MagicMock()
+        drivers = iter([mock_driver_1, mock_driver_2])
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully"),
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock"),
+            unittest.mock.patch("my_lib.chrome_util.delete_profile"),
+            unittest.mock.patch(
+                "my_lib.selenium_util.create_driver", side_effect=lambda *a, **kw: next(drivers)
+            ),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+        ):
+            # 最初のドライバを作成
+            driver1, _ = manager.get_driver()
+            assert driver1 is mock_driver_1
+
+            # restart で新しいドライバを取得
+            driver2, _ = manager.restart_with_clean_profile()
+            assert driver2 is mock_driver_2
+            assert driver2 is not driver1
