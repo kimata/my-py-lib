@@ -40,12 +40,14 @@ if TYPE_CHECKING:
 _PRICE_XPATH: str = '//span[@id="js_scl_unitPrice"]'
 _THUMBNAIL_XPATH: str = '//input[@class="largeUrl"]'
 _OUT_OF_STOCK_XPATH: str = '//p[contains(., "販売休止") or contains(., "販売を終了しました")]'
+_TITLE_XPATH: str = '//span[@itemprop="name"]'
 
 
 @dataclass(frozen=True)
 class ProductInfo:
     """商品ページから取得した情報"""
 
+    title: str
     price: int | None
     thumbnail_url: str | None
     in_stock: bool
@@ -54,6 +56,7 @@ class ProductInfo:
     def parse(cls, data: dict[str, Any]) -> Self:
         """辞書からインスタンスを生成"""
         return cls(
+            title=data["title"],
             price=data.get("price"),
             thumbnail_url=data.get("thumbnail_url"),
             in_stock=data.get("in_stock", True),
@@ -74,6 +77,23 @@ def _wait_for_page_load(
     except selenium.common.exceptions.TimeoutException:
         logging.warning("[Yodobashi] 読み込みタイムアウト")
         raise
+
+
+def _extract_title(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+) -> str:
+    """商品タイトルを取得する"""
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+
+    try:
+        elements = driver.find_elements(by_xpath, _TITLE_XPATH)
+        if elements and elements[0].text:
+            return elements[0].text.strip()
+    except Exception:
+        logging.exception("[Yodobashi] タイトル取得失敗")
+
+    msg = "商品タイトルが見つかりません"
+    raise ValueError(msg)
 
 
 def _extract_price(
@@ -152,17 +172,20 @@ def scrape(
     driver.get(url)
     _wait_for_page_load(wait)
 
+    title = _extract_title(driver)
     price = _extract_price(driver)
     thumbnail_url = _extract_thumbnail_url(driver)
     in_stock = _check_in_stock(driver)
 
     logging.info(
-        "[Yodobashi] 商品ページ取得完了: price=%s, in_stock=%s",
+        "[Yodobashi] 商品ページ取得完了: title=%s, price=%s, in_stock=%s",
+        title,
         price,
         in_stock,
     )
 
     return ProductInfo(
+        title=title,
         price=price,
         thumbnail_url=thumbnail_url,
         in_stock=in_stock,
@@ -203,6 +226,7 @@ if __name__ == "__main__":
         logging.info("=" * 60)
         logging.info("取得結果")
         logging.info("=" * 60)
+        logging.info("タイトル: %s", result.title)
         if result.price:
             logging.info("価格: ¥%s", f"{result.price:,}")
         else:
