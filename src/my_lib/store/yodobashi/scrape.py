@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 _PRICE_XPATH: str = '//span[@id="js_scl_unitPrice"]'
 _THUMBNAIL_XPATH: str = '//input[@class="largeUrl"]'
 _OUT_OF_STOCK_XPATH: str = '//p[contains(., "販売休止") or contains(., "販売を終了しました")]'
-_TITLE_XPATH: str = '//span[@itemprop="name"]'
+_TITLE_XPATH: str = '//h1//span[@itemprop="name"]'
 
 
 @dataclass(frozen=True)
