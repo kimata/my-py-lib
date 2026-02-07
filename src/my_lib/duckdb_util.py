@@ -83,11 +83,32 @@ class ConnectionPool:
 
         Returns:
             DuckDB connection (reused from pool if available)
+
+        Note:
+            DuckDB doesn't allow connections with different read_only settings
+            to the same database file simultaneously. If a connection with a
+            different setting exists, it will be closed first.
         """
-        key = ConnectionKey(db_path=db_path.resolve(), read_only=read_only)
+        resolved_path = db_path.resolve()
+        key = ConnectionKey(db_path=resolved_path, read_only=read_only)
 
         with self._lock:
             if key not in self._connections:
+                # Check if a connection with different read_only exists and close it
+                # DuckDB doesn't allow mixing read_only configurations
+                opposite_key = ConnectionKey(db_path=resolved_path, read_only=not read_only)
+                if opposite_key in self._connections:
+                    try:
+                        self._connections[opposite_key].close()
+                        logger.debug(
+                            "Closed incompatible DuckDB connection: %s (read_only=%s)",
+                            resolved_path,
+                            not read_only,
+                        )
+                    except Exception:
+                        logger.exception("Error closing incompatible connection: %s", resolved_path)
+                    del self._connections[opposite_key]
+
                 # Ensure parent directory exists for new databases
                 if not read_only:
                     db_path.parent.mkdir(parents=True, exist_ok=True)
