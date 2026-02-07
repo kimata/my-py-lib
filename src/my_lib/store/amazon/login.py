@@ -35,7 +35,6 @@ from my_lib.store.amazon.config import AmazonLoginConfig
 _LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
 _LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
-_WAIT_COUNT: int = 40
 
 
 def _resolve_puzzle(
@@ -191,45 +190,73 @@ def _handle_quiz(
     time.sleep(2)
 
 
-def _handle_security_check(
+def _handle_phone_verification(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    slack_config: my_lib.notify.slack.HasCaptchaConfig,
     dump_path: pathlib.Path,
 ) -> None:
-    """セキュリティチェック画面の処理"""
-    security_xpath = (
-        '//span[contains(@class, "a-size-base-plus") and '
-        '(contains(., "確認コードを入力する") or contains(., "セキュリティ"))]'
-    )
-    if not my_lib.selenium_util.xpath_exists(driver, security_xpath):
+    """携帯電話番号確認画面の処理（SMS認証）"""
+    phone_verify_xpath = '//h1[contains(., "携帯電話番号を確認する")]'
+    if not my_lib.selenium_util.xpath_exists(driver, phone_verify_xpath):
         return
 
-    for i in range(_WAIT_COUNT):
-        security_check_xpath = '//span[contains(@class, "a-size-base-plus") and contains(., "セキュリティ")]'
-        if not my_lib.selenium_util.xpath_exists(driver, security_check_xpath):
-            my_lib.selenium_util.dump_page(
-                driver,
-                int(random.random() * 100),  # noqa: S311
-                dump_path,
+    logging.info("SMS認証が要求されました。")
+
+    my_lib.selenium_util.dump_page(
+        driver,
+        int(random.random() * 100),  # noqa: S311
+        dump_path,
+    )
+
+    logging.info("Slack に SMS で送られてきた認証番号を入力してください")
+    ts = my_lib.store.captcha.send_request_text_slack(
+        slack_config,
+        "Amazon",
+        "📱 SMS で送られてきた認証番号を入力してください",
+    )
+    if ts is None:
+        raise RuntimeError("Failed to send request text to Slack")
+
+    code = my_lib.store.captcha.recv_response_text_slack(slack_config, ts)
+    if code is None:
+        raise RuntimeError("Failed to receive authentication code")
+
+    logging.info("認証番号を入力します。")
+    code_input = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="cvf-input-code"]')
+    code_input.send_keys(code)
+
+    logging.info("「携帯電話番号を確認する」ボタンをクリックします。")
+    submit_button = driver.find_element(
+        selenium.webdriver.common.by.By.XPATH, '//span[@id="cvf-submit-otp-button"]//input[@type="submit"]'
+    )
+    submit_button.click()
+
+    time.sleep(0.5)
+
+    wait.until(
+        selenium.webdriver.support.expected_conditions.presence_of_element_located(
+            (
+                selenium.webdriver.common.by.By.XPATH,
+                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
             )
-            logging.info("Security check finished!")
-            break
+        )
+    )
 
-        logging.info("Waiting for security check... (%d/%d)", i + 1, _WAIT_COUNT)
-        time.sleep(2)
+    my_lib.selenium_util.dump_page(
+        driver,
+        int(random.random() * 100),  # noqa: S311
+        dump_path,
+    )
 
-    for i in range(_WAIT_COUNT):
-        wait_xpath = '//span[contains(@class, "a-size-base") and contains(., "少しお待ちください")]'
-        if not my_lib.selenium_util.xpath_exists(driver, wait_xpath):
-            my_lib.selenium_util.dump_page(
-                driver,
-                int(random.random() * 100),  # noqa: S311
-                dump_path,
-            )
-            logging.info("Acknowledged!")
-            break
+    my_lib.notify.slack.send(
+        slack_config,
+        slack_config.captcha.channel.name,
+        my_lib.notify.slack.format_simple("CAPTCHA", "🎉 成功しました"),
+        thread_ts=ts,
+    )
 
-        logging.info("Waiting for acknowledge... (%d/%d)", i + 1, _WAIT_COUNT)
-        time.sleep(2)
+    logging.info("SMS認証が完了しました。")
 
 
 def _execute_impl(
@@ -259,7 +286,7 @@ def _execute_impl(
     _handle_password_input(driver, wait, login_config, slack_config)
 
     _handle_quiz(driver, slack_config, login_config.dump_path)
-    _handle_security_check(driver, login_config.dump_path)
+    _handle_phone_verification(driver, wait, slack_config, login_config.dump_path)
 
     wait.until(
         selenium.webdriver.support.expected_conditions.presence_of_element_located(
