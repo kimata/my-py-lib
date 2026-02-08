@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
+import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
 
 import my_lib.selenium_util
@@ -58,8 +59,75 @@ _CONDITION_PARAM_MAP: dict[my_lib.store.flea_market.ItemCondition, str] = {
 
 
 _SEARCH_BASE_URL: str = "https://fril.jp/s"
+_TARGET_DOMAIN: str = "fril.jp"
+_SEARCH_KEYWORD: str = "ラクマ"
 # 商品リストのアイテム要素
 _ITEM_LIST_XPATH: str = '//div[contains(@class, "item-box")]'
+
+
+def warmup(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> bool:
+    """Google検索経由でラクマにアクセスしてウォームアップする
+
+    bot検出を回避するため、直接アクセスではなくGoogle検索経由でアクセスする。
+
+    Args:
+        driver: WebDriver インスタンス
+        wait: WebDriverWait インスタンス
+
+    Returns:
+        ウォームアップが成功した場合 True
+
+    """
+    logging.info("[Rakuma] ウォームアップ開始")
+
+    try:
+        # Googleにアクセス
+        driver.get("https://www.google.com/")
+        time.sleep(1)
+
+        # 検索ボックスを探して検索
+        by_xpath = selenium.webdriver.common.by.By.XPATH
+        by_name = selenium.webdriver.common.by.By.NAME
+
+        # 検索ボックスに入力
+        search_box = wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_name, "q"))
+        )
+        search_box.clear()
+        search_box.send_keys(_SEARCH_KEYWORD)
+        time.sleep(0.5)
+
+        # 検索実行（Enterキー）
+        search_box.send_keys(selenium.webdriver.common.keys.Keys.RETURN)
+        time.sleep(2)
+
+        # 検索結果からラクマのリンクを探してクリック
+        link_xpath = f'//a[contains(@href, "{_TARGET_DOMAIN}")]'
+        link_element = wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_xpath, link_xpath))
+        )
+
+        # リンクをクリック
+        driver.execute_script("arguments[0].click();", link_element)
+        time.sleep(2)
+
+        # ラクマのページが読み込まれたか確認
+        if _TARGET_DOMAIN in driver.current_url:
+            logging.info("[Rakuma] ウォームアップ完了: %s", driver.current_url)
+            return True
+
+        logging.warning("[Rakuma] ウォームアップ: 予期しないURL: %s", driver.current_url)
+        return False
+
+    except selenium.common.exceptions.TimeoutException:
+        logging.warning("[Rakuma] ウォームアップ: タイムアウト")
+        return False
+    except Exception:
+        logging.exception("[Rakuma] ウォームアップ: エラー")
+        return False
 
 
 def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str:
