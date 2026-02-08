@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
+import selenium.webdriver.common.keys
 import selenium.webdriver.support.expected_conditions
 
 import my_lib.selenium_util
@@ -46,8 +47,75 @@ if TYPE_CHECKING:
 import my_lib.store.flea_market
 
 _SEARCH_BASE_URL: str = "https://jp.mercari.com/search"
+_TARGET_DOMAIN: str = "mercari.com"
+_SEARCH_KEYWORD: str = "メルカリ"
 # item-grid 内のアイテムのみを取得（関連商品やおすすめ商品を除外）
 _ITEM_LIST_XPATH: str = '//div[@id="item-grid"]//li[@data-testid="item-cell"]'
+
+
+def warmup(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> bool:
+    """Google検索経由でメルカリにアクセスしてウォームアップする
+
+    bot検出を回避するため、直接アクセスではなくGoogle検索経由でアクセスする。
+
+    Args:
+        driver: WebDriver インスタンス
+        wait: WebDriverWait インスタンス
+
+    Returns:
+        ウォームアップが成功した場合 True
+
+    """
+    logging.info("[Mercari] ウォームアップ開始")
+
+    try:
+        # Googleにアクセス
+        driver.get("https://www.google.com/")
+        time.sleep(1)
+
+        # 検索ボックスを探して検索
+        by_xpath = selenium.webdriver.common.by.By.XPATH
+        by_name = selenium.webdriver.common.by.By.NAME
+
+        # 検索ボックスに入力
+        search_box = wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_name, "q"))
+        )
+        search_box.clear()
+        search_box.send_keys(_SEARCH_KEYWORD)
+        time.sleep(0.5)
+
+        # 検索実行（Enterキー）
+        search_box.send_keys(selenium.webdriver.common.keys.Keys.RETURN)
+        time.sleep(2)
+
+        # 検索結果からメルカリのリンクを探してクリック
+        link_xpath = f'//a[contains(@href, "{_TARGET_DOMAIN}")]'
+        link_element = wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_xpath, link_xpath))
+        )
+
+        # リンクをクリック
+        driver.execute_script("arguments[0].click();", link_element)
+        time.sleep(2)
+
+        # メルカリのページが読み込まれたか確認
+        if _TARGET_DOMAIN in driver.current_url:
+            logging.info("[Mercari] ウォームアップ完了: %s", driver.current_url)
+            return True
+
+        logging.warning("[Mercari] ウォームアップ: 予期しないURL: %s", driver.current_url)
+        return False
+
+    except selenium.common.exceptions.TimeoutException:
+        logging.warning("[Mercari] ウォームアップ: タイムアウト")
+        return False
+    except Exception:
+        logging.exception("[Mercari] ウォームアップ: エラー")
+        return False
 
 
 def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str:
