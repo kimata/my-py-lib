@@ -32,6 +32,7 @@ _cleaned_up_paths: set[pathlib.Path] = set()
 
 # sqlite3.connect の isolation_level パラメータの型
 IsolationLevel = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
+LockingMode = Literal["NORMAL", "EXCLUSIVE"]
 
 
 @dataclass(frozen=True)
@@ -61,13 +62,19 @@ def init_persistent(conn: sqlite3.Connection) -> None:
     logging.info("SQLiteデータベースの永続設定を初期化しました")
 
 
-def init_connection(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
+def init_connection(
+    conn: sqlite3.Connection,
+    *,
+    timeout: float = 60.0,
+    locking_mode: LockingMode | None = None,
+) -> None:
     """
     接続ごとに必要なPRAGMA設定を行う（毎回の接続時に呼ぶ）
 
     Args:
         conn: SQLiteデータベース接続
         timeout: データベース接続のタイムアウト時間（秒）
+        locking_mode: ロックモード (NORMAL/EXCLUSIVE)。Noneの場合は環境変数を参照
     """
     # 同期モード: NFSやローカルストレージではFULLが最も安全
     conn.execute("PRAGMA synchronous=FULL")
@@ -95,8 +102,13 @@ def init_connection(conn: sqlite3.Connection, *, timeout: float = 60.0) -> None:
     conn.execute("PRAGMA foreign_keys=ON")
 
     # ロックモード: CephFS/NFSでは排他ロックモードが必要
-    locking_mode = os.environ.get("SQLITE_LOCKING_MODE", "EXCLUSIVE")
-    conn.execute(f"PRAGMA locking_mode={locking_mode}")
+    # 引数で指定されていない場合は環境変数を参照
+    if locking_mode is not None:
+        effective_locking_mode: LockingMode = locking_mode
+    else:
+        env_locking_mode = os.environ.get("SQLITE_LOCKING_MODE", "EXCLUSIVE")
+        effective_locking_mode = "EXCLUSIVE" if env_locking_mode == "EXCLUSIVE" else "NORMAL"
+    conn.execute(f"PRAGMA locking_mode={effective_locking_mode}")
 
     conn.commit()
     logging.debug("SQLiteデータベースの接続設定を適用しました")
@@ -139,16 +151,24 @@ def cleanup_stale_files(db_path: pathlib.Path) -> None:
 class DatabaseConnection:
     """SQLite接続をContext Managerとしても通常の関数としても使用可能にするラッパー"""
 
-    def __init__(self, db_path: str | pathlib.Path, *, timeout: float = 60.0) -> None:
+    def __init__(
+        self,
+        db_path: str | pathlib.Path,
+        *,
+        timeout: float = 60.0,
+        locking_mode: LockingMode | None = None,
+    ) -> None:
         """
         データベース接続の初期化
 
         Args:
             db_path: データベースファイルのパス
             timeout: データベース接続のタイムアウト時間（秒）
+            locking_mode: ロックモード (NORMAL/EXCLUSIVE)。Noneの場合は環境変数を参照
         """
         self.db_path = pathlib.Path(db_path)
         self.timeout = timeout
+        self.locking_mode = locking_mode
         self.conn: sqlite3.Connection | None = None
 
     def _acquire_lock(self, lock_file: Any) -> bool:
@@ -208,7 +228,7 @@ class DatabaseConnection:
                             if is_new_db:
                                 init_persistent(self.conn)
                                 logging.info("新規SQLiteデータベースを作成しました: %s", self.db_path)
-                            init_connection(self.conn, timeout=self.timeout)
+                            init_connection(self.conn, timeout=self.timeout, locking_mode=self.locking_mode)
                         finally:
                             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
@@ -232,7 +252,7 @@ class DatabaseConnection:
                 check_same_thread=params.check_same_thread,
                 isolation_level=params.isolation_level,
             )
-            init_connection(self.conn, timeout=self.timeout)
+            init_connection(self.conn, timeout=self.timeout, locking_mode=self.locking_mode)
             logging.debug("既存のSQLiteデータベースに接続しました: %s", self.db_path)
 
         assert self.conn is not None  # noqa: S101
@@ -261,7 +281,12 @@ class DatabaseConnection:
         return self._create_connection()
 
 
-def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseConnection:
+def connect(
+    db_path: str | pathlib.Path,
+    *,
+    timeout: float = 60.0,
+    locking_mode: LockingMode | None = None,
+) -> DatabaseConnection:
     """
     Kubernetes manual storage class環境に適したSQLiteデータベースに接続する
 
@@ -270,6 +295,7 @@ def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseCo
     Args:
         db_path: データベースファイルのパス
         timeout: データベース接続のタイムアウト時間（秒）
+        locking_mode: ロックモード (NORMAL/EXCLUSIVE)。Noneの場合は環境変数を参照
 
     Returns:
         DatabaseConnection: Context Managerとしても通常の接続取得にも使用可能
@@ -286,8 +312,12 @@ def connect(db_path: str | pathlib.Path, *, timeout: float = 60.0) -> DatabaseCo
             conn.execute("SELECT * FROM table")
         finally:
             conn.close()
+
+        # ロックモードを明示的に指定
+        with my_lib.sqlite_util.connect(db_path, locking_mode="NORMAL") as conn:
+            conn.execute("SELECT * FROM table")
     """
-    return DatabaseConnection(db_path, timeout=timeout)
+    return DatabaseConnection(db_path, timeout=timeout, locking_mode=locking_mode)
 
 
 def load_schema(schema_path: str | pathlib.Path) -> str:
@@ -329,6 +359,7 @@ def init_schema_from_file(
     schema_path: str | pathlib.Path,
     *,
     timeout: float = 60.0,
+    locking_mode: LockingMode | None = None,
 ) -> None:
     """SQLite スキーマをファイルから初期化する
 
@@ -336,8 +367,9 @@ def init_schema_from_file(
         db_path: データベースファイルのパス
         schema_path: スキーマファイルのパス
         timeout: DB 接続タイムアウト（秒）
+        locking_mode: ロックモード (NORMAL/EXCLUSIVE)。Noneの場合は環境変数を参照
     """
-    with connect(db_path, timeout=timeout) as conn:
+    with connect(db_path, timeout=timeout, locking_mode=locking_mode) as conn:
         exec_schema_from_file(conn, schema_path)
 
 
