@@ -20,6 +20,16 @@ class HealthzTarget:
     interval: float
 
 
+@dataclass(frozen=True)
+class HttpHealthzTarget:
+    """HTTP ヘルスチェック対象を表すデータクラス"""
+
+    name: str
+    url: str
+    timeout: float = 5.0
+    expected_status: int = 200
+
+
 def check_liveness(target: HealthzTarget) -> bool:
     """単一ターゲットの liveness をチェックする"""
     return check_liveness_elapsed(target) is None
@@ -94,3 +104,48 @@ def check_http_port(port: int, address: str = "127.0.0.1") -> bool:
         logging.exception("Failed to access Web server")
 
     return False
+
+
+def check_http_healthz(target: HttpHealthzTarget) -> bool:
+    """HTTP エンドポイントのヘルスチェック
+
+    Args:
+        target: チェック対象
+
+    Returns:
+        成功時は True、失敗時は False
+    """
+    try:
+        resp = requests.get(target.url, timeout=target.timeout)
+        if resp.status_code == target.expected_status:
+            logging.debug("%s: 正常", target.name)
+            return True
+        logging.warning("%s がステータス %d を返しました", target.name, resp.status_code)
+        return False
+    except requests.RequestException as e:
+        logging.warning("%s に接続できません: %s", target.name, e)
+        return False
+
+
+def check_healthz_all(
+    liveness_targets: list[HealthzTarget] | None = None,
+    http_targets: list[HttpHealthzTarget] | None = None,
+) -> list[str]:
+    """全ターゲット（liveness + HTTP）の統合ヘルスチェック
+
+    Args:
+        liveness_targets: liveness ファイルベースのチェック対象
+        http_targets: HTTP エンドポイントのチェック対象
+
+    Returns:
+        失敗したターゲット名のリスト
+    """
+    failed: list[str] = []
+
+    if liveness_targets:
+        failed.extend(check_liveness_all(liveness_targets))
+
+    if http_targets:
+        failed.extend(target.name for target in http_targets if not check_http_healthz(target))
+
+    return failed
