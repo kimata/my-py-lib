@@ -651,6 +651,8 @@ def _abs_path(config_path: str | pathlib.Path = CONFIG_PATH) -> pathlib.Path:
 def load(
     config_path: str | pathlib.Path = CONFIG_PATH,
     schema_path: str | pathlib.Path | None = None,
+    *,
+    include_base_dir: bool = True,
 ) -> dict[str, Any]:
     config_path_obj = pathlib.Path(config_path).resolve()
 
@@ -683,7 +685,7 @@ def load(
             schema: dict[str, Any] = json.load(file)
             _validate_config(yaml_data, schema, yaml_lines)
 
-    if isinstance(yaml_data, dict):
+    if include_base_dir and isinstance(yaml_data, dict):
         yaml_data["base_dir"] = _abs_path(config_path).parent
 
     return yaml_data
