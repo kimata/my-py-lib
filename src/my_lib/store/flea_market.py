@@ -7,6 +7,9 @@
 
 from __future__ import annotations
 
+import logging
+import pathlib
+import urllib.request
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Self
@@ -73,3 +76,45 @@ class SearchResult:
     name: str
     url: str
     price: int
+    thumb_url: str | None = None
+
+
+def download_image(url: str, save_path: pathlib.Path) -> bool:
+    """画像をダウンロードして保存する
+
+    Args:
+        url: 画像URL
+        save_path: 保存先パス
+
+    Returns:
+        成功した場合 True
+
+    """
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})  # noqa: S310
+        with urllib.request.urlopen(req, timeout=10) as response, save_path.open("wb") as f:  # noqa: S310
+            f.write(response.read())
+        return True
+    except Exception:
+        logging.exception("画像ダウンロード失敗: %s", url)
+        return False
+
+
+def get_image_extension(url: str) -> str:
+    """URLから画像の拡張子を推測する
+
+    Args:
+        url: 画像URL
+
+    Returns:
+        拡張子（.jpg, .png, .webp など）
+
+    """
+    url_lower = url.lower()
+    if ".png" in url_lower:
+        return ".png"
+    if ".webp" in url_lower:
+        return ".webp"
+    if ".gif" in url_lower:
+        return ".gif"
+    return ".jpg"
