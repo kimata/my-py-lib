@@ -235,6 +235,7 @@ def _parse_search_item(
 
         # タイトルを取得
         title: str | None = None
+        thumb_url: str | None = None
 
         # 方法1: p.item-box__item-name 内の span から取得
         title_elements = item_element.find_elements(
@@ -251,13 +252,26 @@ def _parse_search_item(
             if name_elements and name_elements[0].text:
                 title = name_elements[0].text.strip()
 
-        # 方法3: img の alt 属性から取得
+        # 方法3: img の alt 属性から取得し、同時に画像URLも取得
         if not title:
             img_elements = item_element.find_elements(by_xpath, ".//img[@alt]")
             for img in img_elements:
                 alt = img.get_attribute("alt")
                 if alt and alt.strip():
                     title = alt.strip()
+                    # 同じ img から画像URLも取得
+                    src = img.get_attribute("src")
+                    if src and not src.startswith("data:"):
+                        thumb_url = src
+                    break
+
+        # 画像URLのフォールバック: 任意の img タグから取得
+        if not thumb_url:
+            img_elements = item_element.find_elements(by_xpath, ".//img[@src]")
+            for img in img_elements:
+                src = img.get_attribute("src")
+                if src and not src.startswith("data:"):
+                    thumb_url = src
                     break
 
         # 価格を取得
@@ -297,7 +311,7 @@ def _parse_search_item(
             logging.debug("[Rakuma] パース失敗: title=%s, price=%s", title, price)
             return None
 
-        return my_lib.store.flea_market.SearchResult(name=title, url=url, price=price)
+        return my_lib.store.flea_market.SearchResult(name=title, url=url, price=price, thumb_url=thumb_url)
 
     except Exception:
         logging.exception("[Rakuma] パース失敗")
@@ -433,6 +447,16 @@ if __name__ == "__main__":
                     f.write(first_item_html if first_item_html else "")
                 logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
 
+            # 画像をダウンロード
+            img_dir = dump_path / "images"
+            img_dir.mkdir(parents=True, exist_ok=True)
+            for i, result in enumerate(results, 1):
+                if result.thumb_url:
+                    ext = my_lib.store.flea_market.get_image_extension(result.thumb_url)
+                    img_path = img_dir / f"{i:03d}{ext}"
+                    if my_lib.store.flea_market.download_image(result.thumb_url, img_path):
+                        logging.info("画像を保存しました: %s", img_path)
+
         logging.info("=" * 60)
         logging.info("検索結果: %d 件", len(results))
         logging.info("=" * 60)
@@ -441,5 +465,7 @@ if __name__ == "__main__":
             logging.info("[%d] %s", i, result.name)
             logging.info("    価格: ¥%s", f"{result.price:,}")
             logging.info("    URL: %s", result.url)
+            if result.thumb_url:
+                logging.info("    画像: %s", result.thumb_url)
     finally:
         my_lib.selenium_util.quit_driver_gracefully(driver)

@@ -347,7 +347,35 @@ def _parse_search_item(
             logging.debug("[Mercari] パース失敗: title=%s, price=%s, aria_label=%s", title, price, aria_debug)
             return None
 
-        return my_lib.store.flea_market.SearchResult(name=title, url=url, price=price)
+        # 画像URLを取得
+        thumb_url: str | None = None
+
+        # 方法1: img タグの srcset から最大解像度を取得
+        img_elements = item_element.find_elements(by_xpath, ".//img[@srcset]")
+        if img_elements:
+            srcset = img_elements[0].get_attribute("srcset")
+            if srcset:
+                # srcset は "url1 240w, url2 480w, url3 720w" 形式
+                # 最大の解像度のURLを取得
+                srcset_parts = [part.strip() for part in srcset.split(",")]
+                max_width = 0
+                for part in srcset_parts:
+                    match = re.match(r"(\S+)\s+(\d+)w", part)
+                    if match:
+                        width = int(match.group(2))
+                        if width > max_width:
+                            max_width = width
+                            thumb_url = match.group(1)
+
+        # 方法2: img タグの src から取得
+        if not thumb_url:
+            img_elements = item_element.find_elements(by_xpath, ".//img[@src]")
+            if img_elements:
+                src = img_elements[0].get_attribute("src")
+                if src and not src.startswith("data:"):
+                    thumb_url = src
+
+        return my_lib.store.flea_market.SearchResult(name=title, url=url, price=price, thumb_url=thumb_url)
 
     except Exception:
         logging.exception("[Mercari] パース失敗")
@@ -499,6 +527,16 @@ if __name__ == "__main__":
                     f.write(first_item_html if first_item_html else "")
                 logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
 
+            # 画像をダウンロード
+            img_dir = dump_path / "images"
+            img_dir.mkdir(parents=True, exist_ok=True)
+            for i, result in enumerate(results, 1):
+                if result.thumb_url:
+                    ext = my_lib.store.flea_market.get_image_extension(result.thumb_url)
+                    img_path = img_dir / f"{i:03d}{ext}"
+                    if my_lib.store.flea_market.download_image(result.thumb_url, img_path):
+                        logging.info("画像を保存しました: %s", img_path)
+
         logging.info("=" * 60)
         logging.info("検索結果: %d 件", len(results))
         logging.info("=" * 60)
@@ -507,6 +545,8 @@ if __name__ == "__main__":
             logging.info("[%d] %s", i, result.name)
             logging.info("    価格: ¥%s", f"{result.price:,}")
             logging.info("    URL: %s", result.url)
+            if result.thumb_url:
+                logging.info("    画像: %s", result.thumb_url)
     finally:
         my_lib.selenium_util.quit_driver_gracefully(driver)
         # NOTE: undetected_chromedriver の __del__ で ImportError が出ることがあるが、
