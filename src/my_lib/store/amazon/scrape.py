@@ -16,6 +16,7 @@ Options:
 from __future__ import annotations
 
 import io
+import json
 import logging
 import pathlib
 import random
@@ -41,6 +42,39 @@ if TYPE_CHECKING:
 
 # デフォルトのSlack設定（空設定）
 _DEFAULT_SLACK_CONFIG: my_lib.notify.slack.SlackEmptyConfig = my_lib.notify.slack.SlackEmptyConfig()
+
+# Amazonアウトレット判定用のXPath
+# node=2761990051 は Amazonアウトレット専用ページへのリンク
+_AMAZON_OUTLET_SELLER_XPATH = '//div[@id="merchant-info"]//a[contains(@href, "node=2761990051")]'
+
+# 価格データJSON用のXPath
+_PRICE_DATA_XPATH = '//div[contains(@class, "twister-plus-buying-options-price-data")]'
+
+
+def _extract_outlet_price_from_json(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+) -> int | None:
+    """ページ内のJSON価格データからアウトレット価格（USED）を取得する.
+
+    Returns:
+        アウトレット価格。取得できない場合は None
+    """
+    try:
+        elems = driver.find_elements(selenium.webdriver.common.by.By.XPATH, _PRICE_DATA_XPATH)
+        if not elems:
+            return None
+
+        inner_html = elems[0].get_attribute("innerHTML")
+        if not inner_html:
+            return None
+
+        data = json.loads(inner_html)
+        for item in data.get("desktop_buybox_group_1", []):
+            if item.get("buyingOptionType") == "USED":
+                return int(item["priceAmount"])
+    except (json.JSONDecodeError, KeyError, ValueError):
+        logging.debug("Failed to extract outlet price from JSON")
+    return None
 
 
 def _fetch_price_impl(
@@ -166,6 +200,19 @@ def _fetch_price_impl(
         if m is None:
             raise ValueError(f"Failed to parse price: {price_text}")
         item.price = int(m.group(1).replace(",", ""))
+
+        # buybox が Amazonアウトレットの場合、outlet_price を取得
+        # NOTE: buybox が新品の場合、「その他の出品者」にあるアウトレット価格は取得されない
+        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, _AMAZON_OUTLET_SELLER_XPATH)) > 0:
+            # JSONデータから USED 価格を取得（新品とアウトレットが混在する場合に対応）
+            outlet_price = _extract_outlet_price_from_json(driver)
+            if outlet_price is not None:
+                item.outlet_price = outlet_price
+                logging.debug("Amazon Outlet price from JSON: %d", item.outlet_price)
+            else:
+                # JSONデータがない場合はbuybox価格を使用
+                item.outlet_price = item.price
+                logging.debug("Amazon Outlet price from buybox: %d", item.outlet_price)
     except Exception:
         logging.warning('Unable to parse "%s": %s.', price_text, item.url)
 
