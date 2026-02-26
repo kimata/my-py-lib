@@ -70,7 +70,12 @@ class SearchResultItem:
 
 @dataclass  # NOTE: scrape.py で price/category を更新するため frozen=False
 class AmazonItem:
-    """Amazon 商品情報."""
+    """Amazon 商品情報.
+
+    Note:
+        outlet_price は buybox が Amazonアウトレットの場合のみ取得される。
+        buybox が新品で、Amazonアウトレットが「その他の出品者」にある場合は取得されない。
+    """
 
     asin: str
     url: str
@@ -78,6 +83,7 @@ class AmazonItem:
     thumb_url: str | None = None
     category: str | None = None
     stock: int | None = None
+    outlet_price: int | None = None
 
     @classmethod
     def from_asin(cls, asin: str) -> AmazonItem:
