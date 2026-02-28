@@ -46,6 +46,13 @@ def _get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.Def
     )
 
 
+def _set_item_name(item: AmazonItem, data: Any) -> None:
+    try:
+        item.name = data.item_info.title.display_value
+    except Exception:
+        logging.warning("[Amazon] 商品名取得失敗: ASIN=%s", item.asin)
+
+
 def _set_item_category(item: AmazonItem, data: Any) -> None:
     try:
         item.category = data.item_info.classifications.product_group.display_value
@@ -90,6 +97,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_TITLE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
@@ -122,6 +130,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
+                _set_item_name(item, item_data)
                 _set_item_category(item, item_data)
 
                 price_map[item_data.asin] = item
@@ -157,6 +166,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
+                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_TITLE,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
                     paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
@@ -192,6 +202,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
                     price=price,
                     thumb_url=item_data.images.primary.medium.url,
                 )
+                _set_item_name(item, item_data)
                 _set_item_category(item, item_data)
 
                 price_map[item_data.asin] = item
@@ -225,6 +236,7 @@ def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> lis
         for item in item_list:
             if item.asin in price_map:
                 item.stock = 1
+                item.name = price_map[item.asin].name
                 item.price = price_map[item.asin].price
                 item.thumb_url = price_map[item.asin].thumb_url
             else:

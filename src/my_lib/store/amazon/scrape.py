@@ -126,6 +126,12 @@ def _fetch_price_impl(
     # my_lib.store.amazon.captcha.resolve(driver, wait, config)
 
     try:
+        title_elem = driver.find_element(selenium.webdriver.common.by.By.ID, "productTitle")
+        item.name = title_elem.text.strip()
+    except Exception:
+        logging.warning("Failed to fetch product title: %s", item.url)
+
+    try:
         breadcrumb_list = driver.find_elements(
             selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
         )
