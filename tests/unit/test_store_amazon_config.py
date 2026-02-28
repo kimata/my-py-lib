@@ -93,6 +93,7 @@ class TestAmazonItem:
 
         assert item.asin == "B0G3SXHCLJ"
         assert item.url == "https://www.amazon.co.jp/dp/B0G3SXHCLJ"
+        assert item.name is None
         assert item.price is None
         assert item.thumb_url is None
         assert item.category is None
@@ -186,6 +187,7 @@ class TestAmazonItem:
 
         result = item.to_dict()
 
+        assert "name" not in result
         assert "price" not in result
         assert "thumb_url" not in result
         assert "category" not in result

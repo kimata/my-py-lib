@@ -79,6 +79,7 @@ class AmazonItem:
 
     asin: str
     url: str
+    name: str | None = None
     price: int | None = None
     thumb_url: str | None = None
     category: str | None = None
@@ -101,6 +102,7 @@ class AmazonItem:
         return cls(
             asin=asin,
             url=data.get("url", get_item_url(asin)),
+            name=data.get("name"),
             price=data.get("price"),
             thumb_url=data.get("thumb_url"),
             category=data.get("category"),
