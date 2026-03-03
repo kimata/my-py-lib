@@ -355,7 +355,7 @@ def get_wbgt(url: str) -> WbgtResult:
     # NOTE: 夏季にしか提供されないので冬は取りに行かない
     now = my_lib.time.now()
 
-    if (now.month < 3) or ((now.month == 4) and (now.day < 20)) or (now.month > 9):
+    if (now.month < 4) or ((now.month == 4) and (now.day < 20)) or (now.month > 9):
         return WbgtResult()
 
     # NOTE: 当日の過去時間のデータは表示されず、
