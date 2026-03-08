@@ -50,6 +50,10 @@ _AMAZON_OUTLET_SELLER_XPATH = '//div[@id="merchant-info"]//a[contains(@href, "no
 # 価格データJSON用のXPath
 _PRICE_DATA_XPATH = '//div[contains(@class, "twister-plus-buying-options-price-data")]'
 
+# 中古品セクションのXPath
+# このセクションが存在する場合、buybox は中古品を表示しているため新品価格の取得対象外とする
+_USED_BUY_SECTION_XPATH = '//div[@id="usedBuySection"]'
+
 
 def _extract_outlet_price_from_json(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
@@ -138,6 +142,12 @@ def _fetch_price_impl(
         item.category = next(x.text for x in breadcrumb_list)
     except Exception:
         logging.exception("Failed to fetch category")
+
+    # 中古品セクションが存在する場合、新品価格は取得対象外
+    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, _USED_BUY_SECTION_XPATH)) > 0:
+        logging.info("Used item detected (usedBuySection), skipping price: %s", item.url)
+        item.price = 0
+        return True
 
     price_text = ""
     for price_elem in PRICE_ELEM_LIST:
