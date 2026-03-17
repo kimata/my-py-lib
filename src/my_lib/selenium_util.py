@@ -21,6 +21,7 @@ import os
 import pathlib
 import random
 import re
+import shutil
 import signal
 import subprocess
 import time
@@ -50,10 +51,88 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 WAIT_RETRY_COUNT: int = 1
+LOG_MAX_BYTES: int = 10 * 1024 * 1024  # 10MB
+LOG_BACKUP_COUNT: int = 3
 
 
 class SeleniumError(Exception):
     """Selenium 関連エラーの基底クラス"""
+
+
+def _get_rotated_path(log_file: pathlib.Path, index: int) -> pathlib.Path:
+    """ローテーションされたログファイルのパスを生成"""
+    return log_file.parent / f"{log_file.name}.{index}"
+
+
+def _rotate_log_file(
+    log_file: pathlib.Path,
+    max_bytes: int = LOG_MAX_BYTES,
+    backup_count: int = LOG_BACKUP_COUNT,
+) -> bool:
+    """ログファイルをローテーションする（copytruncate 方式）
+
+    Chrome がファイルを開いたまま書き込みを続けるため、
+    ファイルをコピーしてからトランケートする方式を採用。
+
+    Args:
+        log_file: ローテーション対象のログファイルパス
+        max_bytes: ローテーションを実行するファイルサイズ閾値（バイト）
+        backup_count: 保持するバックアップ世代数
+
+    Returns:
+        ローテーションを実行した場合は True
+
+    """
+    if not log_file.exists():
+        return False
+
+    try:
+        file_size = log_file.stat().st_size
+    except OSError:
+        return False
+
+    if file_size <= max_bytes:
+        return False
+
+    logging.info(
+        "Rotating log file: %s (size: %.1f MB)",
+        log_file.name,
+        file_size / (1024 * 1024),
+    )
+
+    # 最古の世代を削除し、世代をシフト
+    for i in range(backup_count, 0, -1):
+        rotated = _get_rotated_path(log_file, i)
+        if i == backup_count:
+            rotated.unlink(missing_ok=True)
+        elif rotated.exists():
+            rotated.rename(_get_rotated_path(log_file, i + 1))
+
+    # 現在のファイルを .1 にコピーしてからトランケート
+    shutil.copy2(log_file, _get_rotated_path(log_file, 1))
+    log_file.open("w").close()
+
+    return True
+
+
+def rotate_selenium_logs(
+    log_path: pathlib.Path,
+    max_bytes: int = LOG_MAX_BYTES,
+    backup_count: int = LOG_BACKUP_COUNT,
+) -> None:
+    """Selenium 関連のログファイルをローテーションする
+
+    Args:
+        log_path: ログディレクトリのパス
+        max_bytes: ローテーションを実行するファイルサイズ閾値（バイト、デフォルト: 10MB）
+        backup_count: 保持するバックアップ世代数（デフォルト: 3）
+
+    """
+    if not log_path.exists():
+        return
+
+    for log_file in log_path.glob("*.log"):
+        _rotate_log_file(log_file, max_bytes, backup_count)
 
 
 def _get_chrome_version() -> int | None:
@@ -157,6 +236,8 @@ def _create_driver_impl(
 
     chrome_data_path.mkdir(parents=True, exist_ok=True)
     log_path.mkdir(parents=True, exist_ok=True)
+
+    rotate_selenium_logs(log_path)
 
     options = _create_chrome_options(profile_name, chrome_data_path, log_path, is_headless)
 
