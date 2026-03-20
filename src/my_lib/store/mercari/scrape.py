@@ -260,13 +260,11 @@ def _parse_item(
 
     try:
         # 必須要素を一括取得
-        elements_cache["link"] = item_element.find_element(by_xpath, ".//a")
+        elements_cache["link"] = item_element.find_element(by_xpath, ".//a[@data-testid='listed-item']")
         elements_cache["name"] = item_element.find_element(by_xpath, ".//p[@data-testid='item-label']")
 
         # 価格要素を取得（存在しない場合はリトライ）
-        price_elements = item_element.find_elements(
-            by_xpath, ".//p[@data-testid='item-label']/following-sibling::span/span[2]"
-        )
+        price_elements = item_element.find_elements(by_xpath, ".//span[@data-testid='price']/span[2]")
         if not price_elements:
             driver.refresh()
             time.sleep(5)
@@ -275,10 +273,10 @@ def _parse_item(
 
         # オプション要素を一括取得
         elements_cache["favorite"] = item_element.find_elements(
-            by_xpath, ".//p[@data-testid='item-label']/following-sibling::div/div[1]/span"
+            by_xpath, ".//span[@data-testid='price']/following-sibling::div/div[1]/span"
         )
         elements_cache["view"] = item_element.find_elements(
-            by_xpath, ".//p[@data-testid='item-label']/following-sibling::div/div[3]/span"
+            by_xpath, ".//span[@data-testid='price']/following-sibling::div/div[3]/span"
         )
         elements_cache["private"] = item_element.find_elements(
             by_xpath, ".//span[contains(text(), '公開停止中')]"
