@@ -171,6 +171,10 @@ def _execute_item(
     if progress_observer is not None:
         progress_observer.on_item_start(index, item_count, item)
 
+    if item.is_stop != 0:
+        logging.info("公開停止中のため、詳細ページへの遷移をスキップします。")
+        return item
+
     # NOTE: ポップアップがリンクを覆い隠す場合があるため、先に閉じる
     _close_popup(driver)
 
