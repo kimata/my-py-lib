@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     import my_lib.store.mercari.progress
 
 _TRY_COUNT: int = 3
+_LOAD_URL_TIMEOUT_SEC: int = 30
 _ITEM_LIST_XPATH: str = '//ul[@data-testid="listed-item-list"]//li'
 _POPUP_CLOSE_XPATHS: list[str] = [
     # NOTE: 右上のポップアップの閉じるボタン（オークション案内など）
@@ -110,10 +111,11 @@ def _load_url(
     wait: selenium.webdriver.support.wait.WebDriverWait,
     url: str,
 ) -> None:
+    load_wait = selenium.webdriver.support.ui.WebDriverWait(driver, _LOAD_URL_TIMEOUT_SEC)
     for retry in range(_TRY_COUNT):
         try:
             driver.execute_script(f'window.location.href = "{url}";')
-            wait.until(
+            load_wait.until(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (selenium.webdriver.common.by.By.XPATH, _ITEM_LIST_XPATH)
                 )
@@ -127,6 +129,7 @@ def _load_url(
                 raise
 
             logging.warning("リトライします。(retry=%d)", retry + 1)
+            my_lib.selenium_util.random_sleep(10)
 
 
 def _expand_all(
