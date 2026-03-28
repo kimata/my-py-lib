@@ -619,7 +619,12 @@ def set_japanese_locale(driver: WebDriver) -> None:
     """CDP を使って日本語ロケールを強制設定
 
     Chrome の起動オプションだけでは言語設定が変わってしまうことがあるため、
-    CDP を使って Accept-Language ヘッダーとロケールを強制的に日本語に設定する。
+    CDP を使って Accept-Language ヘッダーを強制的に日本語に設定する。
+
+    NOTE: Emulation.setLocaleOverride は使用しない。Chrome 142 + 日本語ロケールの
+    組み合わせで、内蔵拡張機能（Web Store 等）の manifest.name が Preferences 保存時に
+    毎回 UTF-8 多重エンコードされ、Preferences ファイルが際限なく肥大化するバグがあるため。
+    --lang=ja-JP オプションと Accept-Language ヘッダーで十分に日本語環境を維持できる。
     """
     try:
         # NOTE: Network.setExtraHTTPHeaders は Network.enable を先に呼ばないと機能しない
@@ -627,10 +632,6 @@ def set_japanese_locale(driver: WebDriver) -> None:
         driver.execute_cdp_cmd(
             "Network.setExtraHTTPHeaders",
             {"headers": {"Accept-Language": "ja-JP,ja;q=0.9"}},
-        )
-        driver.execute_cdp_cmd(
-            "Emulation.setLocaleOverride",
-            {"locale": "ja-JP"},
         )
         logging.debug("Japanese locale set via CDP")
     except Exception:
