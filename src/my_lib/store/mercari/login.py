@@ -169,6 +169,11 @@ def _login_via_line(
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
 ) -> None:
+    # NOTE: ログインページが電話番号入力画面になった場合、「SNSでログインする」を先にクリック
+    if my_lib.selenium_util.xpath_exists(driver, '//button[contains(., "SNSでログインする")]'):
+        my_lib.selenium_util.click_xpath(driver, '//button[contains(., "SNSでログインする")]', wait)
+        time.sleep(1)
+
     my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
 
     wait.until(selenium.webdriver.support.expected_conditions.title_contains("LINE Login"))
