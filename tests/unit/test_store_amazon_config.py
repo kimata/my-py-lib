@@ -15,17 +15,13 @@ class TestAmazonApiConfig:
         from my_lib.store.amazon.config import AmazonApiConfig
 
         config = AmazonApiConfig(
-            access_key="access_key",
-            secret_key="secret_key",
-            host="webservices.amazon.co.jp",
-            region="us-west-2",
+            credential_id="credential_id",
+            credential_secret="credential_secret",
             associate="associate_id",
         )
 
-        assert config.access_key == "access_key"
-        assert config.secret_key == "secret_key"
-        assert config.host == "webservices.amazon.co.jp"
-        assert config.region == "us-west-2"
+        assert config.credential_id == "credential_id"
+        assert config.credential_secret == "credential_secret"
         assert config.associate == "associate_id"
 
     def test_parse(self):
@@ -33,17 +29,16 @@ class TestAmazonApiConfig:
         from my_lib.store.amazon.config import AmazonApiConfig
 
         data = {
-            "access_key": "access_key",
-            "secret_key": "secret_key",
-            "host": "webservices.amazon.co.jp",
-            "region": "us-west-2",
+            "credential_id": "credential_id",
+            "credential_secret": "credential_secret",
             "associate": "associate_id",
         }
 
         config = AmazonApiConfig.parse(data)
 
-        assert config.access_key == "access_key"
-        assert config.secret_key == "secret_key"
+        assert config.credential_id == "credential_id"
+        assert config.credential_secret == "credential_secret"
+        assert config.associate == "associate_id"
 
 
 class TestAmazonLoginConfig:
