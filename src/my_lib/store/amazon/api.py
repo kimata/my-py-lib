@@ -125,6 +125,9 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
                     merchant_name: Any = listing.merchant_info.name
                     if merchant_name is None or not re.search("Amazonアウトレット", merchant_name):
                         continue
+                    if listing.price is None or listing.price.money is None:
+                        logging.info("[Amazon] 販売無し (アウトレット): ASIN=%s", asin)
+                        break
                     amount: Any = listing.price.money.amount
                     if amount is not None:
                         price = int(amount)
@@ -180,15 +183,15 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
 
                 # listings から新品の最安値を取得
                 for listing in item_data.offers_v2.listings:
-                    try:
-                        amount: Any = listing.price.money.amount
-                        if amount is None:
-                            continue
-                        fetched_price = int(amount)
-                        if (price is None) or (fetched_price < price):
-                            price = fetched_price
-                    except Exception:
-                        logging.exception("[Amazon] 価格取得失敗: ASIN=%s", asin)
+                    if listing.price is None or listing.price.money is None:
+                        logging.info("[Amazon] 販売無し (新品): ASIN=%s", asin)
+                        continue
+                    amount: Any = listing.price.money.amount
+                    if amount is None:
+                        continue
+                    fetched_price = int(amount)
+                    if (price is None) or (fetched_price < price):
+                        price = fetched_price
 
                 if price is None:
                     continue
@@ -293,9 +296,11 @@ def search_items(
 
                 try:
                     if item_data.offers_v2 and item_data.offers_v2.listings:
-                        amount: Any = item_data.offers_v2.listings[0].price.money.amount
-                        if amount is not None:
-                            price = int(amount)
+                        first_listing = item_data.offers_v2.listings[0]
+                        if first_listing.price is not None and first_listing.price.money is not None:
+                            amount: Any = first_listing.price.money.amount
+                            if amount is not None:
+                                price = int(amount)
                 except Exception:
                     logging.debug("[Amazon] 価格取得失敗: ASIN=%s", asin)
 
