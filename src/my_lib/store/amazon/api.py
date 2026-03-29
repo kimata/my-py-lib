@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 _API_SPLIT: int = 10
 
-_API_CALL_INTERVAL_SEC: int = 5
+_API_CALL_INTERVAL_SEC: int = 2
 
 _GET_ITEMS_RESOURCES: list[amazon_creatorsapi.models.GetItemsResource] = [
     amazon_creatorsapi.models.GetItemsResource.OFFERS_V2_DOT_LISTINGS_DOT_PRICE,
@@ -50,7 +50,7 @@ def _get_api(config: AmazonApiConfig) -> amazon_creatorsapi.AmazonCreatorsApi:
         version=config.version,
         tag=config.associate,
         country=amazon_creatorsapi.Country.JP,
-        throttling=1,
+        throttling=2,
     )
 
 
@@ -96,12 +96,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
     api = _get_api(config)
 
     price_map: dict[str, AmazonItem] = {}
-    for i, asin_sub_list in enumerate(
-        [asin_list[i : (i + _API_SPLIT)] for i in range(0, len(asin_list), _API_SPLIT)]
-    ):
-        if i != 0:
-            time.sleep(1)
-
+    for asin_sub_list in [asin_list[i : (i + _API_SPLIT)] for i in range(0, len(asin_list), _API_SPLIT)]:
         items: Any = api.get_items(
             items=asin_sub_list,
             condition=amazon_creatorsapi.models.Condition.ANY,
@@ -159,12 +154,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
     api = _get_api(config)
 
     price_map: dict[str, AmazonItem] = {}
-    for i, asin_sub_list in enumerate(
-        [asin_list[i : i + _API_SPLIT] for i in range(0, len(asin_list), _API_SPLIT)]
-    ):
-        if i != 0:
-            time.sleep(1)
-
+    for asin_sub_list in [asin_list[i : i + _API_SPLIT] for i in range(0, len(asin_list), _API_SPLIT)]:
         items: Any = api.get_items(
             items=asin_sub_list,
             condition=amazon_creatorsapi.models.Condition.NEW,
