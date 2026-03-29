@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Amazon の PA-API 5.0 を使って Amazon の価格情報を取得するライブラリです。
+Amazon の Creators API を使って Amazon の価格情報を取得するライブラリです。
 
 Usage:
   api.py [-c CONFIG] [-t ASIN...] [-D]
@@ -19,14 +19,8 @@ import re
 import time
 from typing import TYPE_CHECKING, Any
 
-import paapi5_python_sdk.api.default_api
-import paapi5_python_sdk.condition
-import paapi5_python_sdk.get_items_request
-import paapi5_python_sdk.get_items_resource
-import paapi5_python_sdk.merchant
-import paapi5_python_sdk.partner_type
-import paapi5_python_sdk.search_items_request
-import paapi5_python_sdk.search_items_resource
+import amazon_creatorsapi
+import amazon_creatorsapi.models
 
 from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem, SearchResultItem
 from my_lib.store.amazon.util import get_item_url
@@ -34,15 +28,29 @@ from my_lib.store.amazon.util import get_item_url
 if TYPE_CHECKING:
     from typing import Any
 
-_PAAPI_SPLIT: int = 10
+_API_SPLIT: int = 10
+
+_API_CALL_INTERVAL_SEC: int = 5
+
+_GET_ITEMS_RESOURCES: list[amazon_creatorsapi.models.GetItemsResource] = [
+    amazon_creatorsapi.models.GetItemsResource.OFFERS_V2_DOT_LISTINGS_DOT_PRICE,
+    amazon_creatorsapi.models.GetItemsResource.OFFERS_V2_DOT_LISTINGS_DOT_MERCHANT_INFO,
+    amazon_creatorsapi.models.GetItemsResource.OFFERS_V2_DOT_LISTINGS_DOT_CONDITION,
+    amazon_creatorsapi.models.GetItemsResource.ITEM_INFO_DOT_TITLE,
+    amazon_creatorsapi.models.GetItemsResource.ITEM_INFO_DOT_CLASSIFICATIONS,
+    amazon_creatorsapi.models.GetItemsResource.IMAGES_DOT_PRIMARY_DOT_MEDIUM,
+    amazon_creatorsapi.models.GetItemsResource.IMAGES_DOT_PRIMARY_DOT_SMALL,
+]
 
 
-def _get_paapi(config: AmazonApiConfig) -> paapi5_python_sdk.api.default_api.DefaultApi:
-    return paapi5_python_sdk.api.default_api.DefaultApi(
-        access_key=config.access_key,
-        secret_key=config.secret_key,
-        host=config.host,
-        region=config.region,
+def _get_api(config: AmazonApiConfig) -> amazon_creatorsapi.AmazonCreatorsApi:
+    return amazon_creatorsapi.AmazonCreatorsApi(
+        credential_id=config.credential_id,
+        credential_secret=config.credential_secret,
+        version=config.version,
+        tag=config.associate,
+        country=amazon_creatorsapi.Country.JP,
+        throttling=1,
     )
 
 
@@ -67,73 +75,74 @@ def _format_asin_list(asin_list: list[str], max_display: int = 3) -> str:
     return ", ".join(asin_list[:max_display]) + f"... (他 {len(asin_list) - max_display} 件)"
 
 
+def _get_thumb_url(item_data: Any) -> str | None:
+    try:
+        return item_data.images.primary.medium.url
+    except Exception:
+        return None
+
+
 def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
+    """Amazonアウトレットの価格を取得する.
+
+    Creators API には USED condition がないため、ANY で取得し
+    listings から「Amazonアウトレット」の出品を探す。
+    """
     if len(asin_list) == 0:
         return {}
 
     logging.info("[Amazon] 検索開始 (アウトレット): ASIN=%s", _format_asin_list(asin_list))
 
-    default_api = _get_paapi(config)
+    api = _get_api(config)
 
     price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
-        [asin_list[i : (i + _PAAPI_SPLIT)] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
+        [asin_list[i : (i + _API_SPLIT)] for i in range(0, len(asin_list), _API_SPLIT)]
     ):
         if i != 0:
             time.sleep(1)
 
-        resp: Any = default_api.get_items(
-            paapi5_python_sdk.get_items_request.GetItemsRequest(
-                partner_tag=config.associate,
-                partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
-                marketplace="www.amazon.co.jp",
-                # NOTE: listings にアウトレットが表示されるようにする
-                # (他に安価な中古品の出品がある場合は表示されない)
-                condition=paapi5_python_sdk.condition.Condition.USED,
-                merchant=paapi5_python_sdk.merchant.Merchant.ALL,
-                item_ids=asin_sub_list,
-                resources=[
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_TITLE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
-                ],
-            )
+        items: Any = api.get_items(
+            items=asin_sub_list,
+            condition=amazon_creatorsapi.models.Condition.ANY,
+            resources=_GET_ITEMS_RESOURCES,
         )
 
-        if resp.items_result is not None:
-            for item_data in resp.items_result.items:
-                if item_data.offers is None:
+        if items is not None:
+            for item_data in items:
+                asin: Any = item_data.asin
+                if asin is None:
+                    continue
+                if item_data.offers_v2 is None or item_data.offers_v2.listings is None:
                     continue
 
                 price: int | None = None
 
                 # NOTE: Amazonアウトレットのみ対象にする
-                for listing in item_data.offers.listings:
-                    if listing.merchant_info is None or not re.compile("Amazonアウトレット").search(
-                        listing.merchant_info.name
-                    ):
+                for listing in item_data.offers_v2.listings:
+                    if listing.merchant_info is None:
                         continue
-                    price = int(listing.price.amount)
+                    merchant_name: Any = listing.merchant_info.name
+                    if merchant_name is None or not re.search("Amazonアウトレット", merchant_name):
+                        continue
+                    amount: Any = listing.price.money.amount
+                    if amount is not None:
+                        price = int(amount)
                     break
 
                 if price is None:
                     continue
 
                 item = AmazonItem(
-                    asin=item_data.asin,
-                    url=get_item_url(item_data.asin),
+                    asin=asin,
+                    url=get_item_url(asin),
                     price=price,
-                    thumb_url=item_data.images.primary.medium.url,
+                    thumb_url=_get_thumb_url(item_data),
                 )
                 _set_item_name(item, item_data)
                 _set_item_category(item, item_data)
 
-                price_map[item_data.asin] = item
+                price_map[asin] = item
 
     return price_map
 
@@ -144,82 +153,67 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
 
     logging.info("[Amazon] 検索開始 (新品): ASIN=%s", _format_asin_list(asin_list))
 
-    default_api = _get_paapi(config)
+    api = _get_api(config)
 
     price_map: dict[str, AmazonItem] = {}
     for i, asin_sub_list in enumerate(
-        [asin_list[i : i + _PAAPI_SPLIT] for i in range(0, len(asin_list), _PAAPI_SPLIT)]
+        [asin_list[i : i + _API_SPLIT] for i in range(0, len(asin_list), _API_SPLIT)]
     ):
         if i != 0:
             time.sleep(1)
 
-        resp: Any = default_api.get_items(
-            paapi5_python_sdk.get_items_request.GetItemsRequest(
-                partner_tag=config.associate,
-                partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
-                marketplace="www.amazon.co.jp",
-                condition=paapi5_python_sdk.condition.Condition.NEW,
-                merchant=paapi5_python_sdk.merchant.Merchant.ALL,
-                item_ids=asin_sub_list,
-                resources=[
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_LOWESTPRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_SUMMARIES_HIGHESTPRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_PRICE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.OFFERS_LISTINGS_MERCHANTINFO,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_TITLE,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.ITEMINFO_CLASSIFICATIONS,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_MEDIUM,
-                    paapi5_python_sdk.get_items_resource.GetItemsResource.IMAGES_PRIMARY_SMALL,
-                ],
-            )
+        items: Any = api.get_items(
+            items=asin_sub_list,
+            condition=amazon_creatorsapi.models.Condition.NEW,
+            resources=_GET_ITEMS_RESOURCES,
         )
 
-        if resp.items_result is not None:
-            for item_data in resp.items_result.items:
-                if item_data.offers is None:
+        if items is not None:
+            for item_data in items:
+                asin: Any = item_data.asin
+                if asin is None:
+                    continue
+                if item_data.offers_v2 is None or item_data.offers_v2.listings is None:
                     continue
 
                 price: int | None = None
 
-                for offer in item_data.offers.summaries:
-                    if offer.condition.value != "New":
-                        continue
-
+                # listings から新品の最安値を取得
+                for listing in item_data.offers_v2.listings:
                     try:
-                        fetched_price = int(offer.lowest_price.amount)
+                        amount: Any = listing.price.money.amount
+                        if amount is None:
+                            continue
+                        fetched_price = int(amount)
                         if (price is None) or (fetched_price < price):
                             price = fetched_price
-                        break
                     except Exception:
-                        logging.exception("[Amazon] 価格取得失敗: ASIN=%s", item_data.asin)
+                        logging.exception("[Amazon] 価格取得失敗: ASIN=%s", asin)
 
                 if price is None:
                     continue
 
                 item = AmazonItem(
-                    asin=item_data.asin,
-                    url=get_item_url(item_data.asin),
+                    asin=asin,
+                    url=get_item_url(asin),
                     price=price,
-                    thumb_url=item_data.images.primary.medium.url,
+                    thumb_url=_get_thumb_url(item_data),
                 )
                 _set_item_name(item, item_data)
                 _set_item_category(item, item_data)
 
-                price_map[item_data.asin] = item
+                price_map[asin] = item
 
     return price_map
-
-
-_PAAPI_CALL_INTERVAL_SEC: int = 5
 
 
 def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     price_map = _fetch_price_outlet(config, asin_list)
 
-    # PA-API のレート制限対策として呼び出し間隔を確保
+    # レート制限対策として呼び出し間隔を確保
     remaining_asin_list = list(set(asin_list) - set(price_map.keys()))
     if remaining_asin_list:
-        time.sleep(_PAAPI_CALL_INTERVAL_SEC)
+        time.sleep(_API_CALL_INTERVAL_SEC)
         price_map |= fetch_price_new(config, remaining_asin_list)
 
     if len(price_map) == 0:
@@ -255,7 +249,7 @@ def search_items(
     """キーワードで Amazon 商品を検索する.
 
     Args:
-        config: PA-API 設定
+        config: Creators API 設定
         keywords: 検索キーワード
         item_count: 取得件数（1-10、デフォルト10）
 
@@ -264,27 +258,27 @@ def search_items(
     """
     logging.info("[Amazon] キーワード検索開始: %s", keywords)
 
-    default_api = _get_paapi(config)
-
-    request = paapi5_python_sdk.search_items_request.SearchItemsRequest(
-        partner_tag=config.associate,
-        partner_type=paapi5_python_sdk.partner_type.PartnerType.ASSOCIATES,
-        keywords=keywords,
-        item_count=item_count,
-        resources=[
-            paapi5_python_sdk.search_items_resource.SearchItemsResource.ITEMINFO_TITLE,
-            paapi5_python_sdk.search_items_resource.SearchItemsResource.OFFERS_LISTINGS_PRICE,
-            paapi5_python_sdk.search_items_resource.SearchItemsResource.IMAGES_PRIMARY_SMALL,
-        ],
-    )
+    api = _get_api(config)
 
     results: list[SearchResultItem] = []
 
     try:
-        resp: Any = default_api.search_items(request)
+        resp: Any = api.search_items(
+            keywords=keywords,
+            item_count=item_count,
+            resources=[
+                amazon_creatorsapi.models.SearchItemsResource.ITEM_INFO_DOT_TITLE,
+                amazon_creatorsapi.models.SearchItemsResource.OFFERS_V2_DOT_LISTINGS_DOT_PRICE,
+                amazon_creatorsapi.models.SearchItemsResource.IMAGES_DOT_PRIMARY_DOT_SMALL,
+            ],
+        )
 
-        if resp.search_result is not None:
-            for item_data in resp.search_result.items:
+        if resp is not None and resp.items is not None:
+            for item_data in resp.items:
+                asin: Any = item_data.asin
+                if asin is None:
+                    continue
+
                 title: str | None = None
                 price: int | None = None
                 thumb_url: str | None = None
@@ -292,26 +286,28 @@ def search_items(
                 try:
                     title = item_data.item_info.title.display_value
                 except Exception:
-                    logging.warning("[Amazon] 商品名取得失敗: ASIN=%s", item_data.asin)
+                    logging.warning("[Amazon] 商品名取得失敗: ASIN=%s", asin)
 
                 if title is None:
                     continue
 
                 try:
-                    if item_data.offers and item_data.offers.listings:
-                        price = int(item_data.offers.listings[0].price.amount)
+                    if item_data.offers_v2 and item_data.offers_v2.listings:
+                        amount: Any = item_data.offers_v2.listings[0].price.money.amount
+                        if amount is not None:
+                            price = int(amount)
                 except Exception:
-                    logging.debug("[Amazon] 価格取得失敗: ASIN=%s", item_data.asin)
+                    logging.debug("[Amazon] 価格取得失敗: ASIN=%s", asin)
 
                 try:
                     thumb_url = item_data.images.primary.small.url
                 except Exception:
-                    logging.debug("[Amazon] サムネイル取得失敗: ASIN=%s", item_data.asin)
+                    logging.debug("[Amazon] サムネイル取得失敗: ASIN=%s", asin)
 
                 results.append(
                     SearchResultItem(
                         name=title,
-                        asin=item_data.asin,
+                        asin=asin,
                         price=price,
                         thumb_url=thumb_url,
                     )

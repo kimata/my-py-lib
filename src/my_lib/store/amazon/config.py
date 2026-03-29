@@ -11,13 +11,12 @@ from typing import Any, Self
 
 @dataclass(frozen=True)
 class AmazonApiConfig:
-    """PA-API 5.0 用の設定."""
+    """Creators API 用の設定."""
 
-    access_key: str
-    secret_key: str
-    host: str
-    region: str
+    credential_id: str
+    credential_secret: str
     associate: str
+    version: str = "3.3"
 
     @classmethod
     def parse(cls, amazon_config: dict[str, Any]) -> Self:
@@ -27,11 +26,10 @@ class AmazonApiConfig:
             amazon_config: config["store"]["amazon"] の値
         """
         return cls(
-            access_key=amazon_config["access_key"],
-            secret_key=amazon_config["secret_key"],
-            host=amazon_config["host"],
-            region=amazon_config["region"],
+            credential_id=amazon_config["credential_id"],
+            credential_secret=amazon_config["credential_secret"],
             associate=amazon_config["associate"],
+            version=amazon_config.get("version", "3.3"),
         )
 
 
