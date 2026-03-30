@@ -30,7 +30,8 @@ from typing import Any, Self
 
 import requests
 
-from my_lib.store.yahoo.config import YahooApiConfig, YahooItem
+from my_lib.store.yahoo.credentials import YahooApiConfig
+from my_lib.store.yahoo.models import YahooItem
 
 
 class SortOrder(Enum):

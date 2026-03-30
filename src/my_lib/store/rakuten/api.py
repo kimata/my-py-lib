@@ -29,7 +29,8 @@ from typing import Any, Self
 
 import requests
 
-from my_lib.store.rakuten.config import RakutenApiConfig, RakutenItem
+from my_lib.store.rakuten.credentials import RakutenApiConfig
+from my_lib.store.rakuten.models import RakutenItem
 
 
 class SortOrder(Enum):

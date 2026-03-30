@@ -20,12 +20,12 @@ def create_app(config_file):
     import flask
     import flask_cors
 
+    import my_lib.config
     import my_lib.webapp.config
 
     config = my_lib.config.load(config_file)
-
-    my_lib.webapp.config.URL_PREFIX = WEBAPP_URL_PREFIX
-    my_lib.webapp.config.init(config)
+    webapp_config = my_lib.webapp.config.WebappConfig.parse(config["webapp"])
+    environment = my_lib.webapp.config.build_environment(webapp_config, url_prefix=WEBAPP_URL_PREFIX)
 
     import data.sample_webapp  # ty: ignore[unresolved-import]
     import my_lib.notify.slack
@@ -41,7 +41,9 @@ def create_app(config_file):
 
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
-        my_lib.webapp.log.init(slack_config)
+        if environment.log_file_path is None:
+            raise RuntimeError("webapp.data.log_file_path is required")
+        my_lib.webapp.log.init(slack_config, environment.log_file_path)
 
         def notify_terminate():  # pragma: no cover
             my_lib.webapp.log.info("🏃 アプリを再起動します．")
@@ -58,13 +60,13 @@ def create_app(config_file):
 
     app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
 
-    app.register_blueprint(my_lib.webapp.base.blueprint, url_prefix=my_lib.webapp.config.URL_PREFIX)
-    app.register_blueprint(my_lib.webapp.base.blueprint_default)
-    app.register_blueprint(my_lib.webapp.event.blueprint, url_prefix=my_lib.webapp.config.URL_PREFIX)
-    app.register_blueprint(my_lib.webapp.log.blueprint, url_prefix=my_lib.webapp.config.URL_PREFIX)
-    app.register_blueprint(my_lib.webapp.util.blueprint, url_prefix=my_lib.webapp.config.URL_PREFIX)
+    app.register_blueprint(my_lib.webapp.base.create_static_blueprint(environment=environment))
+    app.register_blueprint(my_lib.webapp.base.create_root_redirect_blueprint(url_prefix=WEBAPP_URL_PREFIX))
+    app.register_blueprint(my_lib.webapp.event.blueprint, url_prefix=WEBAPP_URL_PREFIX)
+    app.register_blueprint(my_lib.webapp.log.blueprint, url_prefix=WEBAPP_URL_PREFIX)
+    app.register_blueprint(my_lib.webapp.util.blueprint, url_prefix=WEBAPP_URL_PREFIX)
 
-    app.register_blueprint(data.sample_webapp.blueprint, url_prefix=my_lib.webapp.config.URL_PREFIX)
+    app.register_blueprint(data.sample_webapp.blueprint, url_prefix=WEBAPP_URL_PREFIX)
 
     return app
 

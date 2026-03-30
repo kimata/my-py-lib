@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-03-22T00:13:42.074405702Z"
+exclude-newer = "2026-03-22T12:08:08.474634447Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -106,33 +106,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/b5/6d55e80f6d8a08ce22b982eafa278d823b541c925f11ee774b0b9c43473d/aiosignal-1.3.2.tar.gz", hash = "sha256:a8c255c66fafb1e499c9351d0bf32ff2d8a0321595ebac3b93713656d2436f54", size = 19424, upload-time = "2024-12-13T17:10:40.86Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/6a/bc7e17a3e87a2985d3e8f4da4cd0f481060eb78fb08596c42be62c90a4d9/aiosignal-1.3.2-py2.py3-none-any.whl", hash = "sha256:45cde58e409a301715980c2b01d0c28bdde3770d8290b5eb2173759d9acb31a5", size = 7597, upload-time = "2024-12-13T17:10:38.469Z" },
-]
-
-[[package]]
-name = "amazon-paapi5"
-version = "1.1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "amightygirl-paapi5-python-sdk" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/54/47/e9de691e36985ad9397a52f63064a28c5d160020bbe695236af7c78b792b/amazon-paapi5-1.1.2.tar.gz", hash = "sha256:5a4fce03a664b49e9ac0409c91014ea7ae91aa1c0868047c919b1b135e51ce75", size = 13512, upload-time = "2020-03-12T07:13:28.252Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/be/a9d5f366eb7b59cdff8123b4a15fe4fa5354fd5e3d4604ec9aaa02cfe3e6/amazon_paapi5-1.1.2-py3-none-any.whl", hash = "sha256:7a747c5e82db11b7ac77c74eec04b80456de06eca272254157be644bfa87cff9", size = 13278, upload-time = "2020-03-12T07:13:27.394Z" },
-]
-
-[[package]]
-name = "amightygirl-paapi5-python-sdk"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "certifi" },
-    { name = "python-dateutil" },
-    { name = "six" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/12/a3/80923767044df21f8d80c84a25f2995d7f433cb8c2f3416e61c824b141c5/amightygirl.paapi5-python-sdk-1.0.0.tar.gz", hash = "sha256:9d1f03bca56911e1dc779e81202260988cfea3f48bc71d5fb5688e2ee79c709b", size = 52032, upload-time = "2019-12-06T15:47:24.533Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/c3/382bef55a6d94584b2c23812cf06da8250f29061a6bfb36dc5764a633368/amightygirl.paapi5_python_sdk-1.0.0-py3-none-any.whl", hash = "sha256:03703b228f8f93f1d3473e98054ebde7a4ca3184dd7f3645b4b95f4cdf9229d1", size = 179813, upload-time = "2019-12-06T15:47:21.888Z" },
 ]
 
 [[package]]
@@ -1308,7 +1281,6 @@ dependencies = [
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pyserial" },
-    { name = "python-amazon-paapi" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1322,7 +1294,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "amazon-paapi5" },
     { name = "flaky" },
     { name = "flask" },
     { name = "flask-cors" },
@@ -1342,6 +1313,7 @@ dev = [
     { name = "pytest-rerunfailures" },
     { name = "pytest-timeout" },
     { name = "pytest-xdist" },
+    { name = "python-amazon-paapi" },
     { name = "rpi-lgpio" },
     { name = "selenium" },
     { name = "speechrecognition" },
@@ -1369,7 +1341,6 @@ requires-dist = [
     { name = "psutil", specifier = ">=7.2.1" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pyserial", specifier = ">=3.5" },
-    { name = "python-amazon-paapi", specifier = ">=6.2.0" },
     { name = "pytz", specifier = ">=2025.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "requests", specifier = ">=2.32.5" },
@@ -1383,7 +1354,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "amazon-paapi5", specifier = ">=1.1.2" },
     { name = "flaky", specifier = ">=3.8.1" },
     { name = "flask", specifier = ">=3.1.2" },
     { name = "flask-cors", specifier = ">=6.0.2" },
@@ -1403,6 +1373,7 @@ dev = [
     { name = "pytest-rerunfailures", specifier = ">=16.1" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "python-amazon-paapi", specifier = ">=6.2.0" },
     { name = "rpi-lgpio", specifier = ">=0.6" },
     { name = "selenium", specifier = ">=4.39.0" },
     { name = "speechrecognition", specifier = ">=3.14.5" },

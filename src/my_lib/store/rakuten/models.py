@@ -1,30 +1,10 @@
 #!/usr/bin/env python3
-"""楽天市場関連の設定を表す dataclass 定義."""
+"""Rakuten item models."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Self
-
-
-@dataclass(frozen=True)
-class RakutenApiConfig:
-    """楽天市場 API 用の設定."""
-
-    application_id: str
-    affiliate_id: str | None = None
-
-    @classmethod
-    def parse(cls, rakuten_config: dict[str, Any]) -> Self:
-        """dict から RakutenApiConfig を生成する.
-
-        Args:
-            rakuten_config: config["store"]["rakuten"] の値
-        """
-        return cls(
-            application_id=rakuten_config["application_id"],
-            affiliate_id=rakuten_config.get("affiliate_id"),
-        )
 
 
 @dataclass(frozen=True)
@@ -43,24 +23,19 @@ class RakutenItem:
 
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
-        """API レスポンスの Items 要素から RakutenItem を生成する.
-
-        Args:
-            data: formatVersion=2 の場合の商品データ
-        """
-        # サムネイル画像 URL（中サイズを優先）
+        """API レスポンスの Items 要素から RakutenItem を生成する."""
         thumb_url = None
         medium_urls = data.get("mediumImageUrls")
-        if medium_urls and len(medium_urls) > 0:
+        if isinstance(medium_urls, list) and medium_urls:
             thumb_url = medium_urls[0]
         else:
             small_urls = data.get("smallImageUrls")
-            if small_urls and len(small_urls) > 0:
+            if isinstance(small_urls, list) and small_urls:
                 thumb_url = small_urls[0]
 
         return cls(
-            name=data["itemName"],
-            url=data["itemUrl"],
+            name=str(data["itemName"]),
+            url=str(data["itemUrl"]),
             price=int(data["itemPrice"]),
             thumb_url=thumb_url,
             review_rate=data.get("reviewAverage"),

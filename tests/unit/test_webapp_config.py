@@ -1,98 +1,64 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101
-"""
-my_lib.webapp.config モジュールのユニットテスト
-"""
+"""my_lib.webapp.config モジュールのユニットテスト."""
 
 from __future__ import annotations
 
 import flask
 
 
-class TestConstants:
-    """定数のテスト"""
+class TestWebappConfig:
+    """WebappConfig / WebappDataConfig のテスト"""
 
-    def test_url_prefix_default(self):
-        """URL_PREFIX のデフォルト値"""
-        from my_lib.webapp.config import URL_PREFIX
-
-        # デフォルトは None
-        assert URL_PREFIX is None
-
-    def test_zoneinfo_exists(self):
-        """ZONEINFO が存在する"""
-        from my_lib.webapp.config import ZONEINFO
-
-        assert ZONEINFO is not None
-
-    def test_pytz_exists(self):
-        """PYTZ が存在する"""
-        from my_lib.webapp.config import PYTZ
-
-        assert PYTZ is not None
-
-
-class TestInit:
-    """init 関数のテスト"""
-
-    def test_sets_static_dir_path(self, temp_dir):
-        """STATIC_DIR_PATH を設定する"""
+    def test_parse(self, temp_dir):
+        """dict から設定を生成できる"""
         import my_lib.webapp.config
 
-        config_dict = {"static_dir_path": str(temp_dir / "static")}
-        config = my_lib.webapp.config.WebappConfig.parse(config_dict)
+        config = my_lib.webapp.config.WebappConfig.parse(
+            {
+                "static_dir_path": str(temp_dir / "static"),
+                "external_url": "https://example.com/app",
+                "data": {
+                    "schedule_file_path": str(temp_dir / "schedule.yaml"),
+                    "log_file_path": str(temp_dir / "log.db"),
+                    "stat_dir_path": str(temp_dir / "stat"),
+                },
+            }
+        )
 
-        my_lib.webapp.config.init(config)
+        assert config.static_dir_path == (temp_dir / "static").resolve()
+        assert config.external_url == "https://example.com/app"
+        assert config.data is not None
+        assert config.data.schedule_file_path == (temp_dir / "schedule.yaml").resolve()
+        assert config.data.log_file_path == (temp_dir / "log.db").resolve()
+        assert config.data.stat_dir_path == (temp_dir / "stat").resolve()
 
-        assert my_lib.webapp.config.STATIC_DIR_PATH is not None
 
-    def test_sets_schedule_file_path(self, temp_dir):
-        """SCHEDULE_FILE_PATH を設定する"""
+class TestBuildEnvironment:
+    """build_environment 関数のテスト"""
+
+    def test_sets_runtime_paths(self, temp_dir):
+        """runtime environment を組み立てる"""
         import my_lib.webapp.config
 
-        config_dict = {
-            "static_dir_path": str(temp_dir / "static"),
-            "data": {
-                "schedule_file_path": str(temp_dir / "schedule.yaml"),
-            },
-        }
-        config = my_lib.webapp.config.WebappConfig.parse(config_dict)
+        config = my_lib.webapp.config.WebappConfig.parse(
+            {
+                "static_dir_path": str(temp_dir / "static"),
+                "data": {
+                    "schedule_file_path": str(temp_dir / "schedule.yaml"),
+                    "log_file_path": str(temp_dir / "log.db"),
+                    "stat_dir_path": str(temp_dir / "stat"),
+                },
+            }
+        )
 
-        my_lib.webapp.config.init(config)
+        environment = my_lib.webapp.config.build_environment(config, url_prefix="/test")
 
-        assert my_lib.webapp.config.SCHEDULE_FILE_PATH is not None
-
-    def test_sets_log_dir_path(self, temp_dir):
-        """LOG_DIR_PATH を設定する"""
-        import my_lib.webapp.config
-
-        config_dict = {
-            "static_dir_path": str(temp_dir / "static"),
-            "data": {
-                "log_file_path": str(temp_dir / "log.db"),
-            },
-        }
-        config = my_lib.webapp.config.WebappConfig.parse(config_dict)
-
-        my_lib.webapp.config.init(config)
-
-        assert my_lib.webapp.config.LOG_DIR_PATH is not None
-
-    def test_sets_stat_dir_path(self, temp_dir):
-        """STAT_DIR_PATH を設定する"""
-        import my_lib.webapp.config
-
-        config_dict = {
-            "static_dir_path": str(temp_dir / "static"),
-            "data": {
-                "stat_dir_path": str(temp_dir / "stat"),
-            },
-        }
-        config = my_lib.webapp.config.WebappConfig.parse(config_dict)
-
-        my_lib.webapp.config.init(config)
-
-        assert my_lib.webapp.config.STAT_DIR_PATH is not None
+        assert environment.url_prefix == "/test"
+        assert environment.static_dir_path == (temp_dir / "static").resolve()
+        assert environment.schedule_file_path == (temp_dir / "schedule.yaml").resolve()
+        assert environment.log_file_path == (temp_dir / "log.db").resolve()
+        assert environment.stat_dir_path == (temp_dir / "stat").resolve()
 
 
 class TestShowHandlerList:

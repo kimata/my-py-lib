@@ -13,7 +13,6 @@ import uptime
 
 import my_lib.flask_util
 import my_lib.time
-import my_lib.webapp.config
 
 blueprint = flask.Blueprint("webapp-util", __name__)
 
