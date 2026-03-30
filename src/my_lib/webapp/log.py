@@ -82,6 +82,7 @@ class LogManager:
     def __init__(self) -> None:
         self._slack_config: my_lib.notify.slack.SlackConfigTypes = my_lib.notify.slack.SlackEmptyConfig()
         self._worker_states: dict[str | None, WorkerLogState] = {}
+        self._db_base_path: pathlib.Path | None = None
 
     @property
     def slack_config(self) -> my_lib.notify.slack.SlackConfigTypes:
@@ -133,16 +134,14 @@ class LogManager:
 
     def get_db_path(self) -> pathlib.Path:
         """データベースパスを取得する（ワーカー ID に応じたパスを返す）"""
-        base_path = my_lib.webapp.config.LOG_DIR_PATH
-
-        if base_path is None:
-            raise RuntimeError("LOG_DIR_PATH is not initialized. Call init() first.")
-
-        return my_lib.pytest_util.get_path(base_path)
+        if self._db_base_path is None:
+            raise RuntimeError("LogManager is not initialized. Call init() first.")
+        return my_lib.pytest_util.get_path(self._db_base_path)
 
     def init(
         self,
         slack_config: my_lib.notify.slack.SlackConfigTypes,
+        db_base_path: pathlib.Path,
         is_read_only: bool = False,
     ) -> None:
         """ログシステムを初期化する
@@ -152,6 +151,7 @@ class LogManager:
             is_read_only: 読み取り専用モード
         """
         self._slack_config = slack_config
+        self._db_base_path = db_base_path
 
         db_path = self.get_db_path()
         # 初回のみsqlite_util.connectを使用してデータベースを初期化
@@ -416,6 +416,7 @@ def _get_worker_id() -> str:
 
 def init(
     slack_config: my_lib.notify.slack.SlackConfigTypes,
+    db_base_path: pathlib.Path,
     is_read_only: bool = False,
 ) -> None:
     """ログシステムを初期化する
@@ -424,7 +425,7 @@ def init(
         slack_config: Slack 設定
         is_read_only: 読み取り専用モード
     """
-    _manager.init(slack_config, is_read_only)
+    _manager.init(slack_config, db_base_path, is_read_only)
 
 
 def _init_impl() -> None:
@@ -592,6 +593,7 @@ def api_log_view() -> flask.Response:
 
 def test_run(
     slack_config: my_lib.notify.slack.SlackConfigTypes,
+    db_base_path: pathlib.Path,
     port: int,
     debug_mode: bool,
 ) -> None:
@@ -603,7 +605,7 @@ def test_run(
     # NOTE: アクセスログは無効にする
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-    my_lib.webapp.log.init(slack_config)
+    my_lib.webapp.log.init(slack_config, db_base_path)
 
     flask_cors.CORS(app)
 
@@ -639,11 +641,6 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    import my_lib.webapp.config
-
-    my_lib.webapp.config.URL_PREFIX = "/test"
-    my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.parse(config["webapp"]))
-
     import my_lib.webapp.base
     import my_lib.webapp.event
     import my_lib.webapp.log
@@ -657,7 +654,12 @@ if __name__ == "__main__":
 
     assert config is not None, "Config must be loaded before running test"  # noqa: S101
     slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
-    proc = multiprocessing.Process(target=lambda: test_run(slack_config, port, debug_mode))
+    webapp_config = my_lib.webapp.config.WebappConfig.parse(config["webapp"])
+
+    db_base_path = webapp_config.data.log_file_path if webapp_config.data is not None else None
+    assert db_base_path is not None, "webapp.data.log_file_path is required"  # noqa: S101
+    # NOTE: assert による絞り込みは lambda に伝搬しない (mypy/ty の既知制限)
+    proc = multiprocessing.Process(target=lambda: test_run(slack_config, db_base_path, port, debug_mode))  # type: ignore[arg-type]
     proc.start()
 
     time.sleep(0.5)

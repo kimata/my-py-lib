@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # ruff: noqa: S101, S105, S106
-"""
-my_lib.store.amazon.config モジュールのユニットテスト
-"""
+"""my_lib.store.amazon credential / model modules のユニットテスト."""
 
 from __future__ import annotations
 
@@ -12,7 +10,7 @@ class TestAmazonApiConfig:
 
     def test_creates_instance(self):
         """インスタンスを作成できる"""
-        from my_lib.store.amazon.config import AmazonApiConfig
+        from my_lib.store.amazon.credentials import AmazonApiConfig
 
         config = AmazonApiConfig(
             credential_id="credential_id",
@@ -26,7 +24,7 @@ class TestAmazonApiConfig:
 
     def test_parse(self):
         """dict から生成できる"""
-        from my_lib.store.amazon.config import AmazonApiConfig
+        from my_lib.store.amazon.credentials import AmazonApiConfig
 
         data = {
             "credential_id": "credential_id",
@@ -46,7 +44,7 @@ class TestAmazonLoginConfig:
 
     def test_creates_instance(self, temp_dir):
         """インスタンスを作成できる"""
-        from my_lib.store.amazon.config import AmazonLoginConfig
+        from my_lib.store.amazon.credentials import AmazonLoginConfig
 
         config = AmazonLoginConfig(
             user="user@example.com",
@@ -60,7 +58,7 @@ class TestAmazonLoginConfig:
 
     def test_parse(self, temp_dir):
         """dict から生成できる"""
-        from my_lib.store.amazon.config import AmazonLoginConfig
+        from my_lib.store.amazon.credentials import AmazonLoginConfig
 
         data = {
             "user": "user@example.com",
@@ -79,7 +77,7 @@ class TestAmazonItem:
 
     def test_creates_instance(self):
         """インスタンスを作成できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         item = AmazonItem(
             asin="B0G3SXHCLJ",
@@ -96,7 +94,7 @@ class TestAmazonItem:
 
     def test_creates_instance_with_optional_fields(self):
         """オプションフィールド付きでインスタンスを作成できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         item = AmazonItem(
             asin="B0G3SXHCLJ",
@@ -114,7 +112,7 @@ class TestAmazonItem:
 
     def test_from_asin(self):
         """ASIN から生成できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         item = AmazonItem.from_asin("B0G3SXHCLJ")
 
@@ -123,7 +121,7 @@ class TestAmazonItem:
 
     def test_parse(self):
         """dict から生成できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         data = {
             "asin": "B0G3SXHCLJ",
@@ -140,7 +138,7 @@ class TestAmazonItem:
 
     def test_parse_with_custom_url(self):
         """カスタム URL 付きの dict から生成できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         data = {
             "asin": "B0G3SXHCLJ",
@@ -153,7 +151,7 @@ class TestAmazonItem:
 
     def test_to_dict(self):
         """dict に変換できる"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         item = AmazonItem(
             asin="B0G3SXHCLJ",
@@ -173,7 +171,7 @@ class TestAmazonItem:
 
     def test_to_dict_excludes_none_values(self):
         """None の値は dict に含まれない"""
-        from my_lib.store.amazon.config import AmazonItem
+        from my_lib.store.amazon.models import AmazonItem
 
         item = AmazonItem(
             asin="B0G3SXHCLJ",
@@ -194,7 +192,7 @@ class TestSearchResultItem:
 
     def test_creates_instance(self):
         """インスタンスを作成できる"""
-        from my_lib.store.amazon.config import SearchResultItem
+        from my_lib.store.amazon.models import SearchResultItem
 
         item = SearchResultItem(
             name="テスト商品",
@@ -210,7 +208,7 @@ class TestSearchResultItem:
 
     def test_creates_instance_with_none_values(self):
         """price と thumb_url が None でもインスタンスを作成できる"""
-        from my_lib.store.amazon.config import SearchResultItem
+        from my_lib.store.amazon.models import SearchResultItem
 
         item = SearchResultItem(
             name="テスト商品",
@@ -228,7 +226,7 @@ class TestSearchResultItem:
         """frozen=True であることを確認"""
         import dataclasses
 
-        from my_lib.store.amazon.config import SearchResultItem
+        from my_lib.store.amazon.models import SearchResultItem
 
         item = SearchResultItem(
             name="テスト商品",
@@ -250,31 +248,31 @@ class TestDummyAmazonItem:
 
     def test_exists(self):
         """存在する"""
-        from my_lib.store.amazon.config import DUMMY_AMAZON_ITEM
+        from my_lib.store.amazon.models import DUMMY_AMAZON_ITEM
 
         assert DUMMY_AMAZON_ITEM is not None
 
     def test_has_correct_asin(self):
         """正しい ASIN を持つ"""
-        from my_lib.store.amazon.config import DUMMY_AMAZON_ITEM
+        from my_lib.store.amazon.models import DUMMY_AMAZON_ITEM
 
         assert DUMMY_AMAZON_ITEM.asin == "B0G3SXHCLJ"
 
     def test_has_correct_url(self):
         """正しい URL を持つ"""
-        from my_lib.store.amazon.config import DUMMY_AMAZON_ITEM
+        from my_lib.store.amazon.models import DUMMY_AMAZON_ITEM
 
         assert DUMMY_AMAZON_ITEM.url == "https://www.amazon.co.jp/dp/B0G3SXHCLJ"
 
     def test_has_price(self):
         """価格を持つ"""
-        from my_lib.store.amazon.config import DUMMY_AMAZON_ITEM
+        from my_lib.store.amazon.models import DUMMY_AMAZON_ITEM
 
         assert DUMMY_AMAZON_ITEM.price is not None
         assert DUMMY_AMAZON_ITEM.price > 0
 
     def test_has_category(self):
         """カテゴリを持つ"""
-        from my_lib.store.amazon.config import DUMMY_AMAZON_ITEM
+        from my_lib.store.amazon.models import DUMMY_AMAZON_ITEM
 
         assert DUMMY_AMAZON_ITEM.category is not None

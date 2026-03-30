@@ -35,7 +35,7 @@ import selenium.webdriver.support.wait
 import my_lib.notify.slack
 import my_lib.selenium_util
 import my_lib.store.amazon.captcha
-from my_lib.store.amazon.config import AmazonItem
+from my_lib.store.amazon.models import AmazonItem
 
 if TYPE_CHECKING:
     from typing import Any

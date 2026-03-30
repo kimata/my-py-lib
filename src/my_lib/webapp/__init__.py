@@ -4,4 +4,5 @@ NOTE: Submodules are not auto-imported to avoid requiring Flask for non-web usag
 Import specific modules as needed: `from my_lib.webapp import base`
 """
 
+from my_lib.webapp import config as config
 from my_lib.webapp import event as event

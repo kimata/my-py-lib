@@ -9,23 +9,14 @@ from typing import Any, Self
 
 import flask
 
-import my_lib.time
 
-URL_PREFIX: str | None = None
-
-ZONEINFO = my_lib.time.get_zoneinfo()
-PYTZ = my_lib.time.get_pytz()
-
-STATIC_DIR_PATH: pathlib.Path | None = None
-
-SCHEDULE_FILE_PATH: pathlib.Path | None = None
-LOG_DIR_PATH: pathlib.Path | None = None
-STAT_DIR_PATH: pathlib.Path | None = None
+def _resolve_path(value: str | pathlib.Path) -> pathlib.Path:
+    return pathlib.Path(value).resolve()
 
 
 @dataclass(frozen=True)
 class WebappDataConfig:
-    """webapp.data セクションの設定"""
+    """Runtime data paths for a web application."""
 
     schedule_file_path: pathlib.Path | None = None
     log_file_path: pathlib.Path | None = None
@@ -34,17 +25,17 @@ class WebappDataConfig:
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
-            schedule_file_path=pathlib.Path(data["schedule_file_path"]).resolve()
+            schedule_file_path=_resolve_path(data["schedule_file_path"])
             if "schedule_file_path" in data
             else None,
-            log_file_path=pathlib.Path(data["log_file_path"]).resolve() if "log_file_path" in data else None,
-            stat_dir_path=pathlib.Path(data["stat_dir_path"]).resolve() if "stat_dir_path" in data else None,
+            log_file_path=_resolve_path(data["log_file_path"]) if "log_file_path" in data else None,
+            stat_dir_path=_resolve_path(data["stat_dir_path"]) if "stat_dir_path" in data else None,
         )
 
 
 @dataclass(frozen=True)
 class WebappConfig:
-    """webapp セクションの設定"""
+    """Parsed webapp configuration."""
 
     static_dir_path: pathlib.Path
     data: WebappDataConfig | None = None
@@ -53,29 +44,37 @@ class WebappConfig:
     @classmethod
     def parse(cls, data: dict[str, Any]) -> Self:
         return cls(
-            static_dir_path=pathlib.Path(data["static_dir_path"]).resolve(),
+            static_dir_path=_resolve_path(data["static_dir_path"]),
             data=WebappDataConfig.parse(data["data"]) if "data" in data else None,
             external_url=data.get("external_url"),
         )
 
 
-def init(config: WebappConfig) -> None:
-    global STATIC_DIR_PATH
-    global SCHEDULE_FILE_PATH
-    global LOG_DIR_PATH
-    global STAT_DIR_PATH
+@dataclass(frozen=True)
+class WebappEnvironment:
+    """Concrete runtime environment for a web application."""
 
-    STATIC_DIR_PATH = config.static_dir_path
+    url_prefix: str | None
+    static_dir_path: pathlib.Path
+    schedule_file_path: pathlib.Path | None = None
+    log_file_path: pathlib.Path | None = None
+    stat_dir_path: pathlib.Path | None = None
 
-    if config.data is not None:
-        SCHEDULE_FILE_PATH = config.data.schedule_file_path
-        LOG_DIR_PATH = config.data.log_file_path
-        STAT_DIR_PATH = config.data.stat_dir_path
 
-    logging.info("STATIC_DIR_PATH = %s", STATIC_DIR_PATH)
-    logging.info("SCHEDULE_FILE_PATH = %s", SCHEDULE_FILE_PATH)
-    logging.info("LOG_DIR_PATH = %s", LOG_DIR_PATH)
-    logging.info("STAT_DIR_PATH = %s", STAT_DIR_PATH)
+def build_environment(config: WebappConfig, *, url_prefix: str | None = None) -> WebappEnvironment:
+    data = config.data
+    environment = WebappEnvironment(
+        url_prefix=url_prefix,
+        static_dir_path=config.static_dir_path,
+        schedule_file_path=data.schedule_file_path if data is not None else None,
+        log_file_path=data.log_file_path if data is not None else None,
+        stat_dir_path=data.stat_dir_path if data is not None else None,
+    )
+    logging.info("static_dir_path = %s", environment.static_dir_path)
+    logging.info("schedule_file_path = %s", environment.schedule_file_path)
+    logging.info("log_file_path = %s", environment.log_file_path)
+    logging.info("stat_dir_path = %s", environment.stat_dir_path)
+    return environment
 
 
 def show_handler_list(app: flask.Flask, is_force: bool = False) -> None:

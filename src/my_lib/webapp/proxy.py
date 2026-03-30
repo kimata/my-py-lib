@@ -229,11 +229,6 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    import my_lib.webapp.config
-
-    my_lib.webapp.config.URL_PREFIX = "/test"
-    my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.parse(config["webapp"]))
-
     import my_lib.webapp.base
     import my_lib.webapp.log
     import my_lib.webapp.proxy
@@ -242,8 +237,13 @@ if __name__ == "__main__":
     base_url = {"log": f"http://127.0.0.1:{log_port}/test", "proxy": f"http://127.0.0.1:{port}/test"}
 
     slack_config = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
+    webapp_config = my_lib.webapp.config.WebappConfig.parse(config["webapp"])
+
+    log_db_path = webapp_config.data.log_file_path if webapp_config.data is not None else None
+    assert log_db_path is not None, "webapp.data.log_file_path is required"  # noqa: S101
     log_proc = multiprocessing.Process(
-        target=lambda: my_lib.webapp.log.test_run(slack_config, log_port, debug_mode)
+        # NOTE: assert による絞り込みは lambda に伝搬しない (mypy/ty の既知制限)
+        target=lambda: my_lib.webapp.log.test_run(slack_config, log_db_path, log_port, debug_mode)  # type: ignore[arg-type]
     )
     log_proc.start()
 

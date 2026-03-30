@@ -10,14 +10,18 @@ import flask
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def reset_log_manager(monkeypatch):
+    """各テストで module-level manager を初期化し直す"""
+    import my_lib.webapp.log as log_module
+
+    monkeypatch.setattr(log_module, "_manager", log_module.LogManager())
+
+
 @pytest.fixture
 def log_db_path(temp_dir):
-    """テスト用のログデータベースパスを設定する"""
-    import my_lib.webapp.config
-
-    db_path = temp_dir / "log.db"
-    my_lib.webapp.config.LOG_DIR_PATH = db_path
-    yield db_path
+    """テスト用のログデータベースパスを返す"""
+    return temp_dir / "log.db"
 
 
 class TestLogLevel:
@@ -72,9 +76,11 @@ class TestLogManager:
 
     def test_get_db_path(self, log_db_path, monkeypatch):
         """データベースパスの取得"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import LogManager
 
         manager = LogManager()
+        manager.init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         # 環境変数がない場合はパスがそのまま返される
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
@@ -83,30 +89,25 @@ class TestLogManager:
 
     def test_get_db_path_with_worker_id(self, log_db_path, monkeypatch):
         """ワーカー ID がある場合のデータベースパスの取得"""
+        from my_lib.notify.slack import SlackEmptyConfig
         from my_lib.webapp.log import LogManager
 
         manager = LogManager()
+        manager.init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw1")
         db_path = manager.get_db_path()
         assert str(db_path).endswith(".gw1")
 
     def test_get_db_path_raises_without_init(self, monkeypatch):
-        """LOG_DIR_PATH が未設定の場合はエラー"""
-        import my_lib.webapp.config
+        """初期化前はエラー"""
         from my_lib.webapp.log import LogManager
 
-        original = my_lib.webapp.config.LOG_DIR_PATH
-        my_lib.webapp.config.LOG_DIR_PATH = None
+        manager = LogManager()
+        monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        try:
-            manager = LogManager()
-            monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
-
-            with pytest.raises(RuntimeError, match="LOG_DIR_PATH is not initialized"):
-                manager.get_db_path()
-        finally:
-            my_lib.webapp.config.LOG_DIR_PATH = original
+        with pytest.raises(RuntimeError, match="LogManager is not initialized. Call init\\(\\) first."):
+            manager.get_db_path()
 
 
 class TestInit:
@@ -119,7 +120,7 @@ class TestInit:
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init(SlackEmptyConfig(), is_read_only=False)
+        init(SlackEmptyConfig(), log_db_path, is_read_only=False)
 
         # ワーカー ID がデフォルトで "main" になるため、test_worker_main ディレクトリに作成される
         db_path = _manager.get_db_path()
@@ -135,7 +136,7 @@ class TestInit:
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init(SlackEmptyConfig(), is_read_only=True)
+        init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         # ワーカー ID がデフォルトで "main" になるため、test_worker_main ディレクトリに作成される
         db_path = _manager.get_db_path()
@@ -225,7 +226,7 @@ class TestGet:
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init(SlackEmptyConfig(), is_read_only=True)
+        init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         logs = _manager.get()
         assert logs == []
@@ -241,7 +242,7 @@ class TestClear:
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
 
-        init(SlackEmptyConfig(), is_read_only=True)
+        init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         # クリア（例外が発生しなければ OK）
         _manager.clear()
@@ -259,9 +260,11 @@ class TestModuleFunctions:
 
     def test_get_db_path(self, log_db_path, monkeypatch):
         """_get_db_path が動作する"""
-        from my_lib.webapp.log import _get_db_path
+        from my_lib.notify.slack import SlackEmptyConfig
+        from my_lib.webapp.log import _get_db_path, init
 
         monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+        init(SlackEmptyConfig(), log_db_path, is_read_only=True)
         db_path = _get_db_path()
         assert db_path == log_db_path
 
@@ -280,7 +283,7 @@ class TestApiEndpoints:
         app.config["TEST"] = True
         app.register_blueprint(log_module.blueprint)
 
-        log_module.init(SlackEmptyConfig(), is_read_only=True)
+        log_module.init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         with app.test_client() as client:
             response = client.get("/api/log_view")
@@ -300,7 +303,7 @@ class TestApiEndpoints:
         app.config["TEST"] = False
         app.register_blueprint(log_module.blueprint)
 
-        log_module.init(SlackEmptyConfig(), is_read_only=True)
+        log_module.init(SlackEmptyConfig(), log_db_path, is_read_only=True)
 
         with app.test_client() as client:
             response = client.post("/api/log_add", data={"message": "test"})

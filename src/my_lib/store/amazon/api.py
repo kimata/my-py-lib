@@ -22,7 +22,8 @@ from typing import TYPE_CHECKING, Any
 import amazon_creatorsapi
 import amazon_creatorsapi.models
 
-from my_lib.store.amazon.config import AmazonApiConfig, AmazonItem, SearchResultItem
+from my_lib.store.amazon.credentials import AmazonApiConfig
+from my_lib.store.amazon.models import AmazonItem, SearchResultItem
 from my_lib.store.amazon.util import get_item_url
 
 if TYPE_CHECKING:

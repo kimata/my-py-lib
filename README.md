@@ -125,16 +125,25 @@ slack.send("🌡️ 温度アラート: 30°Cを超えました！")
 
 ### Webアプリケーション
 
+旧 `my_lib.webapp.config.init(...)` / `URL_PREFIX` / `STATIC_DIR_PATH` を使っていたプロジェクトは
+[`MIGRATION-webapp-config.md`](./MIGRATION-webapp-config.md)
+を参照してください。
+
 ```python
 import flask
 import my_lib.webapp.config
+import my_lib.webapp.base
 import my_lib.flask_util
 
 app = flask.Flask(__name__)
 
-# webapp設定を初期化
+# webapp設定を parse して runtime environment を組み立てる
 config = my_lib.config.load("config.yaml")
-my_lib.webapp.config.init(my_lib.webapp.config.WebappConfig.parse(config["webapp"]))
+webapp_config = my_lib.webapp.config.WebappConfig.parse(config["webapp"])
+environment = my_lib.webapp.config.build_environment(webapp_config, url_prefix="/my-app")
+
+app.register_blueprint(my_lib.webapp.base.create_static_blueprint(environment=environment), url_prefix="/my-app")
+app.register_blueprint(my_lib.webapp.base.create_root_redirect_blueprint(url_prefix="/my-app"))
 
 @app.route("/health")
 def health():
@@ -170,10 +179,10 @@ notify:
         channel_token: "${LINE_CHANNEL_TOKEN}"
 
 webapp:
-    log_dir: "./logs"
-    compress_types:
-        - "text/html"
-        - "application/json"
+    static_dir_path: "./frontend/dist"
+    data:
+        log_file_path: "./data/webapp-log.db"
+        stat_dir_path: "./data/stat"
 ```
 
 ## 対応センサー
