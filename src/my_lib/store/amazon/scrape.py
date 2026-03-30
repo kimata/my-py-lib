@@ -26,6 +26,7 @@ import traceback
 from typing import TYPE_CHECKING
 
 import PIL.Image
+import selenium.common.exceptions
 import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
@@ -247,6 +248,34 @@ def _fetch_price_impl(
     return True
 
 
+_FOOTER_XPATH = '//div[contains(@class, "footer") or contains(@class, "Footer")]'
+_BOT_DETECT_SUBMIT_XPATH = '//form[contains(@action, "/errors/validateCaptcha")]//button[@type="submit"]'
+
+
+def _wait_for_product_page(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> None:
+    """商品ページのフッターが表示されるまで待機（ボット検出ページのハンドリング付き）"""
+    try:
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
+            )
+        )
+    except selenium.common.exceptions.TimeoutException:
+        # ボット検出ページ（「ショッピングを続ける」ボタン付きの validateCaptcha フォーム）
+        if my_lib.selenium_util.click_xpath(driver, _BOT_DETECT_SUBMIT_XPATH, is_warn=False):
+            logging.warning("Bot detection page detected, clicking continue: %s", driver.current_url)
+            wait.until(
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
+                )
+            )
+        else:
+            raise
+
+
 def fetch_price(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
@@ -257,14 +286,7 @@ def fetch_price(
 ) -> AmazonItem:
     try:
         with my_lib.selenium_util.browser_tab(driver, item.url):
-            wait.until(
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (
-                        selenium.webdriver.common.by.By.XPATH,
-                        '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-                    )
-                )
-            )
+            _wait_for_product_page(driver, wait)
 
             _fetch_price_impl(driver, wait, slack_config, item)
 
