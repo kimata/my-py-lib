@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 import amazon_creatorsapi
 import amazon_creatorsapi.models
 
-from my_lib.store.amazon.credentials import AmazonApiConfig
+from my_lib.store.amazon.credentials import AmazonApiConfig, SupportsAmazonApiConfig
 from my_lib.store.amazon.models import AmazonItem, SearchResultItem
 from my_lib.store.amazon.util import get_item_url
 
@@ -44,7 +44,7 @@ _GET_ITEMS_RESOURCES: list[amazon_creatorsapi.models.GetItemsResource] = [
 ]
 
 
-def _get_api(config: AmazonApiConfig) -> amazon_creatorsapi.AmazonCreatorsApi:
+def _get_api(config: SupportsAmazonApiConfig) -> amazon_creatorsapi.AmazonCreatorsApi:
     return amazon_creatorsapi.AmazonCreatorsApi(
         credential_id=config.credential_id,
         credential_secret=config.credential_secret,
@@ -83,7 +83,7 @@ def _get_thumb_url(item_data: Any) -> str | None:
         return None
 
 
-def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
+def _fetch_price_outlet(config: SupportsAmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     """Amazonアウトレットの価格を取得する.
 
     Creators API には USED condition がないため、ANY で取得し
@@ -146,7 +146,7 @@ def _fetch_price_outlet(config: AmazonApiConfig, asin_list: list[str]) -> dict[s
     return price_map
 
 
-def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
+def fetch_price_new(config: SupportsAmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     if len(asin_list) == 0:
         return {}
 
@@ -201,7 +201,7 @@ def fetch_price_new(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, 
     return price_map
 
 
-def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
+def fetch_price(config: SupportsAmazonApiConfig, asin_list: list[str]) -> dict[str, AmazonItem]:
     price_map = _fetch_price_outlet(config, asin_list)
 
     # レート制限対策として呼び出し間隔を確保
@@ -218,7 +218,7 @@ def fetch_price(config: AmazonApiConfig, asin_list: list[str]) -> dict[str, Amaz
     return price_map
 
 
-def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> list[AmazonItem]:
+def check_item_list(config: SupportsAmazonApiConfig, item_list: list[AmazonItem]) -> list[AmazonItem]:
     try:
         price_map = fetch_price(config, [item.asin for item in item_list])
         for item in item_list:
@@ -236,7 +236,7 @@ def check_item_list(config: AmazonApiConfig, item_list: list[AmazonItem]) -> lis
 
 
 def search_items(
-    config: AmazonApiConfig,
+    config: SupportsAmazonApiConfig,
     keywords: str,
     item_count: int = 10,
 ) -> list[SearchResultItem]:

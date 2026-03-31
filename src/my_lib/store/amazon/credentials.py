@@ -5,7 +5,20 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Protocol, Self
+
+
+class SupportsAmazonApiConfig(Protocol):
+    """Minimal shape required by the Amazon Creators API helpers."""
+
+    @property
+    def credential_id(self) -> str: ...
+    @property
+    def credential_secret(self) -> str: ...
+    @property
+    def associate(self) -> str: ...
+    @property
+    def version(self) -> str: ...
 
 
 @dataclass(frozen=True)
