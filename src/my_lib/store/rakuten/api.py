@@ -29,7 +29,7 @@ from typing import Any, Self
 
 import requests
 
-from my_lib.store.rakuten.credentials import RakutenApiConfig
+from my_lib.store.rakuten.credentials import RakutenApiConfig, SupportsRakutenApiConfig
 from my_lib.store.rakuten.models import RakutenItem
 
 
@@ -80,7 +80,7 @@ _RATE_LIMIT_WAIT_SEC: float = 1.0
 
 
 def _build_params(
-    config: RakutenApiConfig,
+    config: SupportsRakutenApiConfig,
     condition: SearchCondition,
     hits: int,
     page: int,
@@ -129,7 +129,7 @@ def _build_params(
 
 
 def _fetch_page(
-    config: RakutenApiConfig,
+    config: SupportsRakutenApiConfig,
     condition: SearchCondition,
     hits: int,
     page: int,
@@ -160,7 +160,7 @@ def _fetch_page(
 
 
 def search(
-    config: RakutenApiConfig,
+    config: SupportsRakutenApiConfig,
     condition: SearchCondition,
     max_items: int | None = None,
 ) -> list[RakutenItem]:

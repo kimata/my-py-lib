@@ -30,7 +30,7 @@ from typing import Any, Self
 
 import requests
 
-from my_lib.store.yahoo.credentials import YahooApiConfig
+from my_lib.store.yahoo.credentials import SupportsYahooApiConfig, YahooApiConfig
 from my_lib.store.yahoo.models import YahooItem
 
 
@@ -92,7 +92,7 @@ _RATE_LIMIT_WAIT_SEC: float = 1.0
 
 
 def _build_params(
-    config: YahooApiConfig,
+    config: SupportsYahooApiConfig,
     condition: SearchCondition,
     results: int,
     start: int,
@@ -148,7 +148,7 @@ def _build_params(
 
 
 def _fetch_page(
-    config: YahooApiConfig,
+    config: SupportsYahooApiConfig,
     condition: SearchCondition,
     results: int,
     start: int,
@@ -179,7 +179,7 @@ def _fetch_page(
 
 
 def search(
-    config: YahooApiConfig,
+    config: SupportsYahooApiConfig,
     condition: SearchCondition,
     max_items: int | None = None,
 ) -> list[YahooItem]:

@@ -4,7 +4,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Protocol, Self
+
+
+class SupportsYahooApiConfig(Protocol):
+    """Minimal shape required by the Yahoo Shopping API helpers."""
+
+    @property
+    def client_id(self) -> str: ...
+
+    @property
+    def secret(self) -> str: ...
+
+    @property
+    def affiliate_type(self) -> str | None: ...
+
+    @property
+    def affiliate_id(self) -> str | None: ...
 
 
 @dataclass(frozen=True)

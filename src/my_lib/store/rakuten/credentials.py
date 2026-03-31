@@ -4,7 +4,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Protocol, Self
+
+
+class SupportsRakutenApiConfig(Protocol):
+    """Minimal shape required by the Rakuten API helpers."""
+
+    @property
+    def application_id(self) -> str: ...
+
+    @property
+    def affiliate_id(self) -> str | None: ...
 
 
 @dataclass(frozen=True)
