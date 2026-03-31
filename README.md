@@ -289,3 +289,36 @@ my-py-lib/
 [🐛 Issue 報告](https://github.com/kimata/my-py-lib/issues) | [💡 Feature Request](https://github.com/kimata/my-py-lib/issues/new?template=feature_request.md) | [📖 Wiki](https://github.com/kimata/my-py-lib/wiki)
 
 </div>
+
+## 低レベル API 契約
+
+`my-py-lib` を他の基盤ライブラリから参照する場合、以下を低レベル API として扱います。
+
+### SQLite
+
+- `my_lib.sqlite_util.connect`
+- `my_lib.sqlite_util.init_schema_from_file`
+- `my_lib.sqlite_util.exec_schema_from_file`
+- `my_lib.sqlite_util.recover`
+
+### Time
+
+- `my_lib.time.get_tz`
+- `my_lib.time.get_zoneinfo`
+- `my_lib.time.now`
+
+### Browser
+
+- `my_lib.browser_manager.BrowserManager`
+- `my_lib.selenium_util.create_driver`
+- `my_lib.selenium_util.quit_driver_gracefully`
+- `my_lib.selenium_util.clear_cache`
+
+### Config / Webapp
+
+- `my_lib.config.load`
+- `my_lib.webapp.config.show_handler_list`
+- `my_lib.webapp.event.blueprint`
+- `my_lib.webapp.event.notify_event`
+
+これらは上位ライブラリから thin facade 経由で利用する前提です。上位側で同等の低レベル実装を複製せず、必要な責務追加は facade または上位のドメイン層で行ってください。
