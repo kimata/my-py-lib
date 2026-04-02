@@ -44,7 +44,11 @@ def elapsed(path_str: str | pathlib.Path) -> float:
     if not path.exists():
         return diff_sec
 
-    diff_sec -= mtime(path_str)
+    try:
+        diff_sec -= mtime(path_str)
+    except (ValueError, OSError):
+        logging.warning("Liveness ファイルの読み取りに失敗（空または破損）: %s", path)
+        return diff_sec
 
     return diff_sec
 

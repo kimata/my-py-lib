@@ -97,6 +97,24 @@ class TestElapsed:
         elapsed = my_lib.footprint.elapsed(path)
         assert elapsed > 10000
 
+    def test_returns_large_value_for_empty_file(self, temp_dir):
+        """空のファイルに対して大きな値を返す（クラッシュしない）"""
+        import my_lib.footprint
+
+        path = temp_dir / "empty_footprint"
+        path.write_text("")
+        elapsed = my_lib.footprint.elapsed(path)
+        assert elapsed > 10000
+
+    def test_returns_large_value_for_corrupted_file(self, temp_dir):
+        """破損したファイルに対して大きな値を返す（クラッシュしない）"""
+        import my_lib.footprint
+
+        path = temp_dir / "corrupted_footprint"
+        path.write_text("not_a_number")
+        elapsed = my_lib.footprint.elapsed(path)
+        assert elapsed > 10000
+
     def test_returns_elapsed_seconds(self, temp_dir):
         """経過秒数を返す"""
         import my_lib.footprint
