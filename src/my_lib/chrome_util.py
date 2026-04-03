@@ -137,11 +137,19 @@ def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
     )
 
 
-def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
+def _recover_corrupted_profile(
+    profile_path: pathlib.Path,
+    *,
+    keep_latest: int = 1,
+) -> bool:
     """破損したプロファイルをバックアップして新規作成を可能にする
+
+    バックアップ成功後、同一プロファイルの古い ``.corrupted.*`` ディレクトリを
+    *keep_latest* 件だけ残して自動削除する。
 
     Args:
         profile_path: Chrome プロファイルのディレクトリパス
+        keep_latest: 残す退避ディレクトリの最大件数（0 で全削除）
 
     Returns:
         bool: リカバリが成功したかどうか
@@ -161,10 +169,44 @@ def _recover_corrupted_profile(profile_path: pathlib.Path) -> bool:
             profile_path,
             backup_path,
         )
-        return True
     except Exception:
         logging.exception("Failed to backup corrupted profile")
         return False
+
+    _cleanup_corrupted_backups(profile_path, keep_latest=keep_latest)
+    return True
+
+
+def _cleanup_corrupted_backups(
+    profile_path: pathlib.Path,
+    *,
+    keep_latest: int = 1,
+) -> None:
+    """同一プロファイルの古い ``.corrupted.*`` バックアップを削除する。
+
+    *keep_latest* 件の新しいバックアップを残し、それ以外を削除する。
+
+    Args:
+        profile_path: 元のプロファイルパス（``*.corrupted.*`` ではなく正規パス）
+        keep_latest: 残すバックアップの最大件数
+
+    """
+    parent = profile_path.parent
+    prefix = f"{profile_path.name}.corrupted."
+
+    backups = sorted(
+        (p for p in parent.iterdir() if p.is_dir() and p.name.startswith(prefix)),
+        key=lambda p: p.name,
+    )
+
+    to_remove = backups[: len(backups) - keep_latest] if keep_latest > 0 else backups
+
+    for old_backup in to_remove:
+        try:
+            shutil.rmtree(old_backup)
+            logging.info("Removed old corrupted backup: %s", old_backup)
+        except Exception:
+            logging.exception("Failed to remove corrupted backup: %s", old_backup)
 
 
 def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:
