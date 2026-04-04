@@ -713,45 +713,6 @@ def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
             item.unlink(missing_ok=True)
 
 
-def get_memory_info(driver: WebDriver) -> dict[str, Any]:
-    """ブラウザのメモリ使用量を取得（単位: KB）"""
-    total_bytes = subprocess.Popen(  # noqa: S602
-        "smem -t -c pss -P chrome | tail -n 1",  # noqa: S607
-        shell=True,
-        stdout=subprocess.PIPE,
-    ).communicate()[0]
-    total = int(str(total_bytes, "utf-8").strip())  # smem の出力は KB 単位
-
-    try:
-        memory_info = driver.execute_cdp_cmd("Memory.getAllTimeSamplingProfile", {})
-        heap_usage = driver.execute_cdp_cmd("Runtime.getHeapUsage", {})
-
-        heap_used = heap_usage.get("usedSize", 0) // 1024  # bytes → KB
-        heap_total = heap_usage.get("totalSize", 0) // 1024  # bytes → KB
-    except Exception as e:
-        logging.debug("Failed to get memory usage: %s", e)
-
-        memory_info = None
-        heap_used = 0
-        heap_total = 0
-
-    return {
-        "total": total,
-        "heap_used": heap_used,
-        "heap_total": heap_total,
-        "memory_info": memory_info,
-    }
-
-
-def log_memory_usage(driver: WebDriver) -> None:
-    mem_info = get_memory_info(driver)
-    logging.info(
-        "Chrome memory: %s MB (JS heap: %s MB)",
-        f"""{mem_info["total"] // 1024:,}""",
-        f"""{mem_info["heap_used"] // 1024:,}""",
-    )
-
-
 def _warmup(
     driver: WebDriver,
     keyword: str,

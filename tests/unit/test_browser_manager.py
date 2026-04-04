@@ -9,6 +9,7 @@ import unittest.mock
 import pytest
 
 import my_lib.browser_manager
+import my_lib.memory_util
 import my_lib.selenium_util
 
 
@@ -129,12 +130,15 @@ class TestGetDriver:
         )
 
         mock_driver = unittest.mock.MagicMock()
+        mock_driver.service.process.pid = 4321
+        actual_profile_name = my_lib.chrome_util._get_actual_profile_name("TestProfile")
 
         with (
             unittest.mock.patch(
                 "my_lib.selenium_util.create_driver", return_value=mock_driver
             ) as mock_create,
             unittest.mock.patch("my_lib.selenium_util.clear_cache") as mock_clear,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register") as mock_register,
         ):
             driver, wait = manager.get_driver()
 
@@ -145,6 +149,11 @@ class TestGetDriver:
                 stealth_mode=True,
             )
             mock_clear.assert_called_once_with(mock_driver)
+            mock_register.assert_called_once_with(
+                profile_name="TestProfile",
+                user_data_dir=temp_dir / "chrome" / actual_profile_name,
+                chromedriver_pid=4321,
+            )
             assert driver is mock_driver
             assert wait is not None
             assert manager.has_driver() is True
@@ -247,13 +256,18 @@ class TestQuit:
         with (
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             manager.get_driver()
 
-        with unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit:
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister") as mock_unregister,
+        ):
             manager.quit()
 
             mock_quit.assert_called_once_with(mock_driver, wait_sec=5)
+            mock_unregister.assert_called_once_with("TestProfile")
             assert manager.has_driver() is False
 
     def test_uses_custom_wait_sec(self, temp_dir: pathlib.Path):
@@ -268,10 +282,14 @@ class TestQuit:
         with (
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             manager.get_driver()
 
-        with unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit:
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
+        ):
             manager.quit(wait_sec=10)
 
             mock_quit.assert_called_once_with(mock_driver, wait_sec=10)
@@ -366,10 +384,14 @@ class TestHasDriver:
         with (
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             manager.get_driver()
 
-        with unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully"):
+        with (
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
+        ):
             manager.quit()
 
             assert manager.has_driver() is False
@@ -387,6 +409,8 @@ class TestContextManager:
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
             unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
             unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock") as mock_cleanup,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
         ):
             with my_lib.browser_manager.BrowserManager(
                 profile_name="TestProfile",
@@ -422,6 +446,8 @@ class TestContextManager:
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
             unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
             unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock") as mock_cleanup,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
         ):
             with (
                 pytest.raises(ValueError, match="test error"),
@@ -453,6 +479,7 @@ class TestDriverContextManager:
         with (
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
             manager.driver() as driver,
         ):
             assert driver is mock_driver
@@ -469,6 +496,7 @@ class TestDriverContextManager:
         with (
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache") as mock_clear,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             with manager.driver():
                 mock_clear.reset_mock()  # get_driver 内での呼び出しをリセット
@@ -488,6 +516,7 @@ class TestDriverContextManager:
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
             unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully") as mock_quit,
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             with manager.driver():
                 pass
@@ -541,6 +570,8 @@ class TestRestartWithCleanProfile:
             unittest.mock.patch("my_lib.chrome_util.delete_profile", side_effect=track_delete) as mock_delete,
             unittest.mock.patch("my_lib.selenium_util.create_driver", side_effect=track_create),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
         ):
             # 最初にドライバを作成
             manager.get_driver()
@@ -569,6 +600,7 @@ class TestRestartWithCleanProfile:
             unittest.mock.patch("my_lib.chrome_util.delete_profile") as mock_delete,
             unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
         ):
             # ドライバー未起動の状態で restart
             driver, wait = manager.restart_with_clean_profile()
@@ -598,6 +630,8 @@ class TestRestartWithCleanProfile:
                 "my_lib.selenium_util.create_driver", side_effect=lambda *a, **kw: next(drivers)
             ),
             unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.register"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry.unregister"),
         ):
             # 最初のドライバを作成
             driver1, _ = manager.get_driver()
@@ -607,3 +641,37 @@ class TestRestartWithCleanProfile:
             driver2, _ = manager.restart_with_clean_profile()
             assert driver2 is mock_driver_2
             assert driver2 is not driver1
+
+
+class TestBrowserRegistry:
+    """Browser process registry integration tests."""
+
+    def test_registry_tracks_driver_lifecycle(self, temp_dir: pathlib.Path):
+        manager = my_lib.browser_manager.BrowserManager(
+            profile_name="TrackedProfile",
+            data_dir=temp_dir,
+        )
+        mock_driver = unittest.mock.MagicMock()
+        mock_driver.service.process.pid = 9876
+        registry = my_lib.memory_util.BrowserProcessRegistry()
+        actual_profile_name = my_lib.chrome_util._get_actual_profile_name("TrackedProfile")
+
+        with (
+            unittest.mock.patch("my_lib.selenium_util.create_driver", return_value=mock_driver),
+            unittest.mock.patch("my_lib.selenium_util.clear_cache"),
+            unittest.mock.patch("my_lib.selenium_util.quit_driver_gracefully"),
+            unittest.mock.patch("my_lib.chrome_util.cleanup_profile_lock"),
+            unittest.mock.patch("my_lib.memory_util.browser_process_registry", registry),
+        ):
+            manager.get_driver()
+            snapshot = registry.snapshot_profiles()
+            assert snapshot == (
+                my_lib.memory_util.TrackedBrowserProcessSet(
+                    profile_name="TrackedProfile",
+                    user_data_dir=temp_dir / "chrome" / actual_profile_name,
+                    chromedriver_pid=9876,
+                ),
+            )
+
+            manager.quit()
+            assert registry.snapshot_profiles() == ()

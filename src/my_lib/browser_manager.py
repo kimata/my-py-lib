@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import selenium.webdriver.support.wait
 
 import my_lib.chrome_util
+import my_lib.memory_util
 import my_lib.selenium_util
 
 if TYPE_CHECKING:
@@ -198,6 +199,20 @@ class BrowserManager:
                 wait = selenium.webdriver.support.wait.WebDriverWait(driver, self.wait_timeout)
 
                 my_lib.selenium_util.clear_cache(driver)
+                chromedriver_pid: int | None = None
+                if hasattr(driver, "service") and driver.service and hasattr(driver.service, "process"):
+                    process = driver.service.process
+                    if process is not None and hasattr(process, "pid"):
+                        pid = process.pid
+                        if isinstance(pid, int):
+                            chromedriver_pid = pid
+
+                actual_profile_name = my_lib.chrome_util._get_actual_profile_name(self.profile_name)
+                my_lib.memory_util.browser_process_registry.register(
+                    profile_name=self.profile_name,
+                    user_data_dir=self.data_dir / "chrome" / actual_profile_name,
+                    chromedriver_pid=chromedriver_pid,
+                )
 
                 self._driver_state = DriverInitialized(driver=driver, wait=wait)
 
@@ -246,6 +261,7 @@ class BrowserManager:
         if isinstance(self._driver_state, DriverInitialized):
             logging.info("Selenium ドライバーを終了しています (%s)...", self.profile_name)
             my_lib.selenium_util.quit_driver_gracefully(self._driver_state.driver, wait_sec=wait_sec)
+            my_lib.memory_util.browser_process_registry.unregister(self.profile_name)
             self._driver_state = DriverUninitialized()
 
             # Chrome が正常終了してもロックファイルが残ることがあるためクリーンアップ
