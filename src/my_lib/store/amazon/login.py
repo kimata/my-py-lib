@@ -20,6 +20,7 @@ import random
 import time
 
 import PIL.Image
+import selenium.common.exceptions
 import selenium.webdriver.common.by
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.support
@@ -35,6 +36,55 @@ from my_lib.store.amazon.credentials import AmazonLoginConfig
 _LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
 _LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
+
+_FOOTER_XPATH = '//div[contains(@class, "footer") or contains(@class, "Footer")]'
+
+# 「ショッピングを続ける」ボタン（CAPTCHA 検証ページ）
+_CONTINUE_SHOPPING_BUTTON_XPATH = (
+    '//span[contains(@class, "a-button")]//button[normalize-space(text()) = "ショッピングを続ける"]'
+)
+
+# 503 エラーページ
+_503_ERROR_TITLE = "ご迷惑をおかけしています"
+_503_CONTINUE_LINK_XPATH = '//a[contains(@href, "ref=cs_503_link")]'
+
+_MAX_ERROR_PAGE_RETRIES = 2
+
+
+def _wait_for_footer(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    *,
+    _retry_count: int = 0,
+) -> None:
+    """フッターが表示されるまで待機（エラーページ自動対応付き）
+
+    Amazon がボット検出や一時エラーで「ショッピングを続ける」ページを返す場合、
+    自動でボタン/リンクをクリックしてリトライする。
+    """
+    try:
+        wait.until(
+            selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
+            )
+        )
+    except selenium.common.exceptions.TimeoutException:
+        if _retry_count >= _MAX_ERROR_PAGE_RETRIES:
+            raise
+
+        # パターン1: CAPTCHA 検証ページの「ショッピングを続ける」ボタン
+        if my_lib.selenium_util.click_xpath(driver, _CONTINUE_SHOPPING_BUTTON_XPATH, is_warn=False):
+            logging.info("Clicked 'continue shopping' button on CAPTCHA validation page")
+            return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
+
+        # パターン2: 503 エラーページの「ショッピングを続ける」リンク
+        if _503_ERROR_TITLE in driver.title:
+            logging.warning("503 error page detected: %s", driver.current_url)
+            my_lib.selenium_util.click_xpath(driver, _503_CONTINUE_LINK_XPATH, is_warn=False)
+            time.sleep(3)
+            return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
+
+        raise
 
 
 def _resolve_puzzle(
@@ -55,14 +105,7 @@ def _resolve_puzzle(
         selenium.webdriver.common.by.By.XPATH, '//input[@name="cvf_captcha_captcha_action"]'
     ).click()
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-            )
-        )
-    )
+    _wait_for_footer(driver, wait)
     time.sleep(0.1)
 
 
@@ -133,14 +176,7 @@ def _handle_password_input(
     submit_button = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="signInSubmit"]')
     driver.execute_script("arguments[0].click();", submit_button)
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-            )
-        )
-    )
+    _wait_for_footer(driver, wait)
 
 
 def _handle_quiz(
@@ -234,14 +270,7 @@ def _handle_phone_verification(
 
     time.sleep(0.5)
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-            )
-        )
-    )
+    _wait_for_footer(driver, wait)
 
     my_lib.selenium_util.dump_page(
         driver,
@@ -266,14 +295,7 @@ def _execute_impl(
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     login_mark_xpath: str,
 ) -> None:
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-            )
-        )
-    )
+    _wait_for_footer(driver, wait)
 
     if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
         logging.info("Login succeeded")
@@ -288,14 +310,7 @@ def _execute_impl(
     _handle_quiz(driver, slack_config, login_config.dump_path)
     _handle_phone_verification(driver, wait, slack_config, login_config.dump_path)
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[contains(@class, "footer") or contains(@class, "Footer")]',
-            )
-        )
-    )
+    _wait_for_footer(driver, wait)
     time.sleep(0.1)
 
 
