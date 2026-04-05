@@ -250,6 +250,8 @@ def _fetch_price_impl(
 
 _FOOTER_XPATH = '//div[contains(@class, "footer") or contains(@class, "Footer")]'
 _BOT_DETECT_SUBMIT_XPATH = '//form[contains(@action, "/errors/validateCaptcha")]//button[@type="submit"]'
+_503_ERROR_TITLE = "ご迷惑をおかけしています"
+_503_CONTINUE_LINK_XPATH = '//a[contains(@href, "ref=cs_503_link")]'
 
 
 def _wait_for_product_page(
@@ -264,16 +266,27 @@ def _wait_for_product_page(
             )
         )
     except selenium.common.exceptions.TimeoutException:
-        # ボット検出ページ（「ショッピングを続ける」ボタン付きの validateCaptcha フォーム）
+        # パターン1: ボット検出ページ（「ショッピングを続ける」ボタン付きの validateCaptcha フォーム）
         if my_lib.selenium_util.click_xpath(driver, _BOT_DETECT_SUBMIT_XPATH, is_warn=False):
-            logging.warning("Bot detection page detected, clicking continue: %s", driver.current_url)
+            logging.warning(
+                "CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
+            )
             wait.until(
                 selenium.webdriver.support.expected_conditions.presence_of_element_located(
                     (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
                 )
             )
-        else:
-            raise
+            return
+
+        # パターン2: 503 エラーページ（「ご迷惑をおかけしています！」）
+        if _503_ERROR_TITLE in driver.title:
+            logging.warning(
+                "503 エラーページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
+            )
+            my_lib.selenium_util.click_xpath(driver, _503_CONTINUE_LINK_XPATH, is_warn=False)
+            time.sleep(3)
+
+        raise
 
 
 def fetch_price(

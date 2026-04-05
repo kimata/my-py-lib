@@ -74,12 +74,16 @@ def _wait_for_footer(
 
         # パターン1: CAPTCHA 検証ページの「ショッピングを続ける」ボタン
         if my_lib.selenium_util.click_xpath(driver, _CONTINUE_SHOPPING_BUTTON_XPATH, is_warn=False):
-            logging.info("Clicked 'continue shopping' button on CAPTCHA validation page")
+            logging.warning(
+                "CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
+            )
             return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
 
         # パターン2: 503 エラーページの「ショッピングを続ける」リンク
         if _503_ERROR_TITLE in driver.title:
-            logging.warning("503 error page detected: %s", driver.current_url)
+            logging.warning(
+                "503 エラーページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
+            )
             my_lib.selenium_util.click_xpath(driver, _503_CONTINUE_LINK_XPATH, is_warn=False)
             time.sleep(3)
             return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
