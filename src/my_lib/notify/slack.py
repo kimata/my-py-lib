@@ -423,6 +423,17 @@ def send(
     return _send(config.bot_token, ch_name, message, thread_ts)
 
 
+def update(
+    config: HasBotToken | SlackEmptyConfig,
+    ch_name: str,
+    ts: str,
+    message: FormattedMessage,
+) -> slack_sdk.web.slack_response.SlackResponse | None:
+    if isinstance(config, SlackEmptyConfig):
+        return None
+    return _update(config.bot_token, ch_name, ts, message)
+
+
 def upload_image(
     config: HasBotToken | SlackEmptyConfig,
     ch_id: str,
@@ -539,6 +550,22 @@ def _send(
         return client.chat_postMessage(**kwargs)
     except slack_sdk.errors.SlackClientError:
         logging.exception("Failed to send Slack message")
+        return None
+
+
+def _update(
+    token: str, ch_name: str, ts: str, message: FormattedMessage
+) -> slack_sdk.web.slack_response.SlackResponse | None:
+    try:
+        client = slack_sdk.WebClient(token=token)
+        return client.chat_update(
+            channel=ch_name,
+            ts=ts,
+            text=message.text,
+            blocks=message.json,
+        )
+    except slack_sdk.errors.SlackClientError:
+        logging.exception("Failed to update Slack message")
         return None
 
 
