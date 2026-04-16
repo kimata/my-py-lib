@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
@@ -67,13 +66,14 @@ def _wait_for_page_load(
     wait: selenium.webdriver.support.wait.WebDriverWait,
 ) -> None:
     """ページの読み込みを待機する"""
+    # //body は常に即時存在するため、実際に抽出対象となる商品タイトル要素の
+    # 出現を待つ（負荷時の描画遅れによるタイトル取得失敗を防ぐ）
     try:
         wait.until(
             selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, "//body")
+                (selenium.webdriver.common.by.By.XPATH, _TITLE_XPATH)
             )
         )
-        time.sleep(1)
     except selenium.common.exceptions.TimeoutException:
         logging.warning("[Yodobashi] 読み込みタイムアウト")
         raise

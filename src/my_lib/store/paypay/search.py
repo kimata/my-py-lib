@@ -199,7 +199,9 @@ def _wait_for_search_results(
         time.sleep(2)  # React の描画完了を待つ
 
         # 検索結果が0件の場合のチェック
-        no_result_xpath = '//p[contains(text(), "見つかりません")] | //p[contains(text(), "0件")]'
+        # text() は要素直下の text node のみ見るため、子 <span> 内の文言は
+        # contains(., …) で要素配下の文字列値全体を対象にする
+        no_result_xpath = '//p[contains(., "見つかりませんでした")] | //p[contains(., "0件")]'
         if my_lib.selenium_util.xpath_exists(driver, no_result_xpath):
             logging.info("[PayPay] 該当なし")
             return False
