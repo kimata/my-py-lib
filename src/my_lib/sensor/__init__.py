@@ -107,10 +107,13 @@ def sensor_info(sensor: SensorProtocol) -> str:
         return f"{sensor.NAME} ({sensor.TYPE})"
 
 
-def ping(sensor_list: list[SensorProtocol]) -> list[SensorProtocol]:
+def ping(
+    sensor_list: list[SensorProtocol],
+) -> tuple[list[SensorProtocol], list[SensorProtocol]]:
     logging.info("Check sensor existences...")
 
     active_sensor_list: list[SensorProtocol] = []
+    inactive_sensor_list: list[SensorProtocol] = []
     for sensor in sensor_list:
         if sensor.ping():
             logging.info("Sensor %s exists.", sensor.NAME)
@@ -121,9 +124,36 @@ def ping(sensor_list: list[SensorProtocol]) -> list[SensorProtocol]:
                 raise RuntimeError("The required sensor could not be found.")
             else:
                 logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
+                inactive_sensor_list.append(sensor)
 
     logging.info("Active sensor list: %s", ", ".join([sensor_info(sensor) for sensor in active_sensor_list]))
-    return active_sensor_list
+    return active_sensor_list, inactive_sensor_list
+
+
+def retry_inactive(
+    active_sensor_list: list[SensorProtocol],
+    inactive_sensor_list: list[SensorProtocol],
+    index: int,
+) -> int:
+    """inactive なセンサーをラウンドロビンで 1 つだけ ping し、復帰していれば active に移す。
+
+    戻り値は次回呼び出し時に使う index。
+    """
+    if not inactive_sensor_list:
+        return 0
+
+    index %= len(inactive_sensor_list)
+    sensor = inactive_sensor_list[index]
+    logging.debug("Retry ping for inactive sensor %s", sensor.NAME)
+
+    if sensor.ping():
+        logging.info("Sensor %s has come back online.", sensor.NAME)
+        inactive_sensor_list.pop(index)
+        active_sensor_list.append(sensor)
+        # NOTE: リストが縮むので、次回は同じ index から始める
+        return index
+
+    return index + 1
 
 
 def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, SensorValue], bool]:

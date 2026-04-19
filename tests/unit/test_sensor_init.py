@@ -61,7 +61,7 @@ class TestPing:
     """ping 関数のテスト"""
 
     def test_returns_active_sensors(self, mock_smbus):
-        """応答があるセンサーのリストを返す"""
+        """応答があるセンサーは active に、応答がないセンサーは inactive に分類される"""
         from my_lib.sensor import ping
 
         sensor1 = MockSensor(name="Sensor1")
@@ -69,14 +69,15 @@ class TestPing:
         sensor2 = MockSensor(name="Sensor2")
         sensor2._ping_result = True
 
-        result = ping([sensor1, sensor2])
+        active, inactive = ping([sensor1, sensor2])
 
-        assert len(result) == 2
-        assert sensor1 in result
-        assert sensor2 in result
+        assert len(active) == 2
+        assert sensor1 in active
+        assert sensor2 in active
+        assert inactive == []
 
     def test_filters_inactive_sensors(self, mock_smbus):
-        """応答がないセンサーを除外する"""
+        """応答がないセンサーは inactive リストに入る"""
         from my_lib.sensor import ping
 
         sensor1 = MockSensor(name="Sensor1")
@@ -84,11 +85,10 @@ class TestPing:
         sensor2 = MockSensor(name="Sensor2")
         sensor2._ping_result = False
 
-        result = ping([sensor1, sensor2])
+        active, inactive = ping([sensor1, sensor2])
 
-        assert len(result) == 1
-        assert sensor1 in result
-        assert sensor2 not in result
+        assert active == [sensor1]
+        assert inactive == [sensor2]
 
     def test_raises_for_required_missing_sensor(self, mock_smbus):
         """必須センサーが見つからない場合は例外を発生"""
@@ -102,12 +102,122 @@ class TestPing:
             ping([sensor])
 
     def test_empty_list_returns_empty(self, mock_smbus):
-        """空のリストを渡すと空のリストを返す"""
+        """空のリストを渡すと空のタプルを返す"""
         from my_lib.sensor import ping
 
-        result = ping([])
+        active, inactive = ping([])
 
-        assert result == []
+        assert active == []
+        assert inactive == []
+
+
+class TestRetryInactive:
+    """retry_inactive 関数のテスト"""
+
+    def test_empty_inactive_returns_zero(self, mock_smbus):
+        """inactive が空なら 0 を返して何もしない"""
+        from my_lib.sensor import retry_inactive
+
+        active: list = []
+        inactive: list = []
+
+        next_index = retry_inactive(active, inactive, 5)
+
+        assert next_index == 0
+        assert active == []
+        assert inactive == []
+
+    def test_promotes_sensor_when_ping_succeeds(self, mock_smbus):
+        """ping 成功時は sensor を active に移す"""
+        from my_lib.sensor import retry_inactive
+
+        sensor1 = MockSensor(name="Sensor1")
+        sensor1._ping_result = True
+        sensor2 = MockSensor(name="Sensor2")
+        sensor2._ping_result = False
+
+        active: list = []
+        inactive = [sensor1, sensor2]
+
+        next_index = retry_inactive(active, inactive, 0)
+
+        assert active == [sensor1]
+        assert inactive == [sensor2]
+        # NOTE: リストが縮んだので次回は同じ index から
+        assert next_index == 0
+
+    def test_keeps_inactive_when_ping_fails(self, mock_smbus):
+        """ping 失敗時は inactive に残し、index を進める"""
+        from my_lib.sensor import retry_inactive
+
+        sensor1 = MockSensor(name="Sensor1")
+        sensor1._ping_result = False
+        sensor2 = MockSensor(name="Sensor2")
+        sensor2._ping_result = False
+
+        active: list = []
+        inactive = [sensor1, sensor2]
+
+        next_index = retry_inactive(active, inactive, 0)
+
+        assert active == []
+        assert inactive == [sensor1, sensor2]
+        assert next_index == 1
+
+    def test_index_wraps_around(self, mock_smbus):
+        """index が範囲外なら先頭に巻き戻す"""
+        from my_lib.sensor import retry_inactive
+
+        sensor1 = MockSensor(name="Sensor1")
+        sensor1._ping_result = False
+        sensor2 = MockSensor(name="Sensor2")
+        sensor2._ping_result = False
+
+        active: list = []
+        inactive = [sensor1, sensor2]
+
+        next_index = retry_inactive(active, inactive, 5)
+
+        # NOTE: 5 % 2 = 1 の sensor2 を ping、失敗で次は 2
+        assert active == []
+        assert inactive == [sensor1, sensor2]
+        assert next_index == 2
+
+    def test_round_robin_sequence(self, mock_smbus):
+        """複数回呼び出しでラウンドロビンする"""
+        from my_lib.sensor import retry_inactive
+
+        sensor1 = MockSensor(name="Sensor1")
+        sensor1._ping_result = False
+        sensor2 = MockSensor(name="Sensor2")
+        sensor2._ping_result = False
+        sensor3 = MockSensor(name="Sensor3")
+        sensor3._ping_result = False
+
+        active: list = []
+        inactive = [sensor1, sensor2, sensor3]
+
+        ping_order = []
+        original_ping1 = sensor1.ping
+        original_ping2 = sensor2.ping
+        original_ping3 = sensor3.ping
+
+        def make_tracker(name, original):
+            def tracker():
+                ping_order.append(name)
+                return original()
+
+            return tracker
+
+        sensor1.ping = make_tracker("Sensor1", original_ping1)  # type: ignore
+        sensor2.ping = make_tracker("Sensor2", original_ping2)  # type: ignore
+        sensor3.ping = make_tracker("Sensor3", original_ping3)  # type: ignore
+
+        idx = 0
+        for _ in range(5):
+            idx = retry_inactive(active, inactive, idx)
+
+        assert ping_order == ["Sensor1", "Sensor2", "Sensor3", "Sensor1", "Sensor2"]
 
 
 class TestSense:
