@@ -161,15 +161,17 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
 
-def _apply_normal_listing_filter(
+def _apply_listing_type_filter(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
+    label: str,
 ) -> bool:
-    """絞り込みUIで出品形式「通常出品」を選択する
+    """絞り込みUIで出品形式の指定ラベルを選択する
 
     Args:
         driver: WebDriver インスタンス
         wait: WebDriverWait インスタンス
+        label: 選択するフィルタラベル（例: "オークション", "通常出品"）
 
     Returns:
         フィルタ適用に成功した場合は True
@@ -178,8 +180,6 @@ def _apply_normal_listing_filter(
     by_xpath = selenium.webdriver.common.by.By.XPATH
 
     try:
-        # PC版: 左側パネルに直接フィルタが表示されている
-        # 「出品形式」セクションを探す
         logging.debug("[Mercari] 出品形式セクションを探索中...")
         listing_type_xpath = '//div[@data-testid="出品形式"]'
         wait.until(
@@ -198,20 +198,16 @@ def _apply_normal_listing_filter(
                 logging.debug("[Mercari] 出品形式セクションを展開")
                 time.sleep(0.3)
 
-        # 「通常出品」チェックボックスのラベルをクリック
-        logging.debug("[Mercari] 通常出品チェックボックスを探索中...")
-        normal_listing_xpath = '//div[@data-testid="出品形式"]//label[.//span[text()="通常出品"]]'
+        target_xpath = f'//div[@data-testid="出品形式"]//label[.//span[text()="{label}"]]'
         wait.until(
-            selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-                (by_xpath, normal_listing_xpath)
-            )
+            selenium.webdriver.support.expected_conditions.element_to_be_clickable((by_xpath, target_xpath))
         )
-        normal_listing_label = driver.find_element(by_xpath, normal_listing_xpath)
-        normal_listing_label.click()
-        logging.debug("[Mercari] 通常出品をクリック")
+        target_label = driver.find_element(by_xpath, target_xpath)
+        target_label.click()
+        logging.debug("[Mercari] 「%s」をクリック", label)
         time.sleep(0.5)
 
-        logging.info("[Mercari] 出品形式「通常出品」フィルタを適用")
+        logging.info("[Mercari] 出品形式「%s」フィルタを適用", label)
         return True
 
     except selenium.common.exceptions.TimeoutException:
@@ -382,6 +378,45 @@ def _parse_search_item(
         return None
 
 
+def _parse_visible_items(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    *,
+    max_items: int | None = None,
+    scroll_to_load: bool = False,
+) -> list[my_lib.store.flea_market.SearchResult]:
+    """現在表示されている検索結果をパースする"""
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+
+    results: list[my_lib.store.flea_market.SearchResult] = []
+    parsed_urls: set[str] = set()
+
+    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+    logging.debug("[Mercari] ページ解析: %d 件発見", len(item_elements))
+
+    for i, item_element in enumerate(item_elements):
+        if max_items is not None and len(results) >= max_items:
+            break
+
+        if scroll_to_load or i < 20:
+            try:
+                driver.execute_script(
+                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
+                    item_element,
+                )
+                if i >= 20:
+                    time.sleep(0.3)
+            except selenium.common.exceptions.StaleElementReferenceException:
+                logging.debug("[Mercari] 要素 %d がStale、スキップ", i + 1)
+                continue
+
+        result = _parse_search_item(item_element)
+        if result is not None and result.url not in parsed_urls:
+            results.append(result)
+            parsed_urls.add(result.url)
+
+    return results
+
+
 def search(
     driver: selenium.webdriver.remote.webdriver.WebDriver,
     wait: selenium.webdriver.support.wait.WebDriverWait,
@@ -411,45 +446,25 @@ def search(
     if not _wait_for_search_results(driver, wait):
         return []
 
-    # 出品形式「通常出品」に絞り込み
-    # フィルタ適用後、検索結果の再読み込みを待機
-    if _apply_normal_listing_filter(driver, wait) and not _wait_for_search_results(driver, wait):
+    # 1. フィルタなしで全結果をパース（通常出品 + Shops + オークション）
+    all_results = _parse_visible_items(driver, max_items=max_items, scroll_to_load=scroll_to_load)
+
+    if not all_results:
+        logging.info("[Mercari] 検索完了: 0 件")
         return []
 
-    by_xpath = selenium.webdriver.common.by.By.XPATH
+    # 2. 「オークション」フィルタを適用してオークション出品の URL を収集
+    auction_urls: set[str] = set()
+    if _apply_listing_type_filter(driver, wait, "オークション") and _wait_for_search_results(driver, wait):
+        auction_items = _parse_visible_items(driver, max_items=None, scroll_to_load=False)
+        auction_urls = {item.url for item in auction_items}
+        if auction_urls:
+            logging.info("[Mercari] オークション %d 件を除外", len(auction_urls))
 
-    results: list[my_lib.store.flea_market.SearchResult] = []
-    parsed_urls: set[str] = set()  # 重複防止用
+    # 3. オークション出品を除外して返す
+    results = [r for r in all_results if r.url not in auction_urls]
 
-    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
-    logging.debug("[Mercari] ページ解析: %d 件発見", len(item_elements))
-
-    for i, item_element in enumerate(item_elements):
-        if max_items is not None and len(results) >= max_items:
-            logging.info("[Mercari] 検索完了: %d 件", len(results))
-            return results
-
-        # スクロールが有効な場合、要素をビューポートにスクロールしてコンテンツをロード
-        if scroll_to_load or i < 20:  # 最初の20件はスクロール不要なことが多い
-            try:
-                # 要素をビューポートにスクロール
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
-                    item_element,
-                )
-                # lazy loading のためのコンテンツロード待機
-                if i >= 20:  # 最初の20件以降はロードに時間がかかる
-                    time.sleep(0.3)
-            except selenium.common.exceptions.StaleElementReferenceException:
-                logging.debug("[Mercari] 要素 %d がStale、スキップ", i + 1)
-                continue
-
-        result = _parse_search_item(item_element)
-        if result is not None and result.url not in parsed_urls:
-            results.append(result)
-            parsed_urls.add(result.url)
-
-    logging.info("[Mercari] 検索完了: %d 件", len(results))
+    logging.info("[Mercari] 検索完了: %d 件（全 %d 件中）", len(results), len(all_results))
     return results
 
 
