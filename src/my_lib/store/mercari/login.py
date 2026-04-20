@@ -21,7 +21,7 @@ import my_lib.selenium_util
 import my_lib.store.captcha
 import my_lib.store.mercari.config
 
-_LINE_LOGIN_TIMEOUT: int = 30
+_LINE_LOGIN_TIMEOUT: int = 60
 
 _LOGIN_URL: str = "https://jp.mercari.com"
 
