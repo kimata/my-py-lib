@@ -246,6 +246,16 @@ def _wait_for_search_results(
             logging.info("[Mercari] 該当なし")
             return False
 
+        # アイテム要素の出現を待機（遅延ロード対策）
+        try:
+            wait.until(
+                selenium.webdriver.support.expected_conditions.presence_of_element_located(
+                    (selenium.webdriver.common.by.By.XPATH, _ITEM_LIST_XPATH)
+                )
+            )
+        except selenium.common.exceptions.TimeoutException:
+            logging.debug("[Mercari] アイテム要素の出現待ちタイムアウト")
+
         return True
     except selenium.common.exceptions.TimeoutException:
         logging.warning("[Mercari] 読み込みタイムアウト")
