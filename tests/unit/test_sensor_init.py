@@ -17,6 +17,7 @@ class MockSensor:
         self.TYPE = sensor_type
         self.dev_addr = dev_addr
         self.required = False
+        self.consecutive_fails = 0
         self._ping_result = True
         self._values: dict[str, float] = {}
 
@@ -183,6 +184,22 @@ class TestRetryInactive:
         assert inactive == [sensor1, sensor2]
         assert next_index == 2
 
+    def test_resets_consecutive_fails_on_recovery(self, mock_smbus):
+        """復帰したセンサーの consecutive_fails を 0 にリセットする"""
+        from my_lib.sensor import retry_inactive
+
+        sensor = MockSensor(name="Sensor")
+        sensor._ping_result = True
+        sensor.consecutive_fails = 3
+
+        active: list = []
+        inactive = [sensor]
+
+        retry_inactive(active, inactive, 0)
+
+        assert active == [sensor]
+        assert sensor.consecutive_fails == 0
+
     def test_round_robin_sequence(self, mock_smbus):
         """複数回呼び出しでラウンドロビンする"""
         from my_lib.sensor import retry_inactive
@@ -232,10 +249,11 @@ class TestSense:
         sensor2 = MockSensor(name="Sensor2")
         sensor2._values = {"humidity": 60.0}
 
-        value_map, is_success = sense([sensor1, sensor2])
+        value_map, is_success, demoted = sense([sensor1, sensor2])
 
         assert value_map == {"temp": 25.0, "humidity": 60.0}
         assert is_success is True
+        assert demoted == []
 
     def test_returns_false_on_exception(self, mock_smbus):
         """例外が発生した場合は is_success が False"""
@@ -248,7 +266,7 @@ class TestSense:
 
         sensor.get_value_map = raise_error  # type: ignore
 
-        value_map, is_success = sense([sensor])
+        _, is_success, _ = sense([sensor])
 
         assert is_success is False
 
@@ -266,7 +284,7 @@ class TestSense:
         sensor2 = MockSensor(name="WorkingSensor")
         sensor2._values = {"temp": 25.0}
 
-        value_map, is_success = sense([sensor1, sensor2])
+        value_map, is_success, _ = sense([sensor1, sensor2])
 
         assert value_map == {"temp": 25.0}
         assert is_success is False
@@ -275,10 +293,74 @@ class TestSense:
         """空のリストを渡すと空の値マップを返す"""
         from my_lib.sensor import sense
 
-        value_map, is_success = sense([])
+        value_map, is_success, demoted = sense([])
 
         assert value_map == {}
         assert is_success is True
+        assert demoted == []
+
+    def test_resets_counter_on_success(self, mock_smbus):
+        """成功時は consecutive_fails を 0 にリセットする"""
+        from my_lib.sensor import sense
+
+        sensor = MockSensor(name="Sensor")
+        sensor._values = {"temp": 25.0}
+        sensor.consecutive_fails = 5
+
+        sense([sensor])
+
+        assert sensor.consecutive_fails == 0
+
+    def test_increments_counter_on_failure(self, mock_smbus):
+        """失敗時は consecutive_fails を増やす"""
+        from my_lib.sensor import sense
+
+        sensor = MockSensor(name="FailingSensor")
+        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError)
+
+        sense([sensor])  # inactive_sensor_list 未指定なので降格しない
+
+        assert sensor.consecutive_fails == 1
+
+    def test_demotes_after_threshold(self, mock_smbus):
+        """連続 fail_threshold 回失敗で inactive に降格する"""
+        from my_lib.sensor import sense
+
+        sensor = MockSensor(name="FailingSensor")
+        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("boom"))
+
+        active = [sensor]
+        inactive: list = []
+
+        _, _, demoted1 = sense(active, inactive, fail_threshold=2)
+        assert active == [sensor]
+        assert inactive == []
+        assert demoted1 == []
+        assert sensor.consecutive_fails == 1
+
+        _, _, demoted2 = sense(active, inactive, fail_threshold=2)
+        assert active == []
+        assert inactive == [sensor]
+        assert len(demoted2) == 1
+        assert demoted2[0].sensor is sensor
+        assert "boom" in demoted2[0].traceback
+        # 降格時にカウンタはリセット
+        assert sensor.consecutive_fails == 0
+
+    def test_does_not_demote_without_inactive_list(self, mock_smbus):
+        """inactive_sensor_list 未指定なら降格しない (後方互換)"""
+        from my_lib.sensor import sense
+
+        sensor = MockSensor(name="FailingSensor")
+        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError)
+
+        active = [sensor]
+
+        for _ in range(5):
+            sense(active)
+
+        assert active == [sensor]
+        assert sensor.consecutive_fails == 5
 
 
 class TestLoad:

@@ -18,6 +18,7 @@ class SensorBase(ABC):
     NAME: str = "Unknown"
     TYPE: str = "Unknown"
     required: bool = False
+    consecutive_fails: int = 0
 
     @abstractmethod
     def ping(self) -> bool:

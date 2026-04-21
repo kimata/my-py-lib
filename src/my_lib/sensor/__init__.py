@@ -3,7 +3,8 @@ from __future__ import annotations
 import importlib
 import logging
 import pathlib
-from typing import TYPE_CHECKING, Any
+import traceback
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import my_lib.sensor
 import my_lib.sensor.i2cbus
@@ -33,10 +34,18 @@ if TYPE_CHECKING:
         NAME: str
         TYPE: str
         required: bool
+        consecutive_fails: int
         dev_addr: int  # I2C デバイスアドレス（I2C センサーの場合）
 
         def ping(self) -> bool: ...
         def get_value_map(self) -> dict[str, SensorValue]: ...
+
+
+class DemotedSensor(NamedTuple):
+    """sense() 中で active から inactive に降格したセンサーと、その決め手となったトレースバック。"""
+
+    sensor: Any
+    traceback: str
 
 
 iolink = importlib.import_module(".io_link", __package__)
@@ -150,25 +159,47 @@ def retry_inactive(
         logging.info("Sensor %s has come back online.", sensor.NAME)
         inactive_sensor_list.pop(index)
         active_sensor_list.append(sensor)
+        sensor.consecutive_fails = 0
         # NOTE: リストが縮むので、次回は同じ index から始める
         return index
 
     return index + 1
 
 
-def sense(sensor_list: list[SensorProtocol]) -> tuple[dict[str, SensorValue], bool]:
+def sense(
+    active_sensor_list: list[SensorProtocol],
+    inactive_sensor_list: list[SensorProtocol] | None = None,
+    fail_threshold: int = 2,
+) -> tuple[dict[str, SensorValue], bool, list[DemotedSensor]]:
+    """active なセンサーを計測し、連続失敗したセンサーを inactive に降格する。
+
+    inactive_sensor_list を与えた場合、連続で fail_threshold 回失敗した
+    センサーを active_sensor_list から inactive_sensor_list に移す。
+    戻り値の 3 番目は今回降格したセンサーとその時のトレースバック。
+    """
     value_map: dict[str, SensorValue] = {}
     is_success = True
-    for sensor in sensor_list:
+    newly_demoted: list[DemotedSensor] = []
+    # NOTE: ループ中に active_sensor_list を変更する可能性があるのでコピーを走査
+    for sensor in list(active_sensor_list):
         try:
             logging.info("Measurement is taken using %s", sensor.NAME)
             val = sensor.get_value_map()
             logging.info(val)
             value_map.update(val)
+            sensor.consecutive_fails = 0
         except Exception:
             logging.exception("Failed to measure using %s", sensor.NAME)
             is_success = False
+            sensor.consecutive_fails += 1
+            if inactive_sensor_list is not None and sensor.consecutive_fails >= fail_threshold:
+                tb = traceback.format_exc()
+                active_sensor_list.remove(sensor)
+                inactive_sensor_list.append(sensor)
+                sensor.consecutive_fails = 0
+                newly_demoted.append(DemotedSensor(sensor=sensor, traceback=tb))
+                logging.warning("Sensor %s demoted to inactive after consecutive failures.", sensor.NAME)
 
     logging.info("Measured results: %s", value_map)
 
-    return (value_map, is_success)
+    return (value_map, is_success, newly_demoted)
