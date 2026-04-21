@@ -249,11 +249,11 @@ class TestSense:
         sensor2 = MockSensor(name="Sensor2")
         sensor2._values = {"humidity": 60.0}
 
-        value_map, is_success, demoted = sense([sensor1, sensor2])
+        value_map, is_success, failed = sense([sensor1, sensor2])
 
         assert value_map == {"temp": 25.0, "humidity": 60.0}
         assert is_success is True
-        assert demoted == []
+        assert failed == []
 
     def test_returns_false_on_exception(self, mock_smbus):
         """例外が発生した場合は is_success が False"""
@@ -293,11 +293,11 @@ class TestSense:
         """空のリストを渡すと空の値マップを返す"""
         from my_lib.sensor import sense
 
-        value_map, is_success, demoted = sense([])
+        value_map, is_success, failed = sense([])
 
         assert value_map == {}
         assert is_success is True
-        assert demoted == []
+        assert failed == []
 
     def test_resets_counter_on_success(self, mock_smbus):
         """成功時は consecutive_fails を 0 にリセットする"""
@@ -318,49 +318,66 @@ class TestSense:
         sensor = MockSensor(name="FailingSensor")
         sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError)
 
-        sense([sensor])  # inactive_sensor_list 未指定なので降格しない
+        sense([sensor])
 
         assert sensor.consecutive_fails == 1
 
-    def test_demotes_after_threshold(self, mock_smbus):
-        """連続 fail_threshold 回失敗で inactive に降格する"""
+    def test_emits_failed_sensor_only_when_threshold_reached(self, mock_smbus):
+        """連続失敗回数が threshold に到達した瞬間のみ failed_sensor を返す"""
         from my_lib.sensor import sense
 
         sensor = MockSensor(name="FailingSensor")
         sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("boom"))
 
         active = [sensor]
-        inactive: list = []
 
-        _, _, demoted1 = sense(active, inactive, fail_threshold=2)
-        assert active == [sensor]
-        assert inactive == []
-        assert demoted1 == []
+        # 1 回目: まだ threshold に達していないので failed は空
+        _, _, failed1 = sense(active, fail_threshold=2)
         assert sensor.consecutive_fails == 1
+        assert failed1 == []
+        # センサーは active に残る
+        assert active == [sensor]
 
-        _, _, demoted2 = sense(active, inactive, fail_threshold=2)
-        assert active == []
-        assert inactive == [sensor]
-        assert len(demoted2) == 1
-        assert demoted2[0].sensor is sensor
-        assert "boom" in demoted2[0].traceback
-        # 降格時にカウンタはリセット
-        assert sensor.consecutive_fails == 0
+        # 2 回目: ちょうど threshold に到達 → 通知用に返る
+        _, _, failed2 = sense(active, fail_threshold=2)
+        assert sensor.consecutive_fails == 2
+        assert len(failed2) == 1
+        assert failed2[0].sensor is sensor
+        assert "boom" in failed2[0].traceback
+        # 降格はしない
+        assert active == [sensor]
 
-    def test_does_not_demote_without_inactive_list(self, mock_smbus):
-        """inactive_sensor_list 未指定なら降格しない (後方互換)"""
+        # 3 回目以降: 連続失敗は続くが再通知しない
+        _, _, failed3 = sense(active, fail_threshold=2)
+        assert sensor.consecutive_fails == 3
+        assert failed3 == []
+        _, _, failed4 = sense(active, fail_threshold=2)
+        assert sensor.consecutive_fails == 4
+        assert failed4 == []
+
+    def test_re_emits_after_recovery_and_fail_again(self, mock_smbus):
+        """一度成功で counter リセット後、再度 2 連続失敗したら再通知する"""
         from my_lib.sensor import sense
 
         sensor = MockSensor(name="FailingSensor")
-        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError)
 
-        active = [sensor]
+        # 2 連続失敗 → 通知
+        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("first"))
+        sense([sensor])
+        _, _, failed_first = sense([sensor])
+        assert len(failed_first) == 1
 
-        for _ in range(5):
-            sense(active)
+        # 成功 → counter リセット
+        sensor.get_value_map = unittest.mock.MagicMock(return_value={"temp": 1.0})
+        sense([sensor])
+        assert sensor.consecutive_fails == 0
 
-        assert active == [sensor]
-        assert sensor.consecutive_fails == 5
+        # 再度 2 連続失敗 → 再通知
+        sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("second"))
+        sense([sensor])
+        _, _, failed_second = sense([sensor])
+        assert len(failed_second) == 1
+        assert "second" in failed_second[0].traceback
 
 
 class TestLoad:

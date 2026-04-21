@@ -41,8 +41,8 @@ if TYPE_CHECKING:
         def get_value_map(self) -> dict[str, SensorValue]: ...
 
 
-class DemotedSensor(NamedTuple):
-    """sense() 中で active から inactive に降格したセンサーと、その決め手となったトレースバック。"""
+class FailedSensor(NamedTuple):
+    """sense() 中で連続失敗の閾値に達したセンサーと、その時点のトレースバック。"""
 
     sensor: Any
     traceback: str
@@ -168,20 +168,20 @@ def retry_inactive(
 
 def sense(
     active_sensor_list: list[SensorProtocol],
-    inactive_sensor_list: list[SensorProtocol] | None = None,
     fail_threshold: int = 2,
-) -> tuple[dict[str, SensorValue], bool, list[DemotedSensor]]:
-    """active なセンサーを計測し、連続失敗したセンサーを inactive に降格する。
+) -> tuple[dict[str, SensorValue], bool, list[FailedSensor]]:
+    """active なセンサーを計測する。
 
-    inactive_sensor_list を与えた場合、連続で fail_threshold 回失敗した
-    センサーを active_sensor_list から inactive_sensor_list に移す。
-    戻り値の 3 番目は今回降格したセンサーとその時のトレースバック。
+    各センサーの連続失敗回数を sensor.consecutive_fails で保持する。
+    連続失敗回数が fail_threshold にちょうど達したセンサーを
+    newly_failed として返す (同じ連続失敗ストリーク内で 1 回だけ)。
+    センサーは降格しない。呼び出し側が is_success=False を見て
+    liveness 更新をスキップするなどの判断を行う。
     """
     value_map: dict[str, SensorValue] = {}
     is_success = True
-    newly_demoted: list[DemotedSensor] = []
-    # NOTE: ループ中に active_sensor_list を変更する可能性があるのでコピーを走査
-    for sensor in list(active_sensor_list):
+    newly_failed: list[FailedSensor] = []
+    for sensor in active_sensor_list:
         try:
             logging.info("Measurement is taken using %s", sensor.NAME)
             val = sensor.get_value_map()
@@ -192,14 +192,10 @@ def sense(
             logging.exception("Failed to measure using %s", sensor.NAME)
             is_success = False
             sensor.consecutive_fails += 1
-            if inactive_sensor_list is not None and sensor.consecutive_fails >= fail_threshold:
-                tb = traceback.format_exc()
-                active_sensor_list.remove(sensor)
-                inactive_sensor_list.append(sensor)
-                sensor.consecutive_fails = 0
-                newly_demoted.append(DemotedSensor(sensor=sensor, traceback=tb))
-                logging.warning("Sensor %s demoted to inactive after consecutive failures.", sensor.NAME)
+            # NOTE: ちょうど閾値に達した瞬間のみ返す (以降の連続失敗では再通知させない)
+            if sensor.consecutive_fails == fail_threshold:
+                newly_failed.append(FailedSensor(sensor=sensor, traceback=traceback.format_exc()))
 
     logging.info("Measured results: %s", value_map)
 
-    return (value_map, is_success, newly_demoted)
+    return (value_map, is_success, newly_failed)
