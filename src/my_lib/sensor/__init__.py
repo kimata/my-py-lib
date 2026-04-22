@@ -74,11 +74,11 @@ __all__ = [
 
 
 def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorProtocol]:
-    logging.info("Load drivers...")
+    logging.info("ドライバをロード中...")
 
     sensor_list: list[SensorProtocol] = []
     for sensor_def in sensor_def_list:
-        logging.info("Load %s driver", sensor_def["name"])
+        logging.info("%s ドライバをロード", sensor_def["name"])
 
         param: dict[str, Any] = {}
         if "uart_dev" in sensor_def:
@@ -92,7 +92,7 @@ def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorProtocol]:
                 dev_file = pathlib.Path(f"/dev/i2c-{param['bus_id']}")
                 if not dev_file.exists():
                     logging.warning(
-                        "I2C bus %d (%s) does NOT exist. skipping.", sensor_def["i2c_bus"], dev_file
+                        "I2C bus %d (%s) が存在しないためスキップ", sensor_def["i2c_bus"], dev_file
                     )
                     continue
 
@@ -119,23 +119,23 @@ def sensor_info(sensor: SensorProtocol) -> str:
 def ping(
     sensor_list: list[SensorProtocol],
 ) -> tuple[list[SensorProtocol], list[SensorProtocol]]:
-    logging.info("Check sensor existences...")
+    logging.info("センサーの存在確認中...")
 
     active_sensor_list: list[SensorProtocol] = []
     inactive_sensor_list: list[SensorProtocol] = []
     for sensor in sensor_list:
         if sensor.ping():
-            logging.info("Sensor %s exists.", sensor.NAME)
+            logging.info("センサー %s は応答あり", sensor.NAME)
             active_sensor_list.append(sensor)
         else:
             if sensor.required:
-                logging.error("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
-                raise RuntimeError("The required sensor could not be found.")
+                logging.error("必須センサー %s が見つかりません", sensor.NAME)
+                raise RuntimeError("必須センサーが見つかりませんでした")
             else:
-                logging.warning("Sensor %s dost NOT exists. Ignored.", sensor.NAME)
+                logging.warning("センサー %s が応答しないため無効化", sensor.NAME)
                 inactive_sensor_list.append(sensor)
 
-    logging.info("Active sensor list: %s", ", ".join([sensor_info(sensor) for sensor in active_sensor_list]))
+    logging.info("有効なセンサー: %s", ", ".join([sensor_info(sensor) for sensor in active_sensor_list]))
     return active_sensor_list, inactive_sensor_list
 
 
@@ -153,10 +153,10 @@ def retry_inactive(
 
     index %= len(inactive_sensor_list)
     sensor = inactive_sensor_list[index]
-    logging.debug("Retry ping for inactive sensor %s", sensor.NAME)
+    logging.debug("無効化されたセンサー %s を ping で再試行", sensor.NAME)
 
     if sensor.ping():
-        logging.info("Sensor %s has come back online.", sensor.NAME)
+        logging.info("センサー %s が復帰", sensor.NAME)
         inactive_sensor_list.pop(index)
         active_sensor_list.append(sensor)
         sensor.consecutive_fails = 0
@@ -183,19 +183,19 @@ def sense(
     newly_failed: list[FailedSensor] = []
     for sensor in active_sensor_list:
         try:
-            logging.info("Measurement is taken using %s", sensor.NAME)
+            logging.info("センサー %s で計測", sensor.NAME)
             val = sensor.get_value_map()
             logging.info(val)
             value_map.update(val)
             sensor.consecutive_fails = 0
         except Exception:
-            logging.exception("Failed to measure using %s", sensor.NAME)
+            logging.exception("センサー %s の計測に失敗", sensor.NAME)
             is_success = False
             sensor.consecutive_fails += 1
             # NOTE: ちょうど閾値に達した瞬間のみ返す (以降の連続失敗では再通知させない)
             if sensor.consecutive_fails == fail_threshold:
                 newly_failed.append(FailedSensor(sensor=sensor, traceback=traceback.format_exc()))
 
-    logging.info("Measured results: %s", value_map)
+    logging.info("計測結果: %s", value_map)
 
     return (value_map, is_success, newly_failed)

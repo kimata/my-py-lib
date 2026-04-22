@@ -99,7 +99,7 @@ class TestPing:
         sensor._ping_result = False
         sensor.required = True
 
-        with pytest.raises(RuntimeError, match="required sensor"):
+        with pytest.raises(RuntimeError, match="必須センサー"):
             ping([sensor])
 
     def test_empty_list_returns_empty(self, mock_smbus):

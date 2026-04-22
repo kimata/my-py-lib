@@ -38,7 +38,7 @@ def ltc2874_reg_write(spi: spidev.SpiDev, reg: int, data: int) -> None:
 
 
 def ltc2874_reset(spi: spidev.SpiDev) -> None:
-    logging.info("Reset LTC2874")
+    logging.info("LTC2874 をリセット")
     spi.xfer2([0x07 << 5, 0x00])
 
 
@@ -97,12 +97,12 @@ def com_status(spi: spidev.SpiDev) -> bool:
 def com_start(spi: spidev.SpiDev) -> serial.Serial:
     BOOT_WAIT_SEC = 5
     if com_status(spi):
-        logging.debug("IO-Link is already Powered-ON")
+        logging.debug("IO-Link は既に通電済み")
     else:
         # Power on, CQ OC Timeout = 480us
-        logging.info("***** Power-On IO-Link ****")
+        logging.info("***** IO-Link を通電 ****")
         ltc2874_reg_write(spi, 0x0E, 0x11)
-        logging.info("Wait for device booting (%d sec)", BOOT_WAIT_SEC)
+        logging.info("デバイス起動待ち (%d 秒)", BOOT_WAIT_SEC)
         time.sleep(BOOT_WAIT_SEC)
 
     # Wakeup
@@ -130,7 +130,7 @@ def com_stop(spi: spidev.SpiDev, ser: serial.Serial | None = None, is_power_off:
 
     if is_power_off:
         # Power off
-        logging.info("***** Power-Off IO-Link ****")
+        logging.info("***** IO-Link を遮断 ****")
         ltc2874_reg_write(spi, 0x0E, 0x00)
 
 
@@ -171,9 +171,9 @@ def dir_param_read(spi: spidev.SpiDev, ser: serial.Serial, addr: int) -> int:
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise SensorCommunicationError("response is too short")
+        raise SensorCommunicationError("レスポンスが短すぎる")
     elif data[1] != msq_checksum([data[0]]):
-        raise SensorCRCError("checksum unmatch")
+        raise SensorCRCError("チェックサム不一致")
 
     return data[0]
 
@@ -193,9 +193,9 @@ def dir_param_write(spi: spidev.SpiDev, ser: serial.Serial, addr: int, value: in
     data = com_read(spi, ser, 4)[3:]
 
     if len(data) < 1:
-        raise SensorCommunicationError("response is too short")
+        raise SensorCommunicationError("レスポンスが短すぎる")
     elif data[0] != msq_checksum([]):
-        raise SensorCRCError("checksum unmatch")
+        raise SensorCRCError("チェックサム不一致")
 
 
 def isdu_req_build(index: int, length: int) -> list[list[int]]:
@@ -234,9 +234,9 @@ def isdu_res_read(spi: spidev.SpiDev, ser: serial.Serial, flow: int) -> int:
     data = com_read(spi, ser, 4)[2:]
 
     if len(data) < 2:
-        raise SensorCommunicationError("response is too short")
+        raise SensorCommunicationError("レスポンスが短すぎる")
     if data[1] != msq_checksum([data[0]]):
-        raise SensorCRCError("checksum unmatch")
+        raise SensorCRCError("チェックサム不一致")
 
     return data[0]
 
@@ -267,12 +267,12 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
                 remain = (header & 0x0F) - 1
             break
         elif header == 0x01:
-            logging.warning("WAIT response")
+            logging.warning("WAIT レスポンス受信")
             continue
         elif (header >> 4) == 0x0C:
-            raise SensorCommunicationError("ERROR response")
+            raise SensorCommunicationError("ERROR レスポンス受信")
         else:
-            raise SensorCommunicationError(f"INVALID response: {pprint.pformat(header)}")
+            raise SensorCommunicationError(f"不明なレスポンス: {pprint.pformat(header)}")
 
     for _ in range(remain - 1):
         res = isdu_res_read(spi, ser, flow & 0xF)
@@ -283,7 +283,7 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
     chk ^= isdu_res_read(spi, ser, flow)
 
     if chk != 0x00:
-        raise SensorCRCError("ISDU checksum unmatch")
+        raise SensorCRCError("ISDU チェックサム不一致")
 
     if data_type == DATA_TYPE_STRING:
         return bytes(data_list).decode("utf-8")
