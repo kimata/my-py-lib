@@ -100,6 +100,28 @@ class TestCheckLiveness:
         assert elapsed is not None
         assert elapsed > 0
 
+    def test_returns_false_when_mtime_in_future(self, temp_dir):
+        """mtime が未来のファイル (時刻巻き戻しで負の elapsed) を異常と判定する"""
+        import my_lib.footprint
+        import my_lib.healthz
+        from my_lib.healthz import HealthzTarget
+
+        liveness_file = temp_dir / "liveness"
+        # 1時間先の時刻で更新
+        future_time = time.time() + 3600
+        my_lib.footprint.update(liveness_file, mtime=future_time)
+
+        target = HealthzTarget(
+            name="test",
+            liveness_file=liveness_file,
+            interval=60.0,
+        )
+
+        assert not my_lib.healthz.check_liveness(target)
+        elapsed = my_lib.healthz.check_liveness_elapsed(target)
+        assert elapsed is not None
+        assert elapsed < 0
+
 
 class TestCheckLivenessAll:
     """check_liveness_all 関数のテスト"""

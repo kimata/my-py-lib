@@ -51,9 +51,12 @@ def check_liveness_elapsed(target: HealthzTarget) -> float | None:
     if elapsed > max(target.interval * 2, 60):
         logging.warning("Execution interval of %s is too long. %s sec)", target.name, f"{elapsed:,.1f}")
         return elapsed
-    else:
-        logging.debug("Execution interval of %s: %s sec)", target.name, f"{elapsed:,.1f}")
-        return None
+    if elapsed < -60:
+        # mtime が現在時刻より未来。時刻の巻き戻しで elapsed が負になったケースを異常とみなす。
+        logging.warning("Liveness file mtime is in the future for %s. %s sec", target.name, f"{elapsed:,.1f}")
+        return elapsed
+    logging.debug("Execution interval of %s: %s sec)", target.name, f"{elapsed:,.1f}")
+    return None
 
 
 def check_liveness_all(target_list: list[HealthzTarget]) -> list[str]:
