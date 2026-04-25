@@ -191,7 +191,9 @@ def _execute_item(
 
     try:
         wait.until(
-            selenium.webdriver.support.expected_conditions.title_contains(re.sub(" +", " ", item.name))
+            selenium.webdriver.support.expected_conditions.text_to_be_present_in_element(
+                (selenium.webdriver.common.by.By.XPATH, "//h1"), re.sub(" +", " ", item.name)
+            )
         )
     except selenium.common.exceptions.TimeoutException:
         logging.exception("Invalid title: %s", driver.title)
