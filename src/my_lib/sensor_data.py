@@ -223,6 +223,7 @@ def _fetch_data_impl(
     window: int,
     create_empty: bool,
     last: bool = False,
+    timeout_sec: float = 10.0,
 ) -> TableList:
     client = None
     try:
@@ -243,7 +244,9 @@ def _fetch_data_impl(
             query += " |> last()"
 
         logging.debug("Flux query = %s", query)
-        client = influxdb_client.InfluxDBClient(url=db_config.url, token=token, org=db_config.org)  # pyright: ignore[reportPrivateImportUsage]
+        client = influxdb_client.InfluxDBClient(  # pyright: ignore[reportPrivateImportUsage]
+            url=db_config.url, token=token, org=db_config.org, timeout=int(timeout_sec * 1000)
+        )
         query_api = client.query_api()
 
         return query_api.query(query=query)
@@ -267,6 +270,7 @@ async def _fetch_data_impl_async(
     window: int,
     create_empty: bool,
     last: bool = False,
+    timeout_sec: float = 10.0,
 ) -> TableList:
     """非同期版のデータ取得実装"""
     loop = asyncio.get_event_loop()
@@ -284,6 +288,7 @@ async def _fetch_data_impl_async(
         window,
         create_empty,
         last,
+        timeout_sec,
     )
 
 
@@ -298,6 +303,7 @@ def fetch_data(
     window_min: int = 3,
     create_empty: bool = True,
     last: bool = False,
+    timeout_sec: float = 10.0,
 ) -> SensorDataResult:
     time_start = time.time()
     logging.debug(
@@ -332,6 +338,7 @@ def fetch_data(
             window_min,
             create_empty,
             last,
+            timeout_sec,
         )
         time_fetched = time.time()
 
@@ -363,6 +370,7 @@ async def fetch_data_async(
     window_min: int = 3,
     create_empty: bool = True,
     last: bool = False,
+    timeout_sec: float = 10.0,
 ) -> SensorDataResult:
     """非同期版のfetch_data"""
     time_start = time.time()
@@ -398,6 +406,7 @@ async def fetch_data_async(
             window_min,
             create_empty,
             last,
+            timeout_sec,
         )
         time_fetched = time.time()
 
