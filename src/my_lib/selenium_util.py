@@ -318,6 +318,19 @@ def create_driver(
     actual_profile_name = my_lib.chrome_util._get_actual_profile_name(profile_name)
     profile_path = data_path / "chrome" / actual_profile_name
 
+    # 過去の連続起動失敗が閾値以上に達していれば、健全性チェックを通過していても強制退避
+    # （JSON/DB レベルの破損は検出できるが、Chrome バージョン非互換等のステルス破損は検出できないため）
+    if auto_recover:
+        failure_count = my_lib.chrome_util._read_startup_failure_count(profile_path)
+        if failure_count >= my_lib.chrome_util.STARTUP_FAILURE_THRESHOLD:
+            logging.warning(
+                "Profile had %d consecutive startup failures (threshold: %d), forcing recovery",
+                failure_count,
+                my_lib.chrome_util.STARTUP_FAILURE_THRESHOLD,
+            )
+            my_lib.chrome_util._recover_corrupted_profile(profile_path)
+            my_lib.chrome_util._clear_startup_failures(profile_path)
+
     # プロファイル健全性チェック
     health = my_lib.chrome_util._check_profile_health(profile_path)
     if not health.is_healthy:
@@ -340,9 +353,11 @@ def create_driver(
 
     # NOTE: 1回だけ自動リトライ
     try:
-        return _create_driver_impl(
+        driver = _create_driver_impl(
             profile_name, data_path, is_headless, use_subprocess, use_undetected, stealth_mode
         )
+        my_lib.chrome_util._clear_startup_failures(profile_path)
+        return driver
     except Exception as e:
         logging.warning("First attempt to create driver failed: %s", e)
 
@@ -358,9 +373,20 @@ def create_driver(
             logging.warning("Profile still corrupted after first attempt, recovering")
             my_lib.chrome_util._recover_corrupted_profile(profile_path)
 
-        return _create_driver_impl(
-            profile_name, data_path, is_headless, use_subprocess, use_undetected, stealth_mode
-        )
+        try:
+            driver = _create_driver_impl(
+                profile_name, data_path, is_headless, use_subprocess, use_undetected, stealth_mode
+            )
+            my_lib.chrome_util._clear_startup_failures(profile_path)
+            return driver
+        except Exception:
+            new_count = my_lib.chrome_util._record_startup_failure(profile_path)
+            logging.warning(
+                "Driver creation failed (consecutive failures: %d, threshold: %d)",
+                new_count,
+                my_lib.chrome_util.STARTUP_FAILURE_THRESHOLD,
+            )
+            raise
 
 
 def xpath_exists(driver: WebDriver, xpath: str) -> bool:

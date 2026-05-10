@@ -19,6 +19,11 @@ import psutil
 
 import my_lib.time
 
+# NOTE: 連続起動失敗回数がこの閾値以上に達したら、健全性チェックを通過していても
+# プロファイルを破損とみなして強制退避する。健全性チェックでは検出できないステルス破損
+# （Chrome バージョン非互換等）に対する保険。
+STARTUP_FAILURE_THRESHOLD = 3
+
 
 @dataclass(frozen=True)
 class _ProfileHealthResult:
@@ -207,6 +212,43 @@ def _cleanup_corrupted_backups(
             logging.info("Removed old corrupted backup: %s", old_backup)
         except Exception:
             logging.exception("Failed to remove corrupted backup: %s", old_backup)
+
+
+def _startup_failure_marker_path(profile_path: pathlib.Path) -> pathlib.Path:
+    """連続起動失敗カウントを記録するマーカーファイルのパス"""
+    return profile_path.parent / f"{profile_path.name}.startup_failures"
+
+
+def _read_startup_failure_count(profile_path: pathlib.Path) -> int:
+    """連続起動失敗回数を読み取る（ファイル不在や読み取り失敗は 0 扱い）"""
+    marker = _startup_failure_marker_path(profile_path)
+    if not marker.exists():
+        return 0
+    try:
+        return int(marker.read_text().strip())
+    except (ValueError, OSError):
+        return 0
+
+
+def _record_startup_failure(profile_path: pathlib.Path) -> int:
+    """起動失敗を記録し、新しい連続失敗回数を返す"""
+    count = _read_startup_failure_count(profile_path) + 1
+    marker = _startup_failure_marker_path(profile_path)
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(str(count))
+    except OSError:
+        logging.exception("Failed to write startup failure marker: %s", marker)
+    return count
+
+
+def _clear_startup_failures(profile_path: pathlib.Path) -> None:
+    """連続起動失敗カウントをクリア（起動成功時や強制退避時に呼び出す）"""
+    marker = _startup_failure_marker_path(profile_path)
+    try:
+        marker.unlink(missing_ok=True)
+    except OSError:
+        logging.exception("Failed to remove startup failure marker: %s", marker)
 
 
 def _cleanup_profile_lock(profile_path: pathlib.Path) -> None:

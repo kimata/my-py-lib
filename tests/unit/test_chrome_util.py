@@ -176,6 +176,95 @@ class TestRecoverCorruptedProfile:
         assert len(backup_dirs) == 1
 
 
+class TestStartupFailureMarker:
+    """連続起動失敗マーカー関連の関数テスト"""
+
+    def test_read_returns_zero_when_marker_missing(self, temp_dir):
+        """マーカー不在時は 0 を返す"""
+        profile_path = temp_dir / "chrome" / "profile"
+
+        result = my_lib.chrome_util._read_startup_failure_count(profile_path)
+
+        assert result == 0
+
+    def test_read_returns_value_from_marker(self, temp_dir):
+        """マーカーから値を読み取る"""
+        profile_path = temp_dir / "chrome" / "profile"
+        profile_path.parent.mkdir(parents=True)
+        marker = profile_path.parent / f"{profile_path.name}.startup_failures"
+        marker.write_text("5")
+
+        result = my_lib.chrome_util._read_startup_failure_count(profile_path)
+
+        assert result == 5
+
+    def test_read_returns_zero_for_invalid_content(self, temp_dir):
+        """無効な内容のマーカーは 0 扱い"""
+        profile_path = temp_dir / "chrome" / "profile"
+        profile_path.parent.mkdir(parents=True)
+        marker = profile_path.parent / f"{profile_path.name}.startup_failures"
+        marker.write_text("not a number")
+
+        result = my_lib.chrome_util._read_startup_failure_count(profile_path)
+
+        assert result == 0
+
+    def test_record_increments_count(self, temp_dir):
+        """失敗を記録するとカウントが増える"""
+        profile_path = temp_dir / "chrome" / "profile"
+        profile_path.parent.mkdir(parents=True)
+
+        first = my_lib.chrome_util._record_startup_failure(profile_path)
+        second = my_lib.chrome_util._record_startup_failure(profile_path)
+        third = my_lib.chrome_util._record_startup_failure(profile_path)
+
+        assert first == 1
+        assert second == 2
+        assert third == 3
+
+    def test_record_creates_parent_directory(self, temp_dir):
+        """親ディレクトリが存在しなくても作成して記録する"""
+        profile_path = temp_dir / "nonexistent" / "profile"
+
+        result = my_lib.chrome_util._record_startup_failure(profile_path)
+
+        assert result == 1
+        marker = profile_path.parent / f"{profile_path.name}.startup_failures"
+        assert marker.exists()
+
+    def test_clear_removes_marker(self, temp_dir):
+        """クリアでマーカーが削除される"""
+        profile_path = temp_dir / "chrome" / "profile"
+        profile_path.parent.mkdir(parents=True)
+        my_lib.chrome_util._record_startup_failure(profile_path)
+        marker = profile_path.parent / f"{profile_path.name}.startup_failures"
+        assert marker.exists()
+
+        my_lib.chrome_util._clear_startup_failures(profile_path)
+
+        assert not marker.exists()
+
+    def test_clear_handles_missing_marker(self, temp_dir):
+        """マーカー不在でもエラーにならない"""
+        profile_path = temp_dir / "chrome" / "profile"
+
+        # 例外が発生しないことを確認
+        my_lib.chrome_util._clear_startup_failures(profile_path)
+
+    def test_marker_path_does_not_collide_with_corrupted_backup(self, temp_dir):
+        """マーカーが corrupted バックアップのクリーンアップ対象にならない"""
+        profile_path = temp_dir / "chrome" / "profile"
+        profile_path.mkdir(parents=True)
+
+        my_lib.chrome_util._record_startup_failure(profile_path)
+        # NOTE: _recover_corrupted_profile は keep_latest=1 で過去の corrupted を掃除するが、
+        #       マーカーファイルは startup_failures サフィックスでファイルなので対象外
+        my_lib.chrome_util._recover_corrupted_profile(profile_path)
+
+        marker = profile_path.parent / f"{profile_path.name}.startup_failures"
+        assert marker.exists()
+
+
 class TestCleanupProfileLock:
     """_cleanup_profile_lock 関数のテスト"""
 
