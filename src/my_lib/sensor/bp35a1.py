@@ -87,10 +87,15 @@ class BP35A1:
         self.__send_command(command)
 
     def scan_channel(self, start_duration: int = 3) -> PanDescriptor | None:
+        # NOTE: MODE 3 (active scan with IE) は MODE 2 より検出率が高い。
+        # メーター側のビーコン送信特性 (頻度・強度) が経年で変化すると
+        # MODE 2 + 短い duration では拾えなくなるため MODE 3 を使う。
+        # duration 9 で各チャネル ~5s, 33ch で約 165 秒。それ以上は 1 サイクルが
+        # Liveness probe の閾値を超えるため上限とする。
         duration = start_duration
         pan_info: PanDescriptor | None = None
         for _ in range(RETRY_COUNT):
-            command = f"SKSCAN 2 {((1 << 32) - 1):X} {duration}"
+            command = f"SKSCAN 3 {((1 << 32) - 1):X} {duration}"
             self.__send_command(command)
 
             for _ in range(WAIT_COUNT):
@@ -106,7 +111,7 @@ class BP35A1:
                 return pan_info
 
             duration += 1
-            if duration > 7:
+            if duration > 9:
                 return None
 
         return None

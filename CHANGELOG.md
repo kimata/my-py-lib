@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.5] - 2026-05-23
+
+### Fixed
+
+- `BP35A1.scan_channel` の検出率を改善:
+    - SKSCAN の MODE を 2 (active scan) から 3 (active scan with IE) に変更。IE 付きの方が検出率が高い
+    - duration の上限を 7 から 9 に拡張 (各チャネル滞在時間を最大 ~5 秒に)
+- メーター側のビーコン送信特性 (送信周期・強度) が経年で変化した場合に、従来 (MODE 2 + duration 上限 7) では PAN ビーコンを拾えなくなるケースに対応
+
 ## [0.2.4] - 2026-05-23
 
 ### Fixed
