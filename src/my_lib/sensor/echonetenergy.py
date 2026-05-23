@@ -25,6 +25,7 @@ from typing import Any
 
 import my_lib.sensor
 from my_lib.sensor.base import SensorValue, UARTSensorBase
+from my_lib.sensor.bp35a1 import PanDescriptor
 from my_lib.sensor.echonetlite import ECHONETLite, EchonetLiteFrame, EchonetLiteProperty
 
 PAN_DESC_DAT_PATH: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
@@ -61,27 +62,29 @@ class EchonetEnergy(UARTSensorBase):
         return frame
 
     # PAN ID の探索 (キャッシュ付き)
-    def get_pan_info(self) -> dict[str, str] | None:
+    def get_pan_info(self) -> PanDescriptor | None:
         if PAN_DESC_DAT_PATH.exists():
             with PAN_DESC_DAT_PATH.open(mode="rb") as f:
                 try:
                     pan_info = pickle.load(f)  # noqa: S301
-                    if isinstance(pan_info, dict):
+                    if isinstance(pan_info, PanDescriptor):
                         return pan_info
                 except Exception:  # noqa: S110
                     pass
 
         pan_info = self._get_pan_info_impl()
 
-        with PAN_DESC_DAT_PATH.open(mode="wb") as f:
-            pickle.dump(pan_info, f)
+        # NOTE: 失敗 (None) はキャッシュしない。次回起動で再 scan できるように。
+        if pan_info is not None:
+            with PAN_DESC_DAT_PATH.open(mode="wb") as f:
+                pickle.dump(pan_info, f)
 
         return pan_info
 
-    def _get_pan_info_impl(self) -> dict[str, str] | None:
+    def _get_pan_info_impl(self) -> PanDescriptor | None:
         return self.echonet_if.scan_channel()
 
-    def connect(self, pan_info: dict[str, str]) -> None:
+    def connect(self, pan_info: PanDescriptor) -> None:
         self.echonet_if.set_id(self.b_id)
         self.echonet_if.set_password(self.b_pass)
 

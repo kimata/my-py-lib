@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.4] - 2026-05-23
+
+### Fixed
+
+- `EchonetEnergy.get_pan_info()` の PAN 情報キャッシュが完全に機能していないバグを修正。`scan_channel()` は `PanDescriptor` (dataclass) を返すのにキャッシュ読込時の判定が `isinstance(pan_info, dict)` のままだったため、永遠に成立せず毎回 scan が走っていた。`isinstance(pan_info, PanDescriptor)` に修正し、`None` (scan 失敗) をキャッシュに書き込まないように変更
+- 関連する型注釈 (`get_pan_info`, `_get_pan_info_impl`, `connect` の `pan_info`) を `dict[str, str]` から `PanDescriptor` に揃えた
+
 ## [0.2.3] - 2026-05-23
 
 ### Fixed
