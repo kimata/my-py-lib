@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-05-23
+
+### Fixed
+
+- `EchonetEnergy` を含む 7 つのセンサークラスが `SensorBase` を継承していなかったため、初回計測で失敗した際に `consecutive_fails` 属性の AttributeError でプロセスが死ぬバグを修正 (継承漏れ: `EchonetEnergy`, `FD_Q10C`, `RG_15`, `SM9561`, `LP_PYRA03`, `GROVE_TDS`, `ADSBase`)
+
+### Changed
+
+- センサー基底クラスの継承関係を整理:
+    - `ADSBase` を `I2CSensorBase` 継承に変更
+    - `SM9561`, `LP_PYRA03`, `GROVE_TDS` を `I2CSensorBase` 継承に変更
+    - `EchonetEnergy`, `RG_15` を新設 `UARTSensorBase` 継承に変更
+    - `FD_Q10C` を `SensorBase` 継承に変更
+- `my_lib.sensor.base` に `UARTSensorBase` を追加 (`I2CSensorBase` と対称な UART/シリアル接続センサー用基底クラス)
+- `SensorBase.__init__()` で `required` / `consecutive_fails` をインスタンス変数として明示的に初期化
+- `my_lib.sensor.SensorProtocol` (TYPE_CHECKING 内の Protocol) を廃止し、`SensorBase` に統一
+
 ## [0.2.2] - 2026-01-25
 
 ### Added

@@ -21,6 +21,7 @@ from types import TracebackType
 from typing import Any
 
 import my_lib.sensor.ltc2874 as driver
+from my_lib.sensor.base import SensorBase
 
 
 class Lock:
@@ -75,11 +76,12 @@ class Lock:
             return path.with_name(path.name + "." + suffix)
 
 
-class FD_Q10C:
+class FD_Q10C(SensorBase):
     NAME: str = "FD_Q10C"
     TYPE: str = "IO_LINK"
 
     def __init__(self) -> None:
+        super().__init__()
         self.dev_addr: int | None = None
 
     def ping(self) -> bool:

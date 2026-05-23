@@ -10,16 +10,15 @@ from __future__ import annotations
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.base import I2CSensorBase
 
 
-class ADSBase:
+class ADSBase(I2CSensorBase):
     """ADS1015/ADS1115 シリーズ ADC の共通基底クラス"""
 
     # サブクラスでオーバーライドするクラス変数
     NAME: str = ""
     DEV_ADDR: int = 0x00  # 7bit
-
-    TYPE: str = "I2C"
 
     # レジスタアドレス
     REG_CONFIG: int = 0x01
@@ -34,9 +33,7 @@ class ADSBase:
     REG_CONFIG_MUX_0G: int = 4
 
     def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int | None = None) -> None:
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr if dev_addr is not None else self.DEV_ADDR
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+        super().__init__(bus_id, dev_addr)
 
         self.mux: int = self.REG_CONFIG_MUX_01
         self.pga: int = self.REG_CONFIG_FSR_0256

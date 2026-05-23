@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 import serial
 
+from my_lib.sensor.base import UARTSensorBase
+
 
 @dataclass
 class RainEvent:
@@ -34,9 +36,8 @@ class RainEvent:
     fall_start: bool = False
 
 
-class RG_15:
+class RG_15(UARTSensorBase):
     NAME: str = "RG_15"
-    TYPE: str = "UART"
     DEV: str = "/dev/ttyAMA0"
     BAUDRATE: int = 9600
 
@@ -45,6 +46,7 @@ class RG_15:
     RAIN_STOP_INTERVAL_SEC: int = 120
 
     def __init__(self, dev: str = DEV) -> None:
+        super().__init__()
         self.dev: str = dev
         self.ser: serial.Serial = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
         self.sum_by_minute: dict[int, float] = {}

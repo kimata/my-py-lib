@@ -24,17 +24,19 @@ import tempfile
 from typing import Any
 
 import my_lib.sensor
+from my_lib.sensor.base import SensorValue, UARTSensorBase
 from my_lib.sensor.echonetlite import ECHONETLite, EchonetLiteFrame, EchonetLiteProperty
 
 PAN_DESC_DAT_PATH: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
 RETRY_COUNT: int = 5
 
 
-class EchonetEnergy:
+class EchonetEnergy(UARTSensorBase):
     NAME: str = "EchonetEnergy"
-    TYPE: str = "UART"
 
     def __init__(self, dev_file: str, param: dict[str, Any], debug: bool = False) -> None:
+        super().__init__()
+
         echonet_if = getattr(my_lib.sensor, param["if"].lower())(dev_file, debug)
 
         self.b_id: str = param["id"]
@@ -157,7 +159,7 @@ class EchonetEnergy:
                     continue
                 return [struct.unpack(">I", prop.edt)[0]]
 
-    def get_value_map(self) -> dict[str, int]:
+    def get_value_map(self) -> dict[str, SensorValue]:
         value = self.get_value()
 
         return {"power": value[0]}

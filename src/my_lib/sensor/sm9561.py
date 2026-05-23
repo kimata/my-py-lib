@@ -25,13 +25,13 @@ import logging
 import time
 
 from my_lib.sensor import i2cbus
+from my_lib.sensor.base import I2CSensorBase, SensorValue
 from my_lib.sensor.crc import crc16_modbus
 from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
 
-class SM9561:
+class SM9561(I2CSensorBase):
     NAME: str = "SM9561"
-    TYPE: str = "I2C"
     DEV_ADDR: int = 0x4D  # 7bit
 
     DEV_CRYSTCAL_FREQ: int = 7372800
@@ -51,10 +51,8 @@ class SM9561:
     REG_DLL: int = 0x00 << 3
     REG_DLH: int = 0x01 << 3
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = DEV_ADDR) -> None:
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int | None = None) -> None:
+        super().__init__(bus_id, dev_addr)
 
     def init(self) -> None:
         self.reset()
@@ -201,7 +199,7 @@ class SM9561:
 
         return [value]
 
-    def get_value_map(self) -> dict[str, int]:
+    def get_value_map(self) -> dict[str, SensorValue]:
         value = self.get_value()
 
         return {"lux": value[0]}

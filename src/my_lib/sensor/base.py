@@ -17,8 +17,18 @@ class SensorBase(ABC):
 
     NAME: str = "Unknown"
     TYPE: str = "Unknown"
+
+    # NOTE: クラス変数として既定値を持たせ、サブクラスが super().__init__() を
+    # 呼ばなくても hasattr で見つかる安全装置とする。
+    # 実体は __init__ でインスタンス変数として上書き初期化される。
     required: bool = False
     consecutive_fails: int = 0
+
+    def __init__(self) -> None:
+        # NOTE: my_lib.sensor.sense() が連続失敗回数を読み書きするため
+        # ここで必ずインスタンス変数として初期化する
+        self.required = False
+        self.consecutive_fails = 0
 
     @abstractmethod
     def ping(self) -> bool:
@@ -36,7 +46,11 @@ class SensorBase(ABC):
 
 
 class I2CSensorBase(SensorBase):
-    """I2C センサーの基底クラス"""
+    """I2C センサーの基底クラス
+
+    サブクラスは _ping_impl をオーバーライドして実装する。
+    独自の ping ロジックが必要な場合は ping 自体をオーバーライドしてもよい。
+    """
 
     TYPE: str = "I2C"
     DEV_ADDR: int = 0x00
@@ -48,6 +62,7 @@ class I2CSensorBase(SensorBase):
             bus_id: I2C バス番号
             dev_addr: デバイスアドレス（省略時はクラスのデフォルト値）
         """
+        super().__init__()
         self.bus_id: int = bus_id
         self.dev_addr: int = dev_addr if dev_addr is not None else self.DEV_ADDR
         self.i2cbus: i2cbus.I2CBUS = i2cbus.I2CBUS(bus_id)
@@ -65,7 +80,20 @@ class I2CSensorBase(SensorBase):
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
 
-    @abstractmethod
     def _ping_impl(self) -> bool:
-        """ping の実装（サブクラスでオーバーライド）"""
-        ...
+        """ping の実装。
+
+        I2CSensorBase の `ping()` を利用するサブクラスはこのメソッドを実装する。
+        `ping()` 自体をオーバーライドするサブクラスは実装不要。
+        """
+        raise NotImplementedError
+
+
+class UARTSensorBase(SensorBase):
+    """UART/シリアル接続センサーの基底クラス
+
+    UART センサーは個々の通信プロトコルが大きく異なるため、
+    本基底クラスは TYPE と consecutive_fails の初期化のみを担う。
+    """
+
+    TYPE: str = "UART"

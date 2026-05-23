@@ -4,7 +4,7 @@ import importlib
 import logging
 import pathlib
 import traceback
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import Any, NamedTuple
 
 import my_lib.sensor
 import my_lib.sensor.i2cbus
@@ -13,7 +13,7 @@ from .ads1015 import ADS1015 as ads1015
 from .ads1115 import ADS1115 as ads1115
 from .ads_base import ADSBase
 from .apds9250 import APDS9250 as apds9250
-from .base import SensorBase, SensorValue
+from .base import I2CSensorBase, SensorBase, SensorValue, UARTSensorBase
 from .bp35a1 import BP35A1 as bp35a1
 from .echonetenergy import EchonetEnergy as echonetenergy
 from .echonetlite import ECHONETLite as echonetlite
@@ -27,19 +27,6 @@ from .scd4x import SCD4X as scd4x
 from .sht35 import SHT35 as sht35
 from .sm9561 import SM9561 as sm9561
 
-if TYPE_CHECKING:
-    from typing import Protocol
-
-    class SensorProtocol(Protocol):
-        NAME: str
-        TYPE: str
-        required: bool
-        consecutive_fails: int
-        dev_addr: int  # I2C デバイスアドレス（I2C センサーの場合）
-
-        def ping(self) -> bool: ...
-        def get_value_map(self) -> dict[str, SensorValue]: ...
-
 
 class FailedSensor(NamedTuple):
     """sense() 中で連続失敗の閾値に達したセンサーと、その時点のトレースバック。"""
@@ -52,8 +39,10 @@ iolink = importlib.import_module(".io_link", __package__)
 
 __all__ = [
     "ADSBase",
+    "I2CSensorBase",
     "SensorBase",
     "SensorValue",
+    "UARTSensorBase",
     "ads1015",
     "ads1115",
     "apds9250",
@@ -73,10 +62,10 @@ __all__ = [
 ]
 
 
-def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorProtocol]:
+def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorBase]:
     logging.info("ドライバをロード中...")
 
-    sensor_list: list[SensorProtocol] = []
+    sensor_list: list[SensorBase] = []
     for sensor_def in sensor_def_list:
         logging.info("%s ドライバをロード", sensor_def["name"])
 
@@ -109,20 +98,23 @@ def load(sensor_def_list: list[dict[str, Any]]) -> list[SensorProtocol]:
     return sensor_list
 
 
-def sensor_info(sensor: SensorProtocol) -> str:
+def sensor_info(sensor: SensorBase) -> str:
     if sensor.TYPE == "I2C":
-        return f"{sensor.NAME} (I2C: 0x{sensor.dev_addr:02X})"
-    else:
-        return f"{sensor.NAME} ({sensor.TYPE})"
+        # NOTE: I2C センサーは dev_addr を持つ。SensorBase の型では明示されないので
+        # getattr で取り出す (テスト Mock が I2CSensorBase を継承していない場合にも対応)。
+        dev_addr = getattr(sensor, "dev_addr", None)
+        if isinstance(dev_addr, int):
+            return f"{sensor.NAME} (I2C: 0x{dev_addr:02X})"
+    return f"{sensor.NAME} ({sensor.TYPE})"
 
 
 def ping(
-    sensor_list: list[SensorProtocol],
-) -> tuple[list[SensorProtocol], list[SensorProtocol]]:
+    sensor_list: list[SensorBase],
+) -> tuple[list[SensorBase], list[SensorBase]]:
     logging.info("センサーの存在確認中...")
 
-    active_sensor_list: list[SensorProtocol] = []
-    inactive_sensor_list: list[SensorProtocol] = []
+    active_sensor_list: list[SensorBase] = []
+    inactive_sensor_list: list[SensorBase] = []
     for sensor in sensor_list:
         if sensor.ping():
             logging.info("センサー %s は応答あり", sensor.NAME)
@@ -140,8 +132,8 @@ def ping(
 
 
 def retry_inactive(
-    active_sensor_list: list[SensorProtocol],
-    inactive_sensor_list: list[SensorProtocol],
+    active_sensor_list: list[SensorBase],
+    inactive_sensor_list: list[SensorBase],
     index: int,
 ) -> int:
     """inactive なセンサーをラウンドロビンで 1 つだけ ping し、復帰していれば active に移す。
@@ -167,7 +159,7 @@ def retry_inactive(
 
 
 def sense(
-    active_sensor_list: list[SensorProtocol],
+    active_sensor_list: list[SensorBase],
     fail_threshold: int = 2,
 ) -> tuple[dict[str, SensorValue], bool, list[FailedSensor]]:
     """active なセンサーを計測する。

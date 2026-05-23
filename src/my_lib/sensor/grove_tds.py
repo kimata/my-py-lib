@@ -17,16 +17,16 @@ import logging
 
 from my_lib.sensor import i2cbus
 from my_lib.sensor.ads1115 import ADS1115
+from my_lib.sensor.base import I2CSensorBase
 
 
-class GROVE_TDS:
+class GROVE_TDS(I2CSensorBase):
     NAME: str = "GROVE-TDS"
-    TYPE: str = "I2C"
+    DEV_ADDR: int = ADS1115.DEV_ADDR
 
-    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int = ADS1115.DEV_ADDR) -> None:
-        self.bus_id: int = bus_id
-        self.dev_addr: int = dev_addr
-        self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=dev_addr)
+    def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int | None = None) -> None:
+        super().__init__(bus_id, dev_addr)
+        self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=self.dev_addr)
 
         self.adc.set_mux(self.adc.REG_CONFIG_MUX_0G)
         self.adc.set_pga(self.adc.REG_CONFIG_FSR_2048)
