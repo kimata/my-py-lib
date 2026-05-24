@@ -175,8 +175,13 @@ class BP35A1:
         # OK が来るまで待つ (途中で EVENT 21 = 送信完了 が割り込む)
         self.session.collect_until({EventKind.OK, EventKind.FAIL}, timeout=10)
 
-    def recv_udp(self, ipv6_addr: str, timeout: float = 5.0) -> bytes | None:
-        """指定送信元からの UDP データを 1 つ受信する。タイムアウトで None。"""
+    def recv_udp(self, ipv6_addr: str, timeout: float = 60.0) -> bytes | None:
+        """指定送信元からの UDP データを 1 つ受信する。タイムアウトで None。
+
+        Wi-SUN の応答は数秒〜数十秒かかることがあり、 旧実装では
+        readline timeout 5s × wait_count 10 = 最大 50 秒待っていた。
+        この挙動を保つためデフォルト 60 秒。
+        """
         import time
 
         deadline = time.monotonic() + timeout

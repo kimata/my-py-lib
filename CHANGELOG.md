@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.8] - 2026-05-24
+
+### Fixed
+
+- `BP35A1.recv_udp` のデフォルト timeout を 5 秒 → 60 秒に。新リファクタ版で旧実装の挙動 (readline timeout 5s × wait_count 10 = 約 50 秒) より短くなっており、メーターの応答前に None を返してしまい上位の `parse_frame(None)` が `ValueError: too short` で落ちる問題があった
+
 ## [0.2.7] - 2026-05-24
 
 ### Changed
