@@ -292,7 +292,9 @@ def error(
     _hist_add(message)
 
     interval_min = config.error.interval_min
-    if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
+    last_elapsed = my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT)
+    # last_elapsed が None の場合は未送信または破損 → レート制限せずに送信する
+    if last_elapsed is not None and last_elapsed <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return None
 
@@ -317,7 +319,9 @@ def error_with_image(
     _hist_add(message)
 
     interval_min = config.error.interval_min
-    if my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT) <= interval_min * 60:
+    last_elapsed = my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT)
+    # last_elapsed が None の場合は未送信または破損 → レート制限せずに送信する
+    if last_elapsed is not None and last_elapsed <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
         return None
 

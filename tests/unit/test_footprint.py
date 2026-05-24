@@ -89,31 +89,30 @@ class TestMtime:
 class TestElapsed:
     """elapsed 関数のテスト"""
 
-    def test_returns_large_value_for_nonexistent_file(self, temp_dir):
-        """存在しないファイルに対して大きな値を返す"""
+    def test_returns_none_for_nonexistent_file(self, temp_dir):
+        """存在しないファイルに対して None を返す"""
         import my_lib.footprint
 
         path = temp_dir / "nonexistent"
-        elapsed = my_lib.footprint.elapsed(path)
-        assert elapsed > 10000
+        assert my_lib.footprint.elapsed(path) is None
 
-    def test_returns_large_value_for_empty_file(self, temp_dir):
-        """空のファイルに対して大きな値を返す（クラッシュしない）"""
+    def test_returns_none_for_empty_file(self, temp_dir):
+        """空のファイルに対して None を返す（クラッシュしない）"""
         import my_lib.footprint
+        import my_lib.pytest_util
 
         path = temp_dir / "empty_footprint"
-        path.write_text("")
-        elapsed = my_lib.footprint.elapsed(path)
-        assert elapsed > 10000
+        my_lib.pytest_util.get_path(path).write_text("")
+        assert my_lib.footprint.elapsed(path) is None
 
-    def test_returns_large_value_for_corrupted_file(self, temp_dir):
-        """破損したファイルに対して大きな値を返す（クラッシュしない）"""
+    def test_returns_none_for_corrupted_file(self, temp_dir):
+        """破損したファイルに対して None を返す（クラッシュしない）"""
         import my_lib.footprint
+        import my_lib.pytest_util
 
         path = temp_dir / "corrupted_footprint"
-        path.write_text("not_a_number")
-        elapsed = my_lib.footprint.elapsed(path)
-        assert elapsed > 10000
+        my_lib.pytest_util.get_path(path).write_text("not_a_number")
+        assert my_lib.footprint.elapsed(path) is None
 
     def test_returns_elapsed_seconds(self, temp_dir):
         """経過秒数を返す"""
@@ -124,6 +123,7 @@ class TestElapsed:
 
         time.sleep(0.1)
         elapsed = my_lib.footprint.elapsed(path)
+        assert elapsed is not None
         assert 0.1 <= elapsed < 1.0
 
 
@@ -151,6 +151,37 @@ class TestCompare:
 
         my_lib.footprint.update(path_a, mtime=1000.0)
         my_lib.footprint.update(path_b, mtime=2000.0)
+
+        assert not my_lib.footprint.compare(path_a, path_b)
+
+    def test_treats_missing_a_as_older(self, temp_dir):
+        """a が不在の場合は b より古いとみなし False を返す"""
+        import my_lib.footprint
+
+        path_a = temp_dir / "nonexistent"
+        path_b = temp_dir / "b"
+
+        my_lib.footprint.update(path_b)
+
+        assert not my_lib.footprint.compare(path_a, path_b)
+
+    def test_treats_missing_b_as_older(self, temp_dir):
+        """b が不在の場合は a より古いとみなし True を返す"""
+        import my_lib.footprint
+
+        path_a = temp_dir / "a"
+        path_b = temp_dir / "nonexistent"
+
+        my_lib.footprint.update(path_a)
+
+        assert my_lib.footprint.compare(path_a, path_b)
+
+    def test_returns_false_when_both_missing(self, temp_dir):
+        """両方不在の場合は等価とみなし False を返す"""
+        import my_lib.footprint
+
+        path_a = temp_dir / "nonexistent_a"
+        path_b = temp_dir / "nonexistent_b"
 
         assert not my_lib.footprint.compare(path_a, path_b)
 

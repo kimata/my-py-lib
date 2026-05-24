@@ -40,13 +40,17 @@ def check_liveness_elapsed(target: HealthzTarget) -> float | None:
 
     Returns:
         成功時は None、失敗時は最終更新からの経過秒数を返す。
-        ファイルが存在しない場合は -1 を返す。
+        ファイルが存在しない場合は -1、ファイルが破損している場合は -2 を返す。
     """
     if not my_lib.footprint.exists(target.liveness_file):
         logging.warning("%s is not executed.", target.name)
         return -1
 
     elapsed = my_lib.footprint.elapsed(target.liveness_file)
+    if elapsed is None:
+        # exists() を通ったのに elapsed が None ということは内容が破損している
+        logging.warning("Liveness file of %s is corrupted.", target.name)
+        return -2
     # NOTE: 少なくとも1分は様子を見る
     if elapsed > max(target.interval * 2, 60):
         logging.warning("Execution interval of %s is too long. %s sec)", target.name, f"{elapsed:,.1f}")

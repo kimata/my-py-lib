@@ -100,6 +100,53 @@ class TestCheckLiveness:
         assert elapsed is not None
         assert elapsed > 0
 
+    def test_returns_minus_one_when_file_missing(self, temp_dir):
+        """ファイル不在時は -1 を返す"""
+        import my_lib.healthz
+        from my_lib.healthz import HealthzTarget
+
+        target = HealthzTarget(
+            name="test",
+            liveness_file=temp_dir / "nonexistent",
+            interval=60.0,
+        )
+
+        assert my_lib.healthz.check_liveness_elapsed(target) == -1
+
+    def test_returns_minus_two_when_file_corrupted(self, temp_dir):
+        """ファイルが破損している場合は -2 を返す"""
+        import my_lib.healthz
+        import my_lib.pytest_util
+        from my_lib.healthz import HealthzTarget
+
+        liveness_file = temp_dir / "liveness"
+        my_lib.pytest_util.get_path(liveness_file).write_text("not_a_number")
+
+        target = HealthzTarget(
+            name="test",
+            liveness_file=liveness_file,
+            interval=60.0,
+        )
+
+        assert my_lib.healthz.check_liveness_elapsed(target) == -2
+
+    def test_returns_minus_two_when_file_empty(self, temp_dir):
+        """ファイルが空の場合は -2 を返す"""
+        import my_lib.healthz
+        import my_lib.pytest_util
+        from my_lib.healthz import HealthzTarget
+
+        liveness_file = temp_dir / "liveness"
+        my_lib.pytest_util.get_path(liveness_file).write_text("")
+
+        target = HealthzTarget(
+            name="test",
+            liveness_file=liveness_file,
+            interval=60.0,
+        )
+
+        assert my_lib.healthz.check_liveness_elapsed(target) == -2
+
     def test_returns_false_when_mtime_in_future(self, temp_dir):
         """mtime が未来のファイル (時刻巻き戻しで負の elapsed) を異常と判定する"""
         import my_lib.footprint
