@@ -165,15 +165,24 @@ class TestEventParserPanDesc:
 class TestEventParserErxudp:
     """ERXUDP の解析テスト"""
 
-    def test_payload_decoded(self):
-        # ERXUDP <sender> <dest> <rport> <lport> <senderlla> <secured> <side> <datalen> <data>
+    def test_payload_decoded_with_side(self):
+        """仕様書通りの 9 フィールド (side あり) フォーマット"""
         line = b"ERXUDP FE80::1 FE80::2 0E1A 0E1A 001D129000000001 1 0 000A 31323334353637383930\r\n"
         evt = EventParser(FakeSerial([line])).next_event()
         assert evt is not None
         assert evt.kind == EventKind.ERXUDP
-        # payload は 16 進文字列 "31323334..." をデコードしたもの = "1234567890"
         assert evt.payload == b"1234567890"
-        assert evt.args[0] == "FE80::1"  # sender
+        assert evt.args[0] == "FE80::1"
+
+    def test_payload_decoded_without_side(self):
+        """実機 (BP35A1 1.2.10) の 8 フィールド (side なし) フォーマット"""
+        line = b"ERXUDP FE80::1 FE80::2 0E1A 0E1A 001D129000000001 1 000A 31323334353637383930\r\n"
+        evt = EventParser(FakeSerial([line])).next_event()
+        assert evt is not None
+        assert evt.kind == EventKind.ERXUDP
+        # 末尾から取るので side の有無に関わらず正しく decode できる
+        assert evt.payload == b"1234567890"
+        assert evt.args[0] == "FE80::1"
 
 
 class TestBP35A1Session:

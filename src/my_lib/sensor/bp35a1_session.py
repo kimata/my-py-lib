@@ -182,15 +182,22 @@ class EventParser:
     def _parse_erxudp(self, line: str) -> Event:
         """ERXUDP 行を解析して payload を bytes に変換する (WOPT 01 前提)。
 
-        フォーマット: ERXUDP <sender> <dest> <rport> <lport> <senderlla> <secured> <side> <datalen> <data>
+        フォーマット (仕様書):
+          ERXUDP <sender> <dest> <rport> <lport> <senderlla> <secured>
+                 [<side>] <datalen> <data>
+
+        BP35A1 のファームウェアバージョンや WOPT 設定により <side> フィールドが
+        省略される場合がある (実機 1.2.10 では省略)。 末尾から <data> を取ることで
+        どちらのフォーマットにも対応する (<data> は WOPT 01 で 16 進文字列のため空白を含まない)。
         """
-        parts = line.split(" ", 9)
+        parts = line.split(" ")
         payload = b""
-        if len(parts) >= 10:
+        # 最低限: ERXUDP, sender, dest, rport, lport, senderlla, secured, datalen, data (9 要素)
+        if len(parts) >= 9:
             try:
-                payload = bytes.fromhex(parts[9])
+                payload = bytes.fromhex(parts[-1])
             except ValueError:
-                self.logger.warning("ERXUDP payload not hex: %r", parts[9])
+                self.logger.warning("ERXUDP payload not hex: %r", parts[-1])
         return Event(kind=EventKind.ERXUDP, raw=line, args=parts[1:], payload=payload)
 
 

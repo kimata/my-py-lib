@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.9] - 2026-05-24
+
+### Fixed
+
+- `EventParser._parse_erxudp` で payload (UDP data) を読む位置がずれていた問題を修正。仕様書通りの 9 フィールド形式 (`<sender> <dest> <rport> <lport> <senderlla> <secured> <side> <datalen> <data>`) を前提に `parts[9]` から読んでいたが、実機 (BP35A1 1.2.10) では `<side>` フィールドが省略された 8 フィールドで返るため、空文字列を decode して payload が常に空 bytes になっていた。末尾 (`parts[-1]`) から data を取るように変更し、 side の有無どちらにも対応
+
 ## [0.2.8] - 2026-05-24
 
 ### Fixed
