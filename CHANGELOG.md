@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.7] - 2026-05-24
+
+### Changed
+
+- `bp35a1` モジュールをイベント駆動アーキテクチャにリファクタリング
+    - Layer 1: シリアル行ストリームを `Event` オブジェクトに分類する `EventParser` を新設
+    - Layer 2: コマンド送信 + イベント待機を管理する `BP35A1Session` を新設
+    - Layer 3: `BP35A1` クラスの内部実装を新セッション経由に書き換え (public API は維持)
+- 従来の「期待文字列を順に read してマッチ」方式から、構造化された Event を待つ方式に変更。これにより以下の脆さが解消:
+    - 想定外イベント (`EVENT 1F`, `ERXUDP` 等) の割り込みでパースが壊れる問題
+    - 複数行ブロック (EPANDESC) のフィールド構成 (PairID 有無等) の差分に弱い問題
+    - read の二重消費による上位ループの timeout 待ち
+    - 行レベルの厳密一致による仕様差分耐性の低さ
+- ユニットテスト `test_sensor_bp35a1_session.py` を追加 (18 ケース)。実機なしでパース/セッション挙動を検証可能
+
+### Added
+
+- `my_lib.sensor.bp35a1_session` モジュール: `Event`, `EventKind`, `EventParser`, `BP35A1Session`
+
 ## [0.2.6] - 2026-05-24
 
 ### Fixed

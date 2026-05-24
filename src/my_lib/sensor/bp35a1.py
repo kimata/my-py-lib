@@ -1,28 +1,53 @@
 #!/usr/bin/env python3
+"""BP35A1 (ECHONET Lite Wi-SUN モジュール) ドライバ。
+
+イベント駆動のセッション層 (bp35a1_session.BP35A1Session) を経由してコマンドを送り、
+必要なイベントを待つ構造。BP35A1 クラスの public API は echonetenergy.py や
+他の上位コードが期待するシグネチャを維持する。
+"""
 
 from __future__ import annotations
 
 import logging
-import pprint
 from dataclasses import dataclass
-from typing import Any
 
 import serial
+
+from my_lib.sensor.bp35a1_session import BP35A1Session, EventKind
 
 
 @dataclass(frozen=True)
 class PanDescriptor:
-    """PANスキャン結果を保持するデータクラス"""
+    """PAN スキャン結果。
+
+    `pair_id` は MODE 2 では返ってくるが MODE 3 (active scan with IE) では
+    省略されるケースがあるためデフォルト値を持つ。
+    """
 
     channel: str
     pan_id: str
     addr: str
-    # NOTE: MODE 3 (active scan with IE) の応答には PairID が含まれない場合がある
     pair_id: str = ""
 
 
-RETRY_COUNT: int = 10
-WAIT_COUNT: int = 30
+# scan_channel が duration を上げながらリトライする際の上限。
+# duration 9 で各チャネル ~5s, 全 33 チャネルで ~165 秒。
+# これ以上は 1 サイクルが長くなりすぎて Liveness probe を超える可能性がある。
+SCAN_DURATION_MAX: int = 9
+
+# PANA 認証 (SKJOIN) を待つ最大秒数。
+JOIN_TIMEOUT: float = 30.0
+
+
+def _scan_timeout_sec(duration: int) -> float:
+    """SKSCAN 1 回分のタイムアウト目安。
+
+    Wi-SUN active scan 仕様で各チャネル滞在時間は約 (2^duration + 1) × 9.6ms。
+    全 33 チャネル + ハンドリング余裕 + 終端 EVENT 22 まで含む。
+    """
+    per_channel_ms = (2**duration + 1) * 9.6
+    total_sec = (33 * per_channel_ms / 1000.0) + 10.0
+    return max(total_sec, 30.0)
 
 
 class BP35A1:
@@ -30,207 +55,169 @@ class BP35A1:
 
     def __init__(self, port: str = "/dev/ttyAMA0", debug: bool = False) -> None:
         self.ser: serial.Serial = serial.Serial(port=port, baudrate=115200, timeout=5)
-        self.opt: int | None = None
         self.ser.reset_input_buffer()
+        self.session: BP35A1Session = BP35A1Session(self.ser)
+        self.opt: int | None = None
 
         self.logger: logging.Logger = logging.getLogger(__name__)
         self.logger.addHandler(logging.NullHandler())
         self.logger.setLevel(logging.DEBUG if debug else logging.WARNING)
 
+    # ------------------------------------------------------------------
+    # 高レベル API (上位コードが使う)
+    # ------------------------------------------------------------------
+
     def ping(self) -> bool:
+        """モジュールが応答するか確認する。"""
         try:
             self.reset()
-
-            ret = self.__send_command_raw("SKINFO")
-            self.__expect("OK")
-            parts = ret.split(" ", 1)
-
-            return parts[0] == "EINFO"
+            # SKINFO は EINFO 行を返した後 OK を出す。EINFO が来れば応答ありと判定
+            evt = self.session.send_and_expect("SKINFO", expect={EventKind.EINFO, EventKind.FAIL}, timeout=5)
+            return evt is not None and evt.kind == EventKind.EINFO
         except Exception:
+            self.logger.warning("ping failed", exc_info=True)
             return False
 
-    def write(self, data: str | bytes) -> None:
-        self.logger.debug("SEND: [%s]", pprint.pformat(data))
-
-        if isinstance(data, str):
-            data = data.encode()
-
-        self.ser.write(data)
-
-    def read(self) -> str:
-        data = self.ser.readline().decode()
-        self.logger.debug("RECV: [%s]", pprint.pformat(data))
-        return data
-
     def reset(self) -> None:
-        # Clear buffer
+        """モジュールをソフトリセットする。"""
         self.ser.reset_input_buffer()
         self.ser.reset_output_buffer()
-
-        self.logger.debug("reset")
-        self.__send_command_without_check("SKRESET")
-        self.__expect("OK")
+        self.session.send_and_expect("SKRESET", timeout=3)
 
     def get_option(self) -> None:
-        ret = self.__send_command("ROPT")
-        if ret is None:
+        """ROPT を実行して self.opt に格納する。"""
+        evt = self.session.send_and_expect("ROPT", timeout=3)
+        if evt is None or evt.kind != EventKind.OK or not evt.args:
             raise RuntimeError("Failed to get option")
-        val = int(ret, 16)
-
-        self.opt = val
+        self.opt = int(evt.args[0], 16)
 
     def set_id(self, b_id: str) -> None:
-        command = f"SKSETRBID {b_id}"
-        self.__send_command(command)
+        """B ルート ID を設定する。"""
+        self._send_ok(f"SKSETRBID {b_id}")
 
     def set_password(self, b_pass: str) -> None:
-        command = f"SKSETPWD {len(b_pass):X} {b_pass}"
-        self.__send_command(command)
+        """B ルートパスワードを設定する。"""
+        self._send_ok(f"SKSETPWD {len(b_pass):X} {b_pass}")
 
     def scan_channel(self, start_duration: int = 3) -> PanDescriptor | None:
-        # NOTE: MODE 3 (active scan with IE) は MODE 2 より検出率が高い。
-        # メーター側のビーコン送信特性 (頻度・強度) が経年で変化すると
-        # MODE 2 + 短い duration では拾えなくなるため MODE 3 を使う。
-        # duration 9 で各チャネル ~5s, 33ch で約 165 秒。それ以上は 1 サイクルが
-        # Liveness probe の閾値を超えるため上限とする。
-        duration = start_duration
-        pan_info: PanDescriptor | None = None
-        for _ in range(RETRY_COUNT):
+        """アクティブスキャンで PAN を探索する。
+
+        duration を `start_duration` から `SCAN_DURATION_MAX` まで上げながら
+        試行し、最初に見つかった PanDescriptor を返す。見つからなければ None。
+
+        SKSCAN MODE 3 (active scan with IE) を使う。MODE 2 より検出率が高く、
+        メーターのビーコン送信特性が変動しても拾いやすい。
+        """
+        for duration in range(start_duration, SCAN_DURATION_MAX + 1):
             command = f"SKSCAN 3 {((1 << 32) - 1):X} {duration}"
-            self.__send_command(command)
+            timeout = _scan_timeout_sec(duration)
+            self.logger.debug("scan duration=%d (timeout=%.1fs)", duration, timeout)
 
-            for _ in range(WAIT_COUNT):
-                line = self.read()
-                # スキャン完了
-                if line.startswith("EVENT 22"):
-                    break
-                # メータ発見
-                if line.startswith("EVENT 20"):
-                    pan_info = self.__parse_pan_desc()
-                    # NOTE: __parse_pan_desc が EVENT 22 を消費している可能性がある。
-                    # 既に発見できているので外側 read の timeout 待ちを避けるため即 break
-                    break
-
-            if pan_info is not None:
-                return pan_info
-
-            duration += 1
-            if duration > 9:
-                return None
-
+            events = self.session.send_and_collect(command, until={EventKind.EVENT_22}, timeout=timeout)
+            for evt in events:
+                if evt.kind == EventKind.EPANDESC:
+                    f = evt.fields
+                    return PanDescriptor(
+                        channel=f.get("Channel", ""),
+                        pan_id=f.get("Pan ID", ""),
+                        addr=f.get("Addr", ""),
+                        pair_id=f.get("PairID", ""),
+                    )
         return None
 
     def connect(self, pan_desc: PanDescriptor) -> str | None:
-        command = f"SKSREG S2 {pan_desc.channel}"
-        self.__send_command(command)
+        """PAN に PANA 認証で接続する。成功時は IPv6 リンクローカルアドレスを返す。"""
+        self._send_ok(f"SKSREG S2 {pan_desc.channel}")
+        self._send_ok(f"SKSREG S3 {pan_desc.pan_id}")
 
-        command = f"SKSREG S3 {pan_desc.pan_id}"
-        self.__send_command(command)
+        # SKLL64 はエコーの後に IPv6 アドレスが 1 行だけ返る (OK なし)
+        ipv6_addr = self._send_ll64(pan_desc.addr)
+        if ipv6_addr is None:
+            self.logger.warning("SKLL64 failed")
+            return None
 
-        command = f"SKLL64 {pan_desc.addr}"
-        ipv6_addr = self.__send_command_raw(command)
-
-        command = f"SKJOIN {ipv6_addr}"
-
-        self.__send_command(command)
-
-        for _ in range(WAIT_COUNT):
-            line = self.read()
-            # 接続失敗
-            if line.startswith("EVENT 24"):
+        # SKJOIN は OK の後に EVENT 24 (失敗) か EVENT 25 (成功) が来る
+        events = self.session.send_and_collect(
+            f"SKJOIN {ipv6_addr}",
+            until={EventKind.EVENT_24, EventKind.EVENT_25},
+            timeout=JOIN_TIMEOUT,
+        )
+        for evt in events:
+            if evt.kind == EventKind.EVENT_24:
                 self.logger.warning("receive EVENT 24 (connect ERROR)")
                 return None
-            # 接続成功
-            if line.startswith("EVENT 25"):
+            if evt.kind == EventKind.EVENT_25:
                 return ipv6_addr
         # タイムアウト
         return None
 
     def disconnect(self) -> None:
-        self.__send_command_without_check("SKTERM")
+        """PANA セッションを終了する (失敗しても無視)。"""
         try:
-            self.__expect("OK")
-            self.__expect("EVENT 27")
+            self.session.send_and_collect("SKTERM", until={EventKind.EVENT_27, EventKind.FAIL}, timeout=10)
         except Exception:
-            return
-
-    def recv_udp(self, ipv6_addr: str, wait_count: int = 10) -> bytes | None:
-        for _ in range(wait_count):
-            line = self.read().rstrip()
-            if line == "":
-                continue
-
-            parts = line.split(" ", 9)
-            if parts[0] != "ERXUDP":
-                continue
-            if parts[1] == ipv6_addr:
-                # NOTE: 16進文字列をバイナリに変換 (デフォルト設定の WOPT 01 の前提)
-                return bytes.fromhex(parts[8])
-        return None
+            self.logger.debug("disconnect: ignored exception", exc_info=True)
 
     def send_udp(
-        self, ipv6_addr: str, port: int, data: bytes, handle: int = 1, security: bool = True
+        self,
+        ipv6_addr: str,
+        port: int,
+        data: bytes,
+        handle: int = 1,
+        security: bool = True,
     ) -> None:
-        command = f"SKSENDTO {handle} {ipv6_addr} {port:04X} {1 if security else 2} {len(data):04X} "
-        self.__send_command_without_check(command.encode() + data)
-        while self.read().rstrip() != "OK":
-            pass
+        """UDP データを送信する。"""
+        header = (
+            f"SKSENDTO {handle} {ipv6_addr} {port:04X} {1 if security else 2} {len(data):04X} "
+        ).encode()
+        # NOTE: ヘッダー + バイナリ + CRLF を 1 度に送信
+        self.session.write_raw(header + data + b"\r\n")
+        # OK が来るまで待つ (途中で EVENT 21 = 送信完了 が割り込む)
+        self.session.collect_until({EventKind.OK, EventKind.FAIL}, timeout=10)
 
-    def __parse_pan_desc(self) -> PanDescriptor:
-        self.__expect("EPANDESC")
-        pan_desc: dict[str, str] = {}
-        for _ in range(WAIT_COUNT):
-            line = self.read()
+    def recv_udp(self, ipv6_addr: str, timeout: float = 5.0) -> bytes | None:
+        """指定送信元からの UDP データを 1 つ受信する。タイムアウトで None。"""
+        import time
 
-            # NOTE: EPANDESC のフィールドは 2 スペース始まり。
-            # それ以外 (EVENT 22 等) が来たらフィールド読み込み終了。
-            if not line.startswith("  "):
-                break
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.ser.timeout = max(0.1, deadline - time.monotonic())
+            evt = self.session.parser.next_event()
+            if evt is None:
+                continue
+            if evt.kind != EventKind.ERXUDP:
+                continue
+            sender = evt.args[0] if evt.args else ""
+            if sender == ipv6_addr:
+                return evt.payload
+        return None
 
-            parts = line.strip().split(":")
-            pan_desc[parts[0]] = parts[1]
+    # ------------------------------------------------------------------
+    # 内部ヘルパー
+    # ------------------------------------------------------------------
 
-            # NOTE: MODE 2 では PairID が最終フィールド (早期 break で WAIT_COUNT を節約)
-            if parts[0] == "PairID":
-                break
+    def _send_ok(self, command: str, timeout: float = 5) -> None:
+        """OK の応答を期待するコマンドを送る。OK 以外が来たら raise。"""
+        evt = self.session.send_and_expect(command, timeout=timeout)
+        if evt is None or evt.kind != EventKind.OK:
+            received = evt.kind if evt else "TIMEOUT"
+            raise RuntimeError(f"Command {command!r} did not return OK (got {received})")
 
-        return PanDescriptor(
-            channel=pan_desc["Channel"],
-            pan_id=pan_desc["Pan ID"],
-            addr=pan_desc["Addr"],
-            pair_id=pan_desc.get("PairID", ""),
-        )
+    def _send_ll64(self, mac_addr: str) -> str | None:
+        """SKLL64 を送って IPv6 アドレス 1 行を取得する。
 
-    def __send_command_raw(self, command: str, echo_back: Any = lambda command: command) -> str:
-        self.write(command)
-        self.write("\r\n")
-        # NOTE: echo_back はコマンドからエコーバック文字列を生成する関数。
-        # デフォルトはコマンドそのもの。
-        self.__expect(echo_back(command))
-
-        return self.read().rstrip()
-
-    def __send_command_without_check(self, command: str | bytes) -> None:
-        self.write(command)
-        self.write("\r\n")
-        self.read()
-
-    def __send_command(self, command: str) -> str | None:
-        ret = self.__send_command_raw(command)
-        parts = ret.split(" ", 1)
-
-        if parts[0] != "OK":
-            raise RuntimeError(f"Status is not OK.\nrst: {parts[0]}")
-
-        return None if len(parts) == 1 else parts[1]
-
-    def __expect(self, text: str) -> None:
-        line = ""
-        for _ in range(WAIT_COUNT):
-            line = self.read().rstrip()
-
-            if line != "":
-                break
-
-        if line != text:
-            raise Exception(f"Echo back is wrong.\nexp: [{text}]\nrst: [{line.rstrip()}]")
+        SKLL64 はエコーの直後に IPv6 アドレスが 1 行だけ返る (OK なし) という
+        特殊な応答仕様。1 行ずつ raw で読んで「IPv6 らしき行」を拾う。
+        """
+        self.session.send_line(f"SKLL64 {mac_addr}")
+        # コマンドエコーや空行を読み飛ばし、IPv6 形式の行を待つ
+        for _ in range(10):
+            line = self.session.read_line_raw(timeout=3)
+            if line is None:
+                return None
+            if line == "" or line.startswith("SKLL64"):
+                continue  # エコーや空行
+            # FE80:... のような形式を期待
+            if ":" in line and len(line) >= 16:
+                return line
+        return None
