@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.6] - 2026-05-24
+
+### Fixed
+
+- `BP35A1.__parse_pan_desc` が SKSCAN MODE 3 (active scan with IE) の応答をパースできない問題を修正。MODE 3 の応答には `PairID` フィールドが含まれない場合があり、従来は EPANDESC ブロック終了後の `EVENT 22` 行を読み込んで「行がスペース始まりでない」と Exception を投げていた
+- `PanDescriptor.pair_id` をオプショナル化 (デフォルト空文字)
+- `scan_channel` で PAN 検出後に外側 read ループから即時抜けるよう変更 (`__parse_pan_desc` が `EVENT 22` を消費した場合の無駄な timeout 待ちを回避)
+
 ## [0.2.5] - 2026-05-23
 
 ### Fixed

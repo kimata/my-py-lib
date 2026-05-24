@@ -17,7 +17,8 @@ class PanDescriptor:
     channel: str
     pan_id: str
     addr: str
-    pair_id: str
+    # NOTE: MODE 3 (active scan with IE) の応答には PairID が含まれない場合がある
+    pair_id: str = ""
 
 
 RETRY_COUNT: int = 10
@@ -106,6 +107,9 @@ class BP35A1:
                 # メータ発見
                 if line.startswith("EVENT 20"):
                     pan_info = self.__parse_pan_desc()
+                    # NOTE: __parse_pan_desc が EVENT 22 を消費している可能性がある。
+                    # 既に発見できているので外側 read の timeout 待ちを避けるため即 break
+                    break
 
             if pan_info is not None:
                 return pan_info
@@ -178,12 +182,15 @@ class BP35A1:
         for _ in range(WAIT_COUNT):
             line = self.read()
 
+            # NOTE: EPANDESC のフィールドは 2 スペース始まり。
+            # それ以外 (EVENT 22 等) が来たらフィールド読み込み終了。
             if not line.startswith("  "):
-                raise Exception(f"Line does not start with space.\nrst: {line}")
+                break
 
             parts = line.strip().split(":")
             pan_desc[parts[0]] = parts[1]
 
+            # NOTE: MODE 2 では PairID が最終フィールド (早期 break で WAIT_COUNT を節約)
             if parts[0] == "PairID":
                 break
 
@@ -191,7 +198,7 @@ class BP35A1:
             channel=pan_desc["Channel"],
             pan_id=pan_desc["Pan ID"],
             addr=pan_desc["Addr"],
-            pair_id=pan_desc["PairID"],
+            pair_id=pan_desc.get("PairID", ""),
         )
 
     def __send_command_raw(self, command: str, echo_back: Any = lambda command: command) -> str:
