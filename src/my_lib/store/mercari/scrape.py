@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import selenium.common.exceptions
 import selenium.webdriver.common.by
+import selenium.webdriver.common.keys
 import selenium.webdriver.remote.webdriver
 import selenium.webdriver.remote.webelement
 import selenium.webdriver.support
@@ -35,6 +36,8 @@ _POPUP_CLOSE_XPATHS: list[str] = [
     # NOTE: モーダルダイアログのキャンセルボタン（アンバサダーツールバー非表示確認など）
     '//button[contains(text(), "キャンセル")]',
 ]
+_DIALOG_XPATH: str = '//*[@role="dialog" and @aria-modal="true"]'
+_ACCOUNT_BUTTON_XPATH: str = '//button[@data-testid="account-button"]'
 
 
 def iter_items_on_display(
@@ -44,11 +47,11 @@ def iter_items_on_display(
     item_func_list: list[Callable[..., Any]],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
 ) -> None:
-    my_lib.selenium_util.click_xpath(
-        driver,
-        '//button[@data-testid="account-button"]',
-        wait,
-    )
+    # NOTE: ログイン直後にキャンペーン用のモーダルダイアログが表示され、account-button への
+    # クリックが遮断されることがあるため、先にポップアップを閉じる。
+    _close_popup(driver)
+
+    _click_account_button_with_retry(driver, wait)
     my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品した商品")]', wait)
 
     wait.until(
@@ -334,9 +337,74 @@ def _parse_item(
 
 def _close_popup(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
     by_xpath = selenium.webdriver.common.by.By.XPATH
+
+    # NOTE: 既知のポップアップ閉じるボタン（互換維持）
     for xpath in _POPUP_CLOSE_XPATHS:
         for button in driver.find_elements(by_xpath, xpath):
             with contextlib.suppress(Exception):
                 if button.is_displayed():
                     button.click()
                     time.sleep(0.5)
+
+    # NOTE: 汎用パターン: role=dialog かつ aria-modal=true なモーダルを汎用的に閉じる。
+    # メルカリは React のスタイル付きコンポーネントで class 名がハッシュ化されるため、
+    # ARIA 属性ベースで判定することで将来のキャンペーン用ダイアログにも追従できる。
+    for dialog in driver.find_elements(by_xpath, _DIALOG_XPATH):
+        if not dialog.is_displayed():
+            continue
+        _close_dialog(driver, dialog)
+
+
+def _close_dialog(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    dialog: selenium.webdriver.remote.webelement.WebElement,
+) -> None:
+    by_xpath = selenium.webdriver.common.by.By.XPATH
+
+    close_buttons: list[selenium.webdriver.remote.webelement.WebElement] = dialog.find_elements(
+        by_xpath,
+        './/button[@aria-label="閉じる" or @aria-label="close" or @aria-label="Close"]',
+    )
+
+    # NOTE: aria-labelledby が指す要素のテキストで「閉じる」を判定（メルカリは
+    # 非表示 span で閉じるラベルを提供し aria-labelledby で参照する実装が多い）。
+    if not close_buttons:
+        for button in dialog.find_elements(by_xpath, ".//button[@aria-labelledby]"):
+            labelledby = button.get_attribute("aria-labelledby")
+            if not labelledby:
+                continue
+            label_elements = driver.find_elements(by_xpath, f'//*[@id="{labelledby}"]')
+            if not label_elements:
+                continue
+            label_text = label_elements[0].get_attribute("textContent") or ""
+            if "閉じる" in label_text or "Close" in label_text:
+                close_buttons.append(button)
+                break
+
+    for button in close_buttons:
+        with contextlib.suppress(Exception):
+            if button.is_displayed():
+                logging.info("ダイアログの閉じるボタンをクリックします。")
+                button.click()
+                time.sleep(0.5)
+                return
+
+    # NOTE: フォールバック: モーダルは Escape で閉じるのが Web 標準。
+    # 閉じるボタンが特定できなかった場合の最終手段。
+    with contextlib.suppress(Exception):
+        logging.info("ダイアログを Escape キーで閉じます。")
+        dialog.send_keys(selenium.webdriver.common.keys.Keys.ESCAPE)
+        time.sleep(0.5)
+
+
+def _click_account_button_with_retry(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+) -> None:
+    try:
+        my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
+    except selenium.common.exceptions.ElementClickInterceptedException:
+        logging.warning("account-button のクリックが遮断されました。ポップアップを閉じてリトライします。")
+        _close_popup(driver)
+        time.sleep(0.5)
+        my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
