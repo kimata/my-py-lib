@@ -46,7 +46,16 @@ def iter_items_on_display(
     debug_mode: bool,
     item_func_list: list[Callable[..., Any]],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
+    max_consecutive_failures: int | None = None,
 ) -> None:
+    """出品中の全アイテムに対して item_func_list の処理を実行する。
+
+    Args:
+        max_consecutive_failures: アイテム単位の処理が連続して失敗した場合に中断する閾値。
+            None の場合は最初の失敗で即座に例外を送出する（従来動作）。
+            指定した場合、失敗したアイテムはスキップして次に進み、
+            連続失敗数が閾値に達した時点で最後の例外を送出する。
+    """
     # NOTE: ログイン直後にキャンペーン用のモーダルダイアログが表示され、account-button への
     # クリックが遮断されることがあるため、先にポップアップを閉じる。
     _close_popup(driver)
@@ -82,23 +91,27 @@ def iter_items_on_display(
     if progress_observer is not None:
         progress_observer.on_total_count(item_count)
 
+    consecutive_failures = 0
     for i in range(1, item_count + 1):
-        for retry in range(_TRY_COUNT):
-            try:
-                item = _execute_item(
-                    driver, wait, debug_mode, item_count, i, item_func_list, progress_observer
-                )
-                if progress_observer is not None and item is not None:
-                    progress_observer.on_item_complete(i, item_count, item)
-                break
-            except Exception:
-                logging.exception("エラーが発生しました。")
-                if retry == _TRY_COUNT - 1:
-                    raise
+        try:
+            _execute_item_with_retry(
+                driver, wait, debug_mode, item_count, i, item_func_list, progress_observer, list_url
+            )
+            consecutive_failures = 0
+        except Exception:
+            if max_consecutive_failures is None:
+                raise
 
-                logging.warning("リトライします。(retry=%d)", retry + 1)
-                my_lib.selenium_util.random_sleep(10)
-                _load_url(driver, wait, list_url)
+            consecutive_failures += 1
+            if consecutive_failures >= max_consecutive_failures:
+                logging.error("%d アイテム連続で処理に失敗したため、中断します。", consecutive_failures)
+                raise
+
+            logging.warning(
+                "アイテムの処理に失敗しましたが、次のアイテムに進みます。(連続失敗: %d/%d)",
+                consecutive_failures,
+                max_consecutive_failures,
+            )
 
         if debug_mode:
             break
@@ -107,6 +120,34 @@ def iter_items_on_display(
 
         # NOTE: _load_url は内部的でリトライ処理が入っているので、try では囲わない。
         _load_url(driver, wait, list_url)
+
+
+def _execute_item_with_retry(
+    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    wait: selenium.webdriver.support.wait.WebDriverWait,
+    debug_mode: bool,
+    item_count: int,
+    index: int,
+    item_func_list: list[Callable[..., Any]],
+    progress_observer: my_lib.store.mercari.progress.ProgressObserver | None,
+    list_url: str,
+) -> None:
+    for retry in range(_TRY_COUNT):
+        try:
+            item = _execute_item(
+                driver, wait, debug_mode, item_count, index, item_func_list, progress_observer
+            )
+            if progress_observer is not None and item is not None:
+                progress_observer.on_item_complete(index, item_count, item)
+            return
+        except Exception:
+            logging.exception("エラーが発生しました。")
+            if retry == _TRY_COUNT - 1:
+                raise
+
+            logging.warning("リトライします。(retry=%d)", retry + 1)
+            my_lib.selenium_util.random_sleep(10)
+            _load_url(driver, wait, list_url)
 
 
 def _load_url(
