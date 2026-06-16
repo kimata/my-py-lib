@@ -381,11 +381,14 @@ class LogManager:
             )
             log_list = [dict(log) for log in cur.fetchall()]
             for log in log_list:
+                # NOTE: タイムゾーン情報を保持したまま ISO 8601 で返す。
+                # naive な "%Y-%m-%d %H:%M:%S" だと、利用側ブラウザの TZ が JST 以外のとき
+                # 時刻がずれて解釈されてしまう。
                 log["date"] = (
                     datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
                     .replace(tzinfo=datetime.UTC)
                     .astimezone(my_lib.time.get_zoneinfo())
-                    .strftime("%Y-%m-%d %H:%M:%S")
+                    .isoformat()
                 )
             return log_list
 
@@ -577,11 +580,8 @@ def api_log_view() -> flask.Response:
     if len(log_list) == 0:
         last_time = time.time()
     else:
-        last_time = (
-            datetime.datetime.strptime(log_list[0]["date"], "%Y-%m-%d %H:%M:%S")
-            .replace(tzinfo=my_lib.time.get_zoneinfo())
-            .timestamp()
-        )
+        # get() は ISO 8601（タイムゾーン付き）の日時文字列を返す
+        last_time = datetime.datetime.fromisoformat(log_list[0]["date"]).timestamp()
 
     response = flask.jsonify({"data": log_list, "last_time": last_time})
 
