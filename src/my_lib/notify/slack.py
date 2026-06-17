@@ -27,15 +27,19 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 import dacite
 import slack_sdk
 import slack_sdk.errors
 import slack_sdk.web.slack_response
-from PIL import Image
 
 import my_lib.footprint
+
+if TYPE_CHECKING:
+    # NOTE: Image は型注釈にしか使わない（実行時呼び出しは無い）。トップレベルで import すると
+    # 画像通知を使わない利用側にも Pillow を要求してしまうため、TYPE_CHECKING に留める。
+    from PIL import Image
 
 _NOTIFY_FOOTPRINT: pathlib.Path = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
 _INTERVAL_MIN: int = 60
