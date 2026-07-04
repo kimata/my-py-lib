@@ -318,6 +318,12 @@ def create_driver(
     actual_profile_name = my_lib.chrome_util._get_actual_profile_name(profile_name)
     profile_path = data_path / "chrome" / actual_profile_name
 
+    # 肥大化した Preferences は起動前に削除する。肥大化したまま起動すると
+    # ドライバー接続がタイムアウトし、プロファイル全体の退避（＝セッション消失）に
+    # つながるため。健全性チェックより先に実行することで、巨大 JSON のパースも回避する。
+    if auto_recover:
+        my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
     # 過去の連続起動失敗が閾値以上に達していれば、健全性チェックを通過していても強制退避
     # （JSON/DB レベルの破損は検出できるが、Chrome バージョン非互換等のステルス破損は検出できないため）
     if auto_recover:

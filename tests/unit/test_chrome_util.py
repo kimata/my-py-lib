@@ -103,6 +103,66 @@ class TestCheckSqliteDb:
         assert "database" in result.lower()
 
 
+class TestCleanupBloatedPreferences:
+    """_cleanup_bloated_preferences 関数のテスト"""
+
+    def _create_profile(self, temp_dir, preferences_size):
+        """指定サイズの Preferences を持つプロファイルを作成する"""
+        profile_path = temp_dir / "chrome" / "test_profile"
+        default_path = profile_path / "Default"
+        default_path.mkdir(parents=True)
+        (default_path / "Preferences").write_bytes(b"x" * preferences_size)
+        return profile_path
+
+    def test_deletes_bloated_preferences(self, temp_dir):
+        """閾値を超えた Preferences を削除する"""
+        profile_path = self._create_profile(temp_dir, my_lib.chrome_util.PREFERENCES_SIZE_LIMIT_BYTES + 1)
+        # セッション情報（Cookies）は削除されないことを確認するために作成
+        cookies_path = profile_path / "Default" / "Cookies"
+        cookies_path.write_bytes(b"session data")
+
+        result = my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
+        assert result is True
+        assert not (profile_path / "Default" / "Preferences").exists()
+        assert cookies_path.exists()
+
+    def test_keeps_normal_preferences(self, temp_dir):
+        """閾値以下の Preferences は削除しない"""
+        profile_path = self._create_profile(temp_dir, 1024)
+
+        result = my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
+        assert result is False
+        assert (profile_path / "Default" / "Preferences").exists()
+
+    def test_keeps_preferences_at_limit(self, temp_dir):
+        """ちょうど閾値の Preferences は削除しない"""
+        profile_path = self._create_profile(temp_dir, my_lib.chrome_util.PREFERENCES_SIZE_LIMIT_BYTES)
+
+        result = my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
+        assert result is False
+        assert (profile_path / "Default" / "Preferences").exists()
+
+    def test_returns_false_for_missing_preferences(self, temp_dir):
+        """Preferences が存在しない場合は False を返す"""
+        profile_path = temp_dir / "chrome" / "nonexistent_profile"
+
+        result = my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
+        assert result is False
+
+    def test_returns_false_when_unlink_fails(self, temp_dir):
+        """削除に失敗した場合は False を返す"""
+        profile_path = self._create_profile(temp_dir, my_lib.chrome_util.PREFERENCES_SIZE_LIMIT_BYTES + 1)
+
+        with unittest.mock.patch.object(pathlib.Path, "unlink", side_effect=OSError("Permission denied")):
+            result = my_lib.chrome_util._cleanup_bloated_preferences(profile_path)
+
+        assert result is False
+
+
 class TestCheckProfileHealth:
     """_check_profile_health 関数のテスト"""
 

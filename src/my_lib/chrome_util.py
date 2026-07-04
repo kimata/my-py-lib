@@ -24,6 +24,11 @@ import my_lib.time
 # （Chrome バージョン非互換等）に対する保険。
 STARTUP_FAILURE_THRESHOLD = 3
 
+# NOTE: Preferences ファイルがこのサイズを超えていたら肥大化バグとみなして削除する。
+# 正常な Preferences は数十〜数百 KB 程度であり、これを大きく超えるのは
+# UTF-8 多重エンコードによる肥大化（_cleanup_bloated_preferences 参照）以外に考えにくい。
+PREFERENCES_SIZE_LIMIT_BYTES = 5 * 1024 * 1024
+
 
 @dataclass(frozen=True)
 class _ProfileHealthResult:
@@ -77,6 +82,52 @@ def _check_sqlite_db(db_path: pathlib.Path) -> str | None:
         return f"{db_path.name} database error: {e}"
     except Exception as e:
         return f"{db_path.name} check error: {e}"
+
+
+def _cleanup_bloated_preferences(profile_path: pathlib.Path) -> bool:
+    """肥大化した Preferences ファイルを削除する
+
+    Chrome の既知バグ（日本語ロケール環境で内蔵拡張機能の manifest.name が
+    Preferences 保存のたびに UTF-8 多重エンコードされる）により、Preferences が
+    指数的に肥大化することがある（実測で数百 MB に達する）。肥大化すると Chrome の
+    起動がドライバー接続のタイムアウトを超えるほど遅くなり、起動失敗 →
+    プロファイル全体の退避 → ログインセッション消失という連鎖につながる。
+
+    Cookie 等のセッション情報は別ファイル（SQLite）に保存されているため、
+    Preferences のみを削除してもログイン状態は失われない。削除された Preferences は
+    Chrome が次回起動時にデフォルト値で再生成する。
+
+    Args:
+        profile_path: Chrome プロファイルのディレクトリパス
+
+    Returns:
+        bool: Preferences を削除した場合 True
+
+    """
+    preferences_path = profile_path / "Default" / "Preferences"
+
+    try:
+        size = preferences_path.stat().st_size
+    except OSError:
+        # ファイルが存在しない場合など。新規プロファイルでは正常な状態。
+        return False
+
+    if size <= PREFERENCES_SIZE_LIMIT_BYTES:
+        return False
+
+    try:
+        preferences_path.unlink()
+    except OSError:
+        logging.exception("Failed to delete bloated Preferences: %s", preferences_path)
+        return False
+
+    logging.warning(
+        "Deleted bloated Preferences: %s (size: %.1f MB, limit: %d MB)",
+        preferences_path,
+        size / (1024 * 1024),
+        PREFERENCES_SIZE_LIMIT_BYTES // (1024 * 1024),
+    )
+    return True
 
 
 def _check_profile_health(profile_path: pathlib.Path) -> _ProfileHealthResult:
