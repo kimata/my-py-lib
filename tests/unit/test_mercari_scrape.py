@@ -27,7 +27,7 @@ def _iter_with_mocks(
     wait = MagicMock()
 
     with (
-        patch.object(mercari_scrape, "_close_popup"),
+        patch.object(mercari_scrape, "close_popup"),
         patch.object(mercari_scrape, "_click_account_button_with_retry"),
         patch.object(mercari_scrape, "_load_url"),
         patch.object(mercari_scrape, "_execute_item", side_effect=execute_item_side_effect) as mock_item,

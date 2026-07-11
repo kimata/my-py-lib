@@ -58,7 +58,7 @@ def iter_items_on_display(
     """
     # NOTE: ログイン直後にキャンペーン用のモーダルダイアログが表示され、account-button への
     # クリックが遮断されることがあるため、先にポップアップを閉じる。
-    _close_popup(driver)
+    close_popup(driver)
 
     _click_account_button_with_retry(driver, wait)
     my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品した商品")]', wait)
@@ -223,7 +223,7 @@ def _execute_item(
         return item
 
     # NOTE: ポップアップがリンクを覆い隠す場合があるため、先に閉じる
-    _close_popup(driver)
+    close_popup(driver)
 
     driver.execute_script("window.scrollTo(0, 0);")
     # NOTE: アイテムにスクロールしてから、ヘッダーに隠れないようちょっと前に戻す
@@ -376,7 +376,12 @@ def _parse_item(
     return item, item_element, elements_cache["link"]
 
 
-def _close_popup(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
+def close_popup(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
+    """ページ上に表示されているポップアップ・ダイアログを閉じる。
+
+    既知の閉じるボタンの XPath に加え、ARIA 属性ベースの汎用判定と
+    Escape キーのフォールバックを持つ。表示されていない場合は何もしない。
+    """
     by_xpath = selenium.webdriver.common.by.By.XPATH
 
     # NOTE: 既知のポップアップ閉じるボタン（互換維持）
@@ -446,6 +451,6 @@ def _click_account_button_with_retry(
         my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
     except selenium.common.exceptions.ElementClickInterceptedException:
         logging.warning("account-button のクリックが遮断されました。ポップアップを閉じてリトライします。")
-        _close_popup(driver)
+        close_popup(driver)
         time.sleep(0.5)
         my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
