@@ -259,6 +259,7 @@ def etag_conditional(
 def file_etag(
     filename_func: Callable[..., str | Path | None] | None = None,
     cache_control: str = "max-age=86400, must-revalidate",
+    cache_control_func: Callable[..., str] | None = None,
 ) -> Callable[[F], F]:
     """
     ファイルベースETAGキャッシュデコレーター
@@ -266,6 +267,7 @@ def file_etag(
     Args:
         filename_func: ファイルパスを取得する関数。Noneの場合は'filename'パラメータを使用
         cache_control: Cache-Controlヘッダーの値
+        cache_control_func: ビュー引数から Cache-Control 値を決める関数。指定時は cache_control より優先
 
     Examples:
         # filename パラメータから自動取得
@@ -286,6 +288,9 @@ def file_etag(
     def decorator(f: F) -> F:
         @functools.wraps(f)
         def decorated_function(*args: Any, **kwargs: Any) -> flask.Response:
+            effective_cache_control = (
+                cache_control_func(*args, **kwargs) if cache_control_func else cache_control
+            )
             # ファイルパスを取得
             file_path: str | Path | None
             if filename_func:
@@ -301,8 +306,8 @@ def file_etag(
                 if etag and check_etag(etag, flask.request.headers):
                     response = flask.make_response("", 304)
                     response.headers["ETag"] = etag
-                    if cache_control:
-                        response.headers["Cache-Control"] = cache_control
+                    if effective_cache_control:
+                        response.headers["Cache-Control"] = effective_cache_control
                     return response
 
             # 元の関数を実行
@@ -317,8 +322,8 @@ def file_etag(
             ):
                 etag = calculate_etag(file_path=file_path, weak=True)
                 response.headers["ETag"] = etag
-                if cache_control and "Cache-Control" not in response.headers:
-                    response.headers["Cache-Control"] = cache_control
+                if effective_cache_control and "Cache-Control" not in response.headers:
+                    response.headers["Cache-Control"] = effective_cache_control
 
             return response
 
