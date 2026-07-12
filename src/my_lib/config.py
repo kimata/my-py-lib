@@ -680,7 +680,22 @@ def load(
         logging.error("\n%s", details)
         raise ConfigParseError("YAML ファイルの構文エラー", details) from e
 
+    if yaml_data is None:
+        # NOTE: 空ファイルは None になる。そのまま返すと呼び出し側で
+        # TypeError: 'NoneType' になり原因が分かりにくい。
+        message = f"設定ファイルが空です: {config_path_obj}"
+        logging.error(message)
+        raise ConfigParseError(message, str(config_path_obj))
+
     if schema_path_obj is not None:
+        if not schema_path_obj.exists():
+            # NOTE: 相対パス指定で CWD が想定と異なる場合に分かりやすいエラーにする
+            message = (
+                f"スキーマファイルが見つかりません: {schema_path_obj} "
+                f"(相対パス指定の場合は CWD に注意してください)"
+            )
+            logging.error(message)
+            raise ConfigFileNotFoundError(message)
         with schema_path_obj.open() as file:
             schema: dict[str, Any] = json.load(file)
             _validate_config(yaml_data, schema, yaml_lines)

@@ -107,9 +107,16 @@ class TestSHT35:
             mock_i2cbus_class.return_value = mock_i2cbus
 
             # CRC が正しいデータを設定
+            # NOTE: ping はステータスレジスタを msg.read + i2c_rdwr で読む
             temp_data = [0x00, 0x01]
             crc = crc8_sensirion(bytes(temp_data))
-            mock_i2cbus.read_i2c_block_data.return_value = temp_data + [crc]
+            data = bytes(temp_data + [crc])
+
+            class FakeReadMsg:
+                def __bytes__(self):
+                    return data
+
+            mock_i2cbus.msg.read.return_value = FakeReadMsg()
 
             from my_lib.sensor.sht35 import SHT35
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import collections
 import gzip
+import hashlib
 import json
 import logging
 import math
@@ -41,8 +42,7 @@ if TYPE_CHECKING:
     # 画像通知を使わない利用側にも Pillow を要求してしまうため、TYPE_CHECKING に留める。
     from PIL import Image
 
-_NOTIFY_FOOTPRINT: pathlib.Path = pathlib.Path("/dev/shm/notify/slack/error")  # noqa: S108
-_INTERVAL_MIN: int = 60
+_NOTIFY_FOOTPRINT_DIR: pathlib.Path = pathlib.Path("/dev/shm/notify/slack")  # noqa: S108
 
 _SIMPLE_TMPL = """\
 [
@@ -50,7 +50,7 @@ _SIMPLE_TMPL = """\
         "type": "header",
     "text": {{
             "type": "plain_text",
-        "text": "{title}",
+        "text": {title},
             "emoji": true
         }}
     }},
@@ -63,6 +63,24 @@ _SIMPLE_TMPL = """\
     }}
 ]
 """
+
+
+def _notify_footprint(config: HasErrorConfig, title: str) -> pathlib.Path:
+    """エラー通知のレート制限用フットプリントのパスを返す。
+
+    アプリ (from_name) と通知タイトルごとにキーを分けることで、
+    同一ホストの別アプリや別種のエラー通知が互いに抑制し合わないようにする。
+    """
+    digest = hashlib.sha256(f"{config.from_name}:{title}".encode()).hexdigest()[:16]
+    return _NOTIFY_FOOTPRINT_DIR / f"error_{digest}"
+
+
+def _update_notify_footprint(footprint_path: pathlib.Path) -> None:
+    """レート制限フットプリントを更新する。失敗しても通知経路全体は落とさない。"""
+    try:
+        my_lib.footprint.update(footprint_path)
+    except OSError:
+        logging.warning("通知レート制限用フットプリントの更新に失敗: %s", footprint_path, exc_info=True)
 
 
 @dataclass(frozen=True)
@@ -244,11 +262,15 @@ class SlackConfig:
         if config_type is None:
             return SlackEmptyConfig()
 
-        return dacite.from_dict(
-            data_class=config_type,
-            data=normalized_data,
-            config=dacite.Config(strict=False),
-        )
+        try:
+            return dacite.from_dict(
+                data_class=config_type,
+                data=normalized_data,
+                config=dacite.Config(strict=False),
+            )
+        except dacite.DaciteError as e:
+            # NOTE: 「どのキーが足りないか」が分かるメッセージに変換する
+            raise ValueError(f"Slack 設定が不正です ({config_type.__name__}): {e}") from e
 
 
 # 型エイリアス
@@ -265,9 +287,10 @@ _hist_lock = threading.Lock()  # スレッドセーフティ用ロック
 
 # NOTE: 公開関数のデフォルト引数で参照されるため、公開関数より前に定義
 def format_simple(title: str, message: str) -> FormattedMessage:
+    # NOTE: title も JSON エスケープする (引用符やバックスラッシュ入りで壊れないように)
     return FormattedMessage(
         text=message,
-        json=json.loads(_SIMPLE_TMPL.format(title=title, message=json.dumps(message))),
+        json=json.loads(_SIMPLE_TMPL.format(title=json.dumps(title), message=json.dumps(message))),
     )
 
 
@@ -295,8 +318,9 @@ def error(
 
     _hist_add(message)
 
+    footprint_path = _notify_footprint(config, title)
     interval_min = config.error.interval_min
-    last_elapsed = my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT)
+    last_elapsed = my_lib.footprint.elapsed(footprint_path)
     # last_elapsed が None の場合は未送信または破損 → レート制限せずに送信する
     if last_elapsed is not None and last_elapsed <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
@@ -304,7 +328,10 @@ def error(
 
     thread_ts = _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
-    my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+    # NOTE: 送信に成功した場合のみレート制限を発動させる。
+    # 失敗時にも発動させると「一度きり」の通知が恒久的に失われる。
+    if thread_ts is not None:
+        _update_notify_footprint(footprint_path)
 
     return thread_ts
 
@@ -322,8 +349,9 @@ def error_with_image(
 
     _hist_add(message)
 
+    footprint_path = _notify_footprint(config, title)
     interval_min = config.error.interval_min
-    last_elapsed = my_lib.footprint.elapsed(_NOTIFY_FOOTPRINT)
+    last_elapsed = my_lib.footprint.elapsed(footprint_path)
     # last_elapsed が None の場合は未送信または破損 → レート制限せずに送信する
     if last_elapsed is not None and last_elapsed <= interval_min * 60:
         logging.warning("Interval is too short. Skipping.")
@@ -338,7 +366,9 @@ def error_with_image(
 
         _upload_image(config.bot_token, ch_id, title, attach_img.data, attach_img.text, thread_ts)
 
-    my_lib.footprint.update(_NOTIFY_FOOTPRINT)
+    # NOTE: 送信に成功した場合のみレート制限を発動させる (error() と同様)
+    if thread_ts is not None:
+        _update_notify_footprint(footprint_path)
 
     return thread_ts
 
@@ -556,7 +586,9 @@ def _send(
             kwargs["thread_ts"] = thread_ts
 
         return client.chat_postMessage(**kwargs)
-    except slack_sdk.errors.SlackClientError:
+    except Exception:
+        # NOTE: ネットワーク断では SlackClientError 以外 (URLError, socket.timeout 等) も
+        # 飛んでくる。通知はベストエフォートであり、呼び出し元のアプリを落とさない。
         logging.exception("Failed to send Slack message")
         return None
 
@@ -572,7 +604,8 @@ def _update(
             text=message.text,
             blocks=message.json,
         )
-    except slack_sdk.errors.SlackClientError:
+    except Exception:
+        # NOTE: _send() と同様、通知失敗でアプリを落とさない
         logging.exception("Failed to update Slack message")
         return None
 
@@ -627,7 +660,8 @@ def _split_send(
                     blocks=formatted_msg.json,
                     thread_ts=thread_ts,
                 )
-            except slack_sdk.errors.SlackClientError:
+            except Exception:
+                # NOTE: _send() と同様、通知失敗でアプリを落とさない
                 logging.exception("Failed to send Slack message in thread")
         else:
             # フォールバック: thread_tsが取得できなかった場合は通常通り送信
@@ -710,7 +744,9 @@ def _upload_file(
 
 # NOTE: テスト用
 def _interval_clear() -> None:
-    my_lib.footprint.clear(_NOTIFY_FOOTPRINT)
+    if _NOTIFY_FOOTPRINT_DIR.exists():
+        for path in _NOTIFY_FOOTPRINT_DIR.glob("error*"):
+            path.unlink(missing_ok=True)
 
 
 # NOTE: テスト用
@@ -721,6 +757,11 @@ def _hist_clear() -> None:
 
 # NOTE: テスト用
 def _hist_add(message: str) -> None:
+    # NOTE: 通知履歴はテスト検証専用。本番の常駐プロセスで無制限に溜め込まないよう
+    # pytest 実行時のみ記録する。
+    if "PYTEST_CURRENT_TEST" not in os.environ and "PYTEST_XDIST_WORKER" not in os.environ:
+        return
+
     _hist_get(True).append(message)
     _hist_get(False).append(message)
 

@@ -40,7 +40,8 @@ class Lock:
             try:
                 fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
-                logging.exception("ロック取得に失敗")
+                # NOTE: 他プロセスがロック中なのは正常系なのでログはデバッグに留める
+                logging.debug("ロック取得に失敗。リトライします", exc_info=True)
             else:
                 return True
             time.sleep(0.5)
@@ -90,12 +91,14 @@ class FD_Q10C(SensorBase):
         except Exception:
             logging.warning("FD_Q10C の ping が失敗。LTC2874 をリセットして再試行")
 
-        # NOTE: 通信が wedge した状態から復旧させるため、チップを hard reset してから再試行
-        self._reset()
-
+        # NOTE: 通信が wedge した状態から復旧させるため、チップを hard reset してから再試行。
+        # ping は「例外を投げない」契約なので、リセット自体の失敗 (ロックタイムアウト等) も
+        # False として扱う。
         try:
+            self._reset()
             return self.read_param(0x12, driver.DATA_TYPE_STRING)[0:4] == "FD-Q"
         except Exception:
+            logging.warning("FD_Q10C のリセット後の再試行も失敗", exc_info=True)
             return False
 
     def get_value(self, force_power_on: bool = True) -> float:

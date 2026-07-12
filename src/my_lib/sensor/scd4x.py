@@ -22,7 +22,7 @@ import time
 from my_lib.sensor import i2cbus
 from my_lib.sensor.base import I2CSensorBase
 from my_lib.sensor.crc import crc8_sensirion
-from my_lib.sensor.exceptions import SensorCRCError
+from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
 
 class SCD4X(I2CSensorBase):
@@ -36,14 +36,6 @@ class SCD4X(I2CSensorBase):
     def _ping_impl(self) -> bool:
         self.__get_data_ready()
         return True
-
-    def __reset(self) -> None:
-        # sto_periodic_measurement
-        self.i2cbus.write_byte_data(self.dev_addr, 0x3F, 0x86)
-        time.sleep(0.5)
-        # reinit
-        self.i2cbus.write_byte_data(self.dev_addr, 0x36, 0x46)
-        time.sleep(0.02)
 
     def __decode_response(self, data: bytes) -> list[int]:
         resp: list[int] = []
@@ -60,7 +52,8 @@ class SCD4X(I2CSensorBase):
         self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, [0xE4, 0xB8]), read)
         resp = self.__decode_response(bytes(read))
 
-        return (int.from_bytes(resp[0:2], byteorder="big") & 0x7F) != 0
+        # NOTE: データシートでは「下位 11 bit が全て 0 なら not ready」
+        return (int.from_bytes(resp[0:2], byteorder="big") & 0x07FF) != 0
 
     def __start_measurement(self) -> None:
         # NOTE: まず待ってみて、それでもデータが準備できないようだったら
@@ -77,6 +70,9 @@ class SCD4X(I2CSensorBase):
             if self.__get_data_ready():
                 return
             time.sleep(0.5)
+
+        # NOTE: 準備できないまま read するとゴミ/NACK を読むことになるため raise する
+        raise SensorCommunicationError("計測開始後もデータが準備できない")
 
     def get_value(self) -> list[int | float]:
         self.__start_measurement()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import sys
 
 
 def get_worker_id(default: str = "main") -> str:
@@ -49,7 +50,9 @@ def get_path(path_str: str | pathlib.Path) -> pathlib.Path:
     suffix = os.environ.get("PYTEST_XDIST_WORKER", None)
     path = pathlib.Path(path_str)
 
-    if suffix is None:
+    # NOTE: 本番プロセスに万一 PYTEST_XDIST_WORKER が残っていてもパスが暗黙に
+    # 変わらないように、pytest 実行下 (pytest が import 済み) でのみ適用する
+    if suffix is None or "pytest" not in sys.modules:
         return path
     else:
         return path.with_name(path.name + "." + suffix)

@@ -18,6 +18,8 @@ class MockSensor:
         self.dev_addr = dev_addr
         self.required = False
         self.consecutive_fails = 0
+        self.field_prefix = ""
+        self.field_rename: dict[str, str] = {}
         self._ping_result = True
         self._values: dict[str, float] = {}
 
@@ -122,9 +124,10 @@ class TestRetryInactive:
         active: list = []
         inactive: list = []
 
-        next_index = retry_inactive(active, inactive, 5)
+        next_index, revived = retry_inactive(active, inactive, 5)
 
         assert next_index == 0
+        assert revived is None
         assert active == []
         assert inactive == []
 
@@ -140,10 +143,11 @@ class TestRetryInactive:
         active: list = []
         inactive = [sensor1, sensor2]
 
-        next_index = retry_inactive(active, inactive, 0)
+        next_index, revived = retry_inactive(active, inactive, 0)
 
         assert active == [sensor1]
         assert inactive == [sensor2]
+        assert revived is sensor1
         # NOTE: リストが縮んだので次回は同じ index から
         assert next_index == 0
 
@@ -159,10 +163,11 @@ class TestRetryInactive:
         active: list = []
         inactive = [sensor1, sensor2]
 
-        next_index = retry_inactive(active, inactive, 0)
+        next_index, revived = retry_inactive(active, inactive, 0)
 
         assert active == []
         assert inactive == [sensor1, sensor2]
+        assert revived is None
         assert next_index == 1
 
     def test_index_wraps_around(self, mock_smbus):
@@ -177,7 +182,7 @@ class TestRetryInactive:
         active: list = []
         inactive = [sensor1, sensor2]
 
-        next_index = retry_inactive(active, inactive, 5)
+        next_index, _ = retry_inactive(active, inactive, 5)
 
         # NOTE: 5 % 2 = 1 の sensor2 を ping、失敗で次は 2
         assert active == []
@@ -232,7 +237,7 @@ class TestRetryInactive:
 
         idx = 0
         for _ in range(5):
-            idx = retry_inactive(active, inactive, idx)
+            idx, _revived = retry_inactive(active, inactive, idx)
 
         assert ping_order == ["Sensor1", "Sensor2", "Sensor3", "Sensor1", "Sensor2"]
 
@@ -249,11 +254,12 @@ class TestSense:
         sensor2 = MockSensor(name="Sensor2")
         sensor2._values = {"humidity": 60.0}
 
-        value_map, is_success, failed = sense([sensor1, sensor2])
+        value_map, is_success, failed, recovered = sense([sensor1, sensor2])
 
         assert value_map == {"temp": 25.0, "humidity": 60.0}
         assert is_success is True
         assert failed == []
+        assert recovered == []
 
     def test_returns_false_on_exception(self, mock_smbus):
         """例外が発生した場合は is_success が False"""
@@ -266,7 +272,7 @@ class TestSense:
 
         sensor.get_value_map = raise_error  # type: ignore
 
-        _, is_success, _ = sense([sensor])
+        _, is_success, _, _ = sense([sensor])
 
         assert is_success is False
 
@@ -284,7 +290,7 @@ class TestSense:
         sensor2 = MockSensor(name="WorkingSensor")
         sensor2._values = {"temp": 25.0}
 
-        value_map, is_success, _ = sense([sensor1, sensor2])
+        value_map, is_success, _, _ = sense([sensor1, sensor2])
 
         assert value_map == {"temp": 25.0}
         assert is_success is False
@@ -293,7 +299,7 @@ class TestSense:
         """空のリストを渡すと空の値マップを返す"""
         from my_lib.sensor import sense
 
-        value_map, is_success, failed = sense([])
+        value_map, is_success, failed, recovered = sense([])
 
         assert value_map == {}
         assert is_success is True
@@ -332,14 +338,14 @@ class TestSense:
         active = [sensor]
 
         # 1 回目: まだ threshold に達していないので failed は空
-        _, _, failed1 = sense(active, fail_threshold=2)
+        _, _, failed1, _ = sense(active, fail_threshold=2)
         assert sensor.consecutive_fails == 1
         assert failed1 == []
         # センサーは active に残る
         assert active == [sensor]
 
         # 2 回目: ちょうど threshold に到達 → 通知用に返る
-        _, _, failed2 = sense(active, fail_threshold=2)
+        _, _, failed2, _ = sense(active, fail_threshold=2)
         assert sensor.consecutive_fails == 2
         assert len(failed2) == 1
         assert failed2[0].sensor is sensor
@@ -348,10 +354,10 @@ class TestSense:
         assert active == [sensor]
 
         # 3 回目以降: 連続失敗は続くが再通知しない
-        _, _, failed3 = sense(active, fail_threshold=2)
+        _, _, failed3, _ = sense(active, fail_threshold=2)
         assert sensor.consecutive_fails == 3
         assert failed3 == []
-        _, _, failed4 = sense(active, fail_threshold=2)
+        _, _, failed4, _ = sense(active, fail_threshold=2)
         assert sensor.consecutive_fails == 4
         assert failed4 == []
 
@@ -364,7 +370,7 @@ class TestSense:
         # 2 連続失敗 → 通知
         sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("first"))
         sense([sensor])
-        _, _, failed_first = sense([sensor])
+        _, _, failed_first, _ = sense([sensor])
         assert len(failed_first) == 1
 
         # 成功 → counter リセット
@@ -375,7 +381,7 @@ class TestSense:
         # 再度 2 連続失敗 → 再通知
         sensor.get_value_map = unittest.mock.MagicMock(side_effect=OSError("second"))
         sense([sensor])
-        _, _, failed_second = sense([sensor])
+        _, _, failed_second, _ = sense([sensor])
         assert len(failed_second) == 1
         assert "second" in failed_second[0].traceback
 

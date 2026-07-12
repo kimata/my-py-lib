@@ -7,7 +7,7 @@ Usage:
 
 Options:
   -b BUS            : I2C バス番号。[default: 0x01]
-  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x4A]
+  -d DEV_ADDR       : デバイスアドレス(7bit)。 [default: 0x48]
   -D                : デバッグモードで動作します。
 """
 
@@ -28,13 +28,17 @@ class GROVE_TDS(I2CSensorBase):
         super().__init__(bus_id, dev_addr)
         self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=self.dev_addr)
 
+        # NOTE: 同一バスを 2 本 open しないように、ADC 側とバスハンドルを共有する
+        self.adc.i2cbus.close()
+        self.adc.i2cbus = self.i2cbus
+
         self.adc.set_mux(self.adc.REG_CONFIG_MUX_0G)
         self.adc.set_pga(self.adc.REG_CONFIG_FSR_2048)
 
     def ping(self) -> bool:
         return self.adc.ping()
 
-    def get_value(self, temp: float = 26.0) -> list[float]:
+    def get_value(self, temp: float = 25.0) -> list[float]:
         volt = self.adc.get_value()[0] / 1000.0
         tds = (133.42 * volt * volt * volt - 255.86 * volt * volt + 857.39 * volt) * 0.5
         tds /= 1 + 0.018 * (temp - 25)  # 0.018 は実測データから算出

@@ -16,6 +16,9 @@ class I2CBUS:
         self.bus_id: int = bus_id
         self.smbus: smbus2.SMBus = smbus2.SMBus(bus_id)
 
+    def close(self) -> None:
+        self.smbus.close()
+
     def write_byte_data(self, dev_addr: int, register: int, data: int) -> None:
         logging.debug("i2c write - dev:0x%02X reg:0x%02X data:0x%02X", dev_addr, register, data)
         self.smbus.write_byte_data(dev_addr, register, data)

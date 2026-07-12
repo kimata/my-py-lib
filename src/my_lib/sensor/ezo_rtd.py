@@ -13,43 +13,16 @@ Options:
 
 from __future__ import annotations
 
-import time
-
-from my_lib.sensor.base import I2CSensorBase
+from my_lib.sensor.ezo_base import EZOBase
 
 
-class EZO_RTD(I2CSensorBase):
+class EZO_RTD(EZOBase):
     NAME: str = "EZO-RTD"
     DEV_ADDR: int = 0x66  # 7bit
-
-    def __init__(self, bus_id: int | None = None, dev_addr: int | None = None) -> None:
-        from my_lib.sensor import i2cbus
-
-        super().__init__(
-            bus_id=bus_id if bus_id is not None else i2cbus.I2CBUS.ARM,
-            dev_addr=dev_addr if dev_addr is not None else self.DEV_ADDR,
-        )
-
-    def _ping_impl(self) -> bool:
-        value = self.exec_command("i")
-        return value[1:].decode().split(",")[1] == "RTD"
+    DEVICE_ID: str = "RTD"
 
     def get_value(self) -> float:
-        value = self.exec_command("R")
-
-        return float(value[1:].decode().rstrip("\x00"))
-
-    def exec_command(self, cmd: str) -> bytes:
-        command = list(cmd.encode())
-
-        self.i2cbus.i2c_rdwr(self.i2cbus.msg.write(self.dev_addr, command))
-
-        time.sleep(1)
-
-        read = self.i2cbus.msg.read(self.dev_addr, 10)
-        self.i2cbus.i2c_rdwr(read)
-
-        return bytes(read)
+        return round(float(self.exec_command("R")), 3)
 
     def get_value_map(self) -> dict[str, float]:
         value = self.get_value()

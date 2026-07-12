@@ -27,6 +27,7 @@ import my_lib.sensor
 from my_lib.sensor.base import SensorValue, UARTSensorBase
 from my_lib.sensor.bp35a1 import PanDescriptor
 from my_lib.sensor.echonetlite import ECHONETLite, EchonetLiteFrame, EchonetLiteProperty
+from my_lib.sensor.exceptions import SensorCommunicationError
 
 PAN_DESC_DAT_PATH: pathlib.Path = pathlib.Path(tempfile.gettempdir()) / "pan_desc.dat"
 RETRY_COUNT: int = 5
@@ -93,29 +94,26 @@ class EchonetEnergy(UARTSensorBase):
             raise RuntimeError("Failed to connect Wi-SUN")
 
         # NOTE: インスタンスリスト通知メッセージが来ない場合があるので
-        # チェックを省略
-
-        # for i in range(RETRY_COUNT):
-        #     recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
-
-        #     frame = self.parse_frame(recv_packet)
-        #     if ((frame.edata.seoj == 0x0EF001) and
-        #         (frame.edata.deoj == 0x0EF001)):
-        #         break
-
-        # # インスタンスリスト
-        # inst_list = ECHONETLite.parse_inst_list(
-        #     frame.edata.props[0].edt)
-
-        # # 低圧スマート電力量メータクラスがあるか確認
-        # is_meter_exit = ECHONETLite.check_class(
-        #     inst_list, 0x02, 0x88)
-
-        # if not is_meter_exit:
-        #     raise Exception('Meter not found')
+        # チェックを省略している
 
     def disconnect(self) -> None:
         self.echonet_if.disconnect()
+
+    def close(self) -> None:
+        self.echonet_if.close()
+
+    def _reset_connection(self) -> None:
+        """接続状態と PAN 情報キャッシュを破棄し、次回計測時に再スキャン・再接続させる。
+
+        PANA セッション寿命切れやチャネル変更が起きても自己修復できるようにする。
+        """
+        self.is_connected = False
+        self.ipv6_addr = None
+        PAN_DESC_DAT_PATH.unlink(missing_ok=True)
+        try:
+            self.disconnect()
+        except Exception:
+            self.logger.debug("disconnect failed during reset", exc_info=True)
 
     def get_value(self) -> list[int]:
         if not self.is_connected:
@@ -146,9 +144,22 @@ class EchonetEnergy(UARTSensorBase):
         )
         send_packet = ECHONETLite.build_frame(edata)
 
-        while True:
+        try:
+            return self._request_energy(meter_eoj, send_packet)
+        except SensorCommunicationError:
+            # NOTE: PANA セッション失効やチャネル変更の可能性があるので、
+            # 接続状態とキャッシュを破棄して次回に再接続させる
+            self._reset_connection()
+            raise
+
+    def _request_energy(self, meter_eoj: int, send_packet: bytes) -> list[int]:
+        for _ in range(RETRY_COUNT):
             self.echonet_if.send_udp(self.ipv6_addr, ECHONETLite.UDP_PORT, send_packet)
             recv_packet = self.echonet_if.recv_udp(self.ipv6_addr)
+            if recv_packet is None:
+                # NOTE: recv_udp はタイムアウトで None を返す。再送する。
+                self.logger.warning("recv_udp timeout")
+                continue
             frame = self.parse_frame(recv_packet)
 
             if frame.edata is None:
@@ -158,9 +169,12 @@ class EchonetEnergy(UARTSensorBase):
             for prop in frame.edata.props:
                 if prop.epc != ECHONETLite.EPC.LOW_VOLTAGE_SMART_METER.INSTANTANEOUS_ENERGY:
                     continue
-                if prop.edt is None or len(prop.edt) != prop.pdc:
+                if prop.edt is None or len(prop.edt) != prop.pdc or prop.pdc != 4:
                     continue
-                return [struct.unpack(">I", prop.edt)[0]]
+                # NOTE: EPC 0xE7 (瞬時電力) は signed long。逆潮流 (売電) 時は負値になる。
+                return [struct.unpack(">i", prop.edt)[0]]
+
+        raise SensorCommunicationError(f"瞬時電力の応答を {RETRY_COUNT} 回試行しても受信できず")
 
     def get_value_map(self) -> dict[str, SensorValue]:
         value = self.get_value()

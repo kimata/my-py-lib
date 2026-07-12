@@ -51,6 +51,10 @@ class SM9561(I2CSensorBase):
     REG_DLL: int = 0x00 << 3
     REG_DLH: int = 0x01 << 3
 
+    # NOTE: RS485 先のセンサーが無応答のときに FIFO 待ちで永久ループしないための上限。
+    # 9600bps でレスポンス (数バイト) は数十 ms で届くので 2 秒あれば十分。
+    FIFO_TIMEOUT_SEC: float = 2.0
+
     def __init__(self, bus_id: int = i2cbus.I2CBUS.ARM, dev_addr: int | None = None) -> None:
         super().__init__(bus_id, dev_addr)
 
@@ -151,7 +155,11 @@ class SM9561(I2CSensorBase):
         for data in data_list:
             self.i2cbus.write_byte_data(self.dev_addr, self.REG_THR, data)
 
+        deadline = time.monotonic() + self.FIFO_TIMEOUT_SEC
         while (self.i2cbus.read_byte_data(self.dev_addr, self.REG_LSR) & 0x20) != 0x20:
+            if time.monotonic() > deadline:
+                self.set_rts(False)
+                raise SensorCommunicationError("TX FIFO empty 待ちがタイムアウト")
             logging.debug("Wait for TX FIFO empty")
             time.sleep(0.005)
         time.sleep(0.005)
@@ -160,8 +168,11 @@ class SM9561(I2CSensorBase):
 
     def read_bytes(self, length: int) -> list[int]:
         data_list: list[int] = []
+        deadline = time.monotonic() + self.FIFO_TIMEOUT_SEC
         for _ in range(length):
             while self.i2cbus.read_byte_data(self.dev_addr, self.REG_RXLVL) == 0:
+                if time.monotonic() > deadline:
+                    raise SensorCommunicationError("RX FIFO データ待ちがタイムアウト")
                 logging.debug("Wait for RX FIFO data available")
                 time.sleep(0.01)
 

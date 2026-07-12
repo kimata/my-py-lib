@@ -25,15 +25,19 @@ class TestGetHandle:
             mock_sender.return_value = unittest.mock.MagicMock()
             result = my_lib.fluentd_util.get_handle("test_tag", "localhost")
 
-            mock_sender.assert_called_once_with("test_tag", "localhost")
+            mock_sender.assert_called_once_with(
+                "test_tag", host="localhost", port=24224, forward_packet_error=False
+            )
             assert result is not None
 
     def test_passes_tag_and_host(self):
         """タグとホストを正しく渡す"""
         with unittest.mock.patch("fluent.sender.FluentSender") as mock_sender:
-            my_lib.fluentd_util.get_handle("my_app", "192.168.1.100")
+            my_lib.fluentd_util.get_handle("my_app", "192.168.1.100", port=24225)
 
-            mock_sender.assert_called_once_with("my_app", "192.168.1.100")
+            mock_sender.assert_called_once_with(
+                "my_app", host="192.168.1.100", port=24225, forward_packet_error=False
+            )
 
 
 class TestSend:

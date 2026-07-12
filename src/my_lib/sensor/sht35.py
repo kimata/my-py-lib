@@ -29,9 +29,14 @@ class SHT35(I2CSensorBase):
     DEV_ADDR: int = 0x44  # 7bit
 
     def _ping_impl(self) -> bool:
+        # NOTE: ステータスレジスタ読み出し (コマンド 0xF32D)。
+        # SHT3x は 16bit コマンドのみ受理するため、読み出しは SMBus プロトコル
+        # (コマンドバイト付き read) ではなく素の read を使う。
         self.i2cbus.write_byte_data(self.dev_addr, 0xF3, 0x2D)
-        data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x00, 3)
-        return crc8_sensirion(data[0:2]) == data[2]
+        read = self.i2cbus.msg.read(self.dev_addr, 3)
+        self.i2cbus.i2c_rdwr(read)
+        data = bytes(read)
+        return crc8_sensirion(list(data[0:2])) == data[2]
 
     def get_value(self) -> list[float]:
         self.i2cbus.write_byte_data(self.dev_addr, 0x24, 0x16)

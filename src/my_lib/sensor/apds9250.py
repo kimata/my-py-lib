@@ -13,7 +13,10 @@ Options:
 
 from __future__ import annotations
 
+import time
+
 from my_lib.sensor.base import I2CSensorBase
+from my_lib.sensor.exceptions import SensorCommunicationError
 
 
 class APDS9250(I2CSensorBase):
@@ -27,7 +30,6 @@ class APDS9250(I2CSensorBase):
             bus_id=bus_id if bus_id is not None else i2cbus.I2CBUS.ARM,
             dev_addr=dev_addr if dev_addr is not None else self.DEV_ADDR,
         )
-        self.is_init: bool = False
 
     def _ping_impl(self) -> bool:
         data = self.i2cbus.read_byte_data(self.dev_addr, 0x06)
@@ -40,6 +42,15 @@ class APDS9250(I2CSensorBase):
         self.i2cbus.write_byte_data(self.dev_addr, 0x05, 0x01)
         # Sensor = active
         self.i2cbus.write_byte_data(self.dev_addr, 0x00, 0x02)
+
+        # NOTE: MAIN_STATUS (0x07) の ALS Data Status ビットで測定完了を待つ。
+        # standby から active にした直後は 20bit 変換の 400ms を待つ必要がある。
+        for _ in range(15):
+            if self.i2cbus.read_byte_data(self.dev_addr, 0x07) & 0x08:
+                break
+            time.sleep(0.1)
+        else:
+            raise SensorCommunicationError("測定完了待ちがタイムアウト")
 
         data = self.i2cbus.read_i2c_block_data(self.dev_addr, 0x0A, 6)
 

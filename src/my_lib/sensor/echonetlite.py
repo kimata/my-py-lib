@@ -90,8 +90,8 @@ class ECHONETLite:
         PROP_WRITE: int = 0x61
         # プロパティ値読み出し要求
         PROP_READ: int = 0x62
-        # プロパティ値通知要求
-        PROP_NOTIFY: int = 0x62
+        # プロパティ値通知要求 (INF_REQ)
+        PROP_NOTIFY: int = 0x63
         # プロパティ値書き込み・読み出し要求
         PROP_WRITE_READ: int = 0x6E
 

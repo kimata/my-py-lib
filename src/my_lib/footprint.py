@@ -28,6 +28,9 @@ def update(path_str: str | pathlib.Path, mtime: float | None = None) -> None:
         tmp_file.write(str(mtime))
         temp_file_path = pathlib.Path(tmp_file.name)
 
+    # NOTE: NamedTemporaryFile は 0600 で作られるため、healthz を別ユーザーで
+    # 実行する構成でも読めるように 0644 にしてから rename する
+    temp_file_path.chmod(0o644)
     temp_file_path.rename(path)
 
 

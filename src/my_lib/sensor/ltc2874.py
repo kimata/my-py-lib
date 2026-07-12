@@ -14,11 +14,12 @@ import my_lib.sensor
 import my_lib.sensor.io_link
 from my_lib.sensor.exceptions import SensorCommunicationError, SensorCRCError
 
-DEBUG: bool = True
-
 DATA_TYPE_RAW: int = 0
 DATA_TYPE_STRING: int = 1
 DATA_TYPE_UINT16: int = 2
+
+# NOTE: ISDU read で WAIT レスポンスを許容する回数の上限 (無限ループ防止)
+ISDU_WAIT_LIMIT: int = 100
 
 
 def dump_byte_list(label: str, byte_list: list[int]) -> None:
@@ -253,6 +254,7 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
 
     chk = 0x00
     flow = 1
+    wait_count = 0
     data_list: list[int] = []
     while True:
         header = isdu_res_read(spi, ser, 0x10)
@@ -267,7 +269,11 @@ def isdu_read(spi: spidev.SpiDev, ser: serial.Serial, index: int, data_type: int
                 remain = (header & 0x0F) - 1
             break
         elif header == 0x01:
-            logging.warning("WAIT レスポンス受信")
+            # NOTE: WAIT が続く限り無限ループしないように上限を設ける
+            wait_count += 1
+            if wait_count > ISDU_WAIT_LIMIT:
+                raise SensorCommunicationError("WAIT レスポンスが続いたため中断")
+            logging.debug("WAIT レスポンス受信 (%d 回目)", wait_count)
             continue
         elif (header >> 4) == 0x0C:
             raise SensorCommunicationError("ERROR レスポンス受信")

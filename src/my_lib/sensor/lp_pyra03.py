@@ -31,11 +31,15 @@ class LP_PYRA03(I2CSensorBase):
         super().__init__(bus_id, dev_addr)
         self.adc: ADS1115 = ADS1115(bus_id=bus_id, dev_addr=self.dev_addr)
 
+        # NOTE: 同一バスを 2 本 open しないように、ADC 側とバスハンドルを共有する
+        self.adc.i2cbus.close()
+        self.adc.i2cbus = self.i2cbus
+
     def ping(self) -> bool:
         return self.adc.ping()
 
     def get_value(self) -> list[float]:
-        mvolt = abs(max(self.adc.get_value()[0], 0))
+        mvolt = max(self.adc.get_value()[0], 0)
 
         return [round(1000 * mvolt / self.SENSITIVITY, 2)]
 

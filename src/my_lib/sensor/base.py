@@ -23,12 +23,17 @@ class SensorBase(ABC):
     # 実体は __init__ でインスタンス変数として上書き初期化される。
     required: bool = False
     consecutive_fails: int = 0
+    field_prefix: str = ""
 
     def __init__(self) -> None:
         # NOTE: my_lib.sensor.sense() が連続失敗回数を読み書きするため
         # ここで必ずインスタンス変数として初期化する
         self.required = False
         self.consecutive_fails = 0
+        # NOTE: my_lib.sensor.load() が config の field_prefix / rename を書き込み、
+        # sense() が get_value_map() のキーへ適用する
+        self.field_prefix = ""
+        self.field_rename: dict[str, str] = {}
 
     @abstractmethod
     def ping(self) -> bool:
@@ -43,6 +48,13 @@ class SensorBase(ABC):
     def get_value_map(self) -> dict[str, SensorValue]:
         """センサー値を辞書で取得する"""
         ...
+
+    def close(self) -> None:  # noqa: B027
+        """通信ハンドル (I2C/SPI/serial) を解放する。
+
+        既定は何もしない (意図的な optional hook)。
+        ハンドルを保持するサブクラスがオーバーライドする。
+        """
 
 
 class I2CSensorBase(SensorBase):
@@ -79,6 +91,11 @@ class I2CSensorBase(SensorBase):
         except OSError:
             logging.debug("Failed to detect %s", self.NAME, exc_info=True)
             return False
+        except Exception:
+            # NOTE: ping は「例外を投げない」契約。デコード失敗や CRC エラー等の
+            # 異常応答も「応答なし」として扱う (呼び出し側のアプリを落とさない)。
+            logging.warning("Unexpected error while pinging %s", self.NAME, exc_info=True)
+            return False
 
     def _ping_impl(self) -> bool:
         """ping の実装。
@@ -87,6 +104,10 @@ class I2CSensorBase(SensorBase):
         `ping()` 自体をオーバーライドするサブクラスは実装不要。
         """
         raise NotImplementedError
+
+    def close(self) -> None:
+        """I2C バスのハンドルを解放する。"""
+        self.i2cbus.close()
 
 
 class UARTSensorBase(SensorBase):

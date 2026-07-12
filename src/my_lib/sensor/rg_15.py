@@ -16,6 +16,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import serial
 
@@ -45,12 +46,22 @@ class RG_15(UARTSensorBase):
     RAIN_START_ACC_SUM: float = 0.04
     RAIN_STOP_INTERVAL_SEC: int = 120
 
-    def __init__(self, dev: str = DEV) -> None:
+    def __init__(self, dev: str = DEV, param: dict[str, Any] | None = None) -> None:
+        """RG-15 ドライバを初期化する。
+
+        Args:
+            dev: シリアルデバイスファイル
+            param: UART ドライバ共通シグネチャのための追加パラメータ (RG-15 では未使用)
+        """
         super().__init__()
         self.dev: str = dev
         self.ser: serial.Serial = serial.Serial(self.dev, self.BAUDRATE, timeout=2)
         self.sum_by_minute: dict[int, float] = {}
         self.event: RainEvent = RainEvent()
+
+    def close(self) -> None:
+        """シリアルポートを閉じる。"""
+        self.ser.close()
 
     def update_stat(self, data: dict[str, float]) -> list[float | bool]:
         minute = int(time.time() / 60)
@@ -91,6 +102,10 @@ class RG_15(UARTSensorBase):
         # NOTE: 直前の1分間降水量を返す
         rain = self.sum_by_minute.get(minute - 1, 0.0)
 
+        # NOTE: 参照するのは直前 1 分だけなので、それより古い集計は捨てる (無限成長防止)
+        for old_minute in [m for m in self.sum_by_minute if m < minute - 1]:
+            del self.sum_by_minute[old_minute]
+
         return [rain, self.event.fall_start]
 
     def ping(self) -> bool:
@@ -101,15 +116,20 @@ class RG_15(UARTSensorBase):
 
             res = self.ser.read(1).decode(encoding="utf-8")
 
+            # NOTE: 応答の残りバイトが次回の read に混入しないように捨てる
+            self.ser.reset_input_buffer()
+
             return res == "p"
         except Exception:
             return False
 
     def get_value(self) -> list[float | bool]:
+        self.ser.reset_input_buffer()
         self.ser.write("R\r\n".encode(encoding="utf-8"))  # noqa: UP012
         self.ser.flush()
 
-        res = self.ser.read(100).decode(encoding="utf-8").strip()
+        # NOTE: 応答は 1 行なので行末まで読む (固定長 read だと毎回タイムアウトまで待つ)
+        res = self.ser.read_until(expected=b"\n", size=200).decode(encoding="utf-8").strip()
 
         logging.debug(res)
 

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import serial
 
 from my_lib.sensor.bp35a1_session import BP35A1Session, EventKind
+from my_lib.sensor.exceptions import SensorCommunicationError
 
 
 @dataclass(frozen=True)
@@ -68,15 +69,23 @@ class BP35A1:
     # ------------------------------------------------------------------
 
     def ping(self) -> bool:
-        """モジュールが応答するか確認する。"""
+        """モジュールが応答するか確認する。
+
+        NOTE: SKRESET は PANA セッションを破棄してしまうため、ping では発行しない
+        (接続確立後に ping しても副作用がないようにする)。
+        """
         try:
-            self.reset()
+            self.ser.reset_input_buffer()
             # SKINFO は EINFO 行を返した後 OK を出す。EINFO が来れば応答ありと判定
             evt = self.session.send_and_expect("SKINFO", expect={EventKind.EINFO, EventKind.FAIL}, timeout=5)
             return evt is not None and evt.kind == EventKind.EINFO
         except Exception:
             self.logger.warning("ping failed", exc_info=True)
             return False
+
+    def close(self) -> None:
+        """シリアルポートを閉じる。"""
+        self.ser.close()
 
     def reset(self) -> None:
         """モジュールをソフトリセットする。"""
@@ -90,6 +99,21 @@ class BP35A1:
         if evt is None or evt.kind != EventKind.OK or not evt.args:
             raise RuntimeError("Failed to get option")
         self.opt = int(evt.args[0], 16)
+
+    def ensure_hex_output(self) -> None:
+        """ERXUDP のペイロード表示形式を 16 進 ASCII (WOPT 01) に揃える。
+
+        セッション層の ERXUDP パースは WOPT 01 前提のため、工場出荷状態
+        (WOPT 00 = バイナリ表示) のモジュールでは接続前に設定する必要がある。
+        WOPT はフラッシュに永続化され書き込み回数制限 (約 10,000 回) があるため、
+        ROPT で現在値を確認して異なる場合のみ書き込む。
+        """
+        self.get_option()
+        if self.opt is not None and (self.opt & 0x01) == 0x01:
+            return
+        self.logger.warning("WOPT を 01 (16 進 ASCII 表示) に変更します")
+        self._send_ok("WOPT 01")
+        self.opt = 0x01
 
     def set_id(self, b_id: str) -> None:
         """B ルート ID を設定する。"""
@@ -127,6 +151,7 @@ class BP35A1:
 
     def connect(self, pan_desc: PanDescriptor) -> str | None:
         """PAN に PANA 認証で接続する。成功時は IPv6 リンクローカルアドレスを返す。"""
+        self.ensure_hex_output()
         self._send_ok(f"SKSREG S2 {pan_desc.channel}")
         self._send_ok(f"SKSREG S3 {pan_desc.pan_id}")
 
@@ -173,7 +198,13 @@ class BP35A1:
         # NOTE: ヘッダー + バイナリ + CRLF を 1 度に送信
         self.session.write_raw(header + data + b"\r\n")
         # OK が来るまで待つ (途中で EVENT 21 = 送信完了 が割り込む)
-        self.session.collect_until({EventKind.OK, EventKind.FAIL}, timeout=10)
+        events = self.session.collect_until({EventKind.OK, EventKind.FAIL}, timeout=10)
+        for evt in events:
+            if evt.kind == EventKind.FAIL:
+                raise SensorCommunicationError(f"SKSENDTO が FAIL を返した: {evt.raw}")
+            if evt.kind == EventKind.OK:
+                return
+        raise SensorCommunicationError("SKSENDTO の応答 (OK/FAIL) を受信できず")
 
     def recv_udp(self, ipv6_addr: str, timeout: float = 60.0) -> bytes | None:
         """指定送信元からの UDP データを 1 つ受信する。タイムアウトで None。
