@@ -37,7 +37,11 @@ _LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0
 
 _LOGIN_MARK_XPATH: str = '//span[contains(text(), "アカウント＆リスト")]'
 
-_FOOTER_XPATH = '//div[contains(@class, "footer") or contains(@class, "Footer")]'
+# NOTE: 認証チャレンジ系ページ（画像クイズ・SMS 認証）の footer は
+# <div id="footer" class="a-section"> で class に footer を含まないため、id も見る。
+# id を見ないとパスワード送信後にクイズが出た場合ここでタイムアウトし、
+# 後段の _handle_quiz / _handle_phone_verification に到達できない。
+_FOOTER_XPATH = '//div[@id="footer" or contains(@class, "footer") or contains(@class, "Footer")]'
 
 # 「ショッピングを続ける」ボタン（CAPTCHA 検証ページ）
 _CONTINUE_SHOPPING_BUTTON_XPATH = (
