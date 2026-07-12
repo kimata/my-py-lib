@@ -136,6 +136,51 @@ class TestParseWbgtCurrent:
         assert result is None
 
 
+class TestParseWbgtDaily:
+    """parse_wbgt_daily 関数のテスト"""
+
+    @staticmethod
+    def _build_forecast3day_html(day_list):
+        """forecast3day テーブル (td 35 個、予測値は全て空) を生成する"""
+        cells = ['<td class="day"></td>'] * 8
+        for day in day_list:
+            cells.append(f'<td class="day">{day}日</td>')
+            cells.extend(['<td class="day"></td>'] * 8)
+        return lxml.html.fromstring(f"<table class='forecast3day'><tr>{''.join(cells)}</tr></table>")
+
+    def test_short_measured_list_does_not_raise(self):
+        """実測値リストが短い (day_list.php が空テーブル) 場合でも IndexError にならないこと"""
+        import my_lib.time
+
+        now = my_lib.time.now()
+        tomorrow = now + datetime.timedelta(days=1)
+        day3 = now + datetime.timedelta(days=2)
+
+        html = self._build_forecast3day_html([now.day, tomorrow.day, day3.day])
+
+        # NOTE: day_list.php が空テーブルを返した場合、実測値リストは [None] (長さ 1) になる
+        result = my_lib.weather.parse_wbgt_daily(html, [None])
+
+        assert result.today is not None
+        assert all(v is None for v in result.today)
+
+    def test_measured_values_fill_today(self):
+        """当日の欠測が実測値で差し替えられること"""
+        import my_lib.time
+
+        now = my_lib.time.now()
+        tomorrow = now + datetime.timedelta(days=1)
+        day3 = now + datetime.timedelta(days=2)
+
+        html = self._build_forecast3day_html([now.day, tomorrow.day, day3.day])
+
+        measured = [None, 25.0, 26.0, 27.0, 28.0, 29.0, 30.0, 31.0, 32.0]
+        result = my_lib.weather.parse_wbgt_daily(html, measured)
+
+        assert result.today is not None
+        assert result.today[1:] == [25, 26, 27, 28, 29, 30, 31, 32]
+
+
 class TestGetSunsetUrlNao:
     """get_sunset_url_nao 関数のテスト"""
 

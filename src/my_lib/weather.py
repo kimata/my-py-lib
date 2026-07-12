@@ -293,10 +293,11 @@ def parse_wbgt_daily(
         wbgt_list[0] = None
         wbgt_list[9] = None
 
-        # NOTE: 当日の過去データは実測値で差し替える
+        # NOTE: 当日の過去データは実測値で差し替える。
+        # day_list.php が空テーブルを返すと実測値リストが短くなるため、境界チェックを行う
         for i in range(9):
             if wbgt_list[i] is None:
-                measured = wbgt_measured_today[i]
+                measured = wbgt_measured_today[i] if i < len(wbgt_measured_today) else None
                 wbgt_list[i] = int(measured) if measured is not None else None
 
         return WbgtDailyData(

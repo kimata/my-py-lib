@@ -531,3 +531,37 @@ class TestExitMethod:
         with my_lib.sqlite_util.connect(db_path) as conn:
             conn.execute("CREATE TABLE test (id INTEGER)")
             # context manager の __exit__ が呼ばれる
+
+
+class TestMarkCleanupDone:
+    """mark_cleanup_done 関数のテスト"""
+
+    def test_mark_prevents_wal_deletion(self, temp_dir):
+        """mark_cleanup_done を呼んだ DB は WAL/SHM が削除されないこと"""
+        import my_lib.sqlite_util
+
+        db_path = temp_dir / "test_mark.db"
+        db_path.touch()
+        wal_path = temp_dir / "test_mark.db-wal"
+        wal_path.touch()
+        shm_path = temp_dir / "test_mark.db-shm"
+        shm_path.touch()
+
+        my_lib.sqlite_util.mark_cleanup_done(db_path)
+        my_lib.sqlite_util.cleanup_stale_files(db_path)
+
+        assert wal_path.exists()
+        assert shm_path.exists()
+
+    def test_cleanup_removes_wal_without_mark(self, temp_dir):
+        """mark_cleanup_done を呼んでいない DB は WAL/SHM が削除されること"""
+        import my_lib.sqlite_util
+
+        db_path = temp_dir / "test_no_mark.db"
+        db_path.touch()
+        wal_path = temp_dir / "test_no_mark.db-wal"
+        wal_path.touch()
+
+        my_lib.sqlite_util.cleanup_stale_files(db_path)
+
+        assert not wal_path.exists()

@@ -114,6 +114,23 @@ def init_connection(
     logging.debug("SQLiteデータベースの接続設定を適用しました")
 
 
+def mark_cleanup_done(db_path: pathlib.Path | str) -> None:
+    """指定した DB を、このプロセスで WAL/SHM クリーンアップ実施済みとして登録する
+
+    cleanup_stale_files はプロセスごとの初回接続時に WAL/SHM を削除するが、
+    親プロセスが使用中の DB に短命なサブプロセスから接続する場合、その削除は
+    使用中のライブ WAL を消してデータ喪失や DB 破損を引き起こし得る。
+    そのようなプロセスでは、最初の接続前にこの関数を呼んで削除を抑止する。
+
+    Args:
+        db_path: データベースファイルのパス
+    """
+    resolved_path = pathlib.Path(db_path).resolve()
+
+    with _cleanup_lock:
+        _cleaned_up_paths.add(resolved_path)
+
+
 def cleanup_stale_files(db_path: pathlib.Path) -> None:
     """
     CephFS/NFS環境で残存するWAL/SHMファイルを削除する
