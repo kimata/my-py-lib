@@ -6,6 +6,8 @@ my_lib.webapp.log モジュールのユニットテスト
 
 from __future__ import annotations
 
+import time
+
 import flask
 import pytest
 
@@ -246,6 +248,58 @@ class TestClear:
 
         # クリア（例外が発生しなければ OK）
         _manager.clear()
+
+    def test_clear_and_get_retry_while_locked(self, log_db_path, monkeypatch, caplog):
+        """他コネクションが EXCLUSIVE ロックを保持していてもリトライで成功する
+
+        ワーカースレッドの書き込み中に log_clear / log_view が来ると
+        「database is locked」になる競合の回帰テスト。
+        """
+        import threading
+
+        import my_lib.sqlite_util
+        from my_lib.notify.slack import SlackEmptyConfig
+        from my_lib.webapp.log import _manager, init
+
+        monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+
+        init(SlackEmptyConfig(), log_db_path, is_read_only=True)
+
+        # busy timeout (デフォルト 60 秒) がロック待ちを吸収してしまうと
+        # リトライ経路を検証できないため、短い timeout を強制する
+        original_connect = my_lib.sqlite_util.connect
+
+        def connect_with_short_timeout(db_path_, **kwargs):
+            kwargs["timeout"] = 0.05
+            return original_connect(db_path_, **kwargs)
+
+        monkeypatch.setattr(my_lib.sqlite_util, "connect", connect_with_short_timeout)
+
+        db_path = _manager.get_db_path()
+        locked = threading.Event()
+
+        def hold_exclusive_lock():
+            # 書き込みを行い EXCLUSIVE ロックを取得したまま 1 秒保持する
+            # （PRAGMA locking_mode=EXCLUSIVE によりロックは接続クローズまで維持される）
+            with original_connect(db_path, locking_mode="EXCLUSIVE") as conn:
+                conn.execute("INSERT INTO log VALUES (NULL, DATETIME('now'), 'lock-holder')")
+                conn.commit()
+                locked.set()
+                time.sleep(1)
+
+        holder = threading.Thread(target=hold_exclusive_lock)
+        holder.start()
+        try:
+            assert locked.wait(5)
+            # リトライにより例外なく成功すること（初回はロックに阻まれる）
+            _manager.clear()
+            logs = _manager.get()
+            assert logs == []
+        finally:
+            holder.join()
+
+        # ロック保持中に少なくとも1回はリトライが発生していること
+        assert any("リトライ" in record.message for record in caplog.records)
 
 
 class TestModuleFunctions:

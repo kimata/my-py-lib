@@ -371,35 +371,47 @@ class LogManager:
         Returns:
             ログのリスト
         """
-        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
-            sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
-            cur = sqlite.cursor()
-            cur.execute(
-                f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
-                # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
-                [f"-{stop_day} days"],
-            )
-            log_list = [dict(log) for log in cur.fetchall()]
-            for log in log_list:
-                # NOTE: タイムゾーン情報を保持したまま ISO 8601 で返す。
-                # naive な "%Y-%m-%d %H:%M:%S" だと、利用側ブラウザの TZ が JST 以外のとき
-                # 時刻がずれて解釈されてしまう。
-                log["date"] = (
-                    datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
-                    .replace(tzinfo=datetime.UTC)
-                    .astimezone(my_lib.time.get_zoneinfo())
-                    .isoformat()
+
+        # NOTE: locking_mode=EXCLUSIVE 環境ではワーカースレッドの書き込み中に
+        # 「database is locked」になり得るため、書き込みと同様にリトライする
+        def _execute_get() -> list[dict[str, Any]]:
+            with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
+                sqlite.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=True))
+                cur = sqlite.cursor()
+                cur.execute(
+                    f'SELECT * FROM {TABLE_NAME} WHERE date <= DATETIME("now", ?) ORDER BY id DESC LIMIT 500',  # noqa: S608
+                    # NOTE: デモ用に stop_day 日前までののログしか出さない指定ができるようにする
+                    [f"-{stop_day} days"],
                 )
-            return log_list
+                return [dict(log) for log in cur.fetchall()]
+
+        log_list = self._execute_with_retry(_execute_get) or []
+        for log in log_list:
+            # NOTE: タイムゾーン情報を保持したまま ISO 8601 で返す。
+            # naive な "%Y-%m-%d %H:%M:%S" だと、利用側ブラウザの TZ が JST 以外のとき
+            # 時刻がずれて解釈されてしまう。
+            log["date"] = (
+                datetime.datetime.strptime(log["date"], "%Y-%m-%d %H:%M:%S")
+                .replace(tzinfo=datetime.UTC)
+                .astimezone(my_lib.time.get_zoneinfo())
+                .isoformat()
+            )
+        return log_list
 
     def clear(self) -> None:
         """ログをクリアする"""
-        with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
-            cur = sqlite.cursor()
 
-            logging.debug("clear SQLite")
-            cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
-            sqlite.commit()
+        # NOTE: ワーカースレッドの書き込み中は「database is locked」になり得るため、
+        # 書き込みと同様にリトライする
+        def _execute_clear() -> None:
+            with my_lib.sqlite_util.connect(self.get_db_path()) as sqlite:
+                cur = sqlite.cursor()
+
+                logging.debug("clear SQLite")
+                cur.execute(f"DELETE FROM {TABLE_NAME}")  # noqa: S608
+                sqlite.commit()
+
+        self._execute_with_retry(_execute_clear)
 
         logging.debug("clear Queue")
         log_queue = self.get_log_queue()
