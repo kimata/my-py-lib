@@ -54,6 +54,14 @@ class TestWidgets:
         assert "has-text-primary" in card
         assert "card-header-title" in card
 
+    def test_chart_card(self):
+        import my_lib.metrics.page
+
+        html = my_lib.metrics.page.chart_card("daily-volume", "散水量", "dailyVolumeChart")
+        assert 'id="daily-volume"' in html
+        assert "copyPermalink('daily-volume')" in html
+        assert 'id="dailyVolumeChart"' in html
+
     def test_chart_container(self):
         import my_lib.metrics.page
 

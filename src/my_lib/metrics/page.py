@@ -229,6 +229,31 @@ def stat_card(title: str, items_html: str) -> str:
 """
 
 
+def chart_card(anchor: str, title: str, canvas_id: str) -> str:
+    """パーマリンク付きタイトルとチャートを持つカード"""
+    return f"""
+        <div class="columns">
+            <div class="column">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <p class="card-header-title permalink-header" id="{anchor}">
+                            {title}
+                            <span class="permalink-icon" onclick="copyPermalink('{anchor}')">
+                                <i class="fas fa-link"></i>
+                            </span>
+                        </p>
+                    </div>
+                    <div class="card-content">
+                        <div class="chart-container">
+                            <canvas id="{canvas_id}"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+"""
+
+
 def chart_container(canvas_id: str) -> str:
     """Chart.js 描画用のコンテナ"""
     return f"""
