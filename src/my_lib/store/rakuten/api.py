@@ -5,6 +5,9 @@
 https://webservice.rakuten.co.jp/documentation/ichiba-item-search を使用して商品を検索し、
 タイトル、URL、価格のリストを取得します。
 
+2026 年の新仕様（openapi.rakuten.co.jp）に対応しており、applicationId に加えて
+accessKey（アプリ情報ページで発行）が必須です。accessKey は HTTP ヘッダで送信します。
+
 Usage:
   api.py [-c CONFIG] [-k KEYWORD] [-e EXCLUDE] [-m MIN] [-M MAX]
          [-n COUNT] [-D]
@@ -73,7 +76,8 @@ class SearchCondition:
         )
 
 
-_API_ENDPOINT: str = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
+_API_ENDPOINT: str = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701"
+_ACCESS_KEY_HEADER: str = "accessKey"
 _MAX_RESULTS_PER_REQUEST: int = 30
 _MAX_PAGE: int = 100
 _RATE_LIMIT_WAIT_SEC: float = 1.0
@@ -150,13 +154,46 @@ def _fetch_page(
 
     """
     params = _build_params(config, condition, hits, page)
+    # accessKey は URL に残さないようヘッダで送る（ログ・例外メッセージへの露出防止）
+    headers = {_ACCESS_KEY_HEADER: config.access_key} if config.access_key else {}
 
     logging.debug("[Rakuten] API リクエスト: %s, params=%s", _API_ENDPOINT, params)
 
-    response = requests.get(_API_ENDPOINT, params=params, timeout=30)
+    response = requests.get(_API_ENDPOINT, params=params, headers=headers, timeout=30)
+    if not response.ok:
+        logging.error("[Rakuten] API エラー: status=%d, %s", response.status_code, _error_message(response))
     response.raise_for_status()
 
     return response.json()
+
+
+def _error_message(response: requests.Response) -> str:
+    """エラーレスポンスからメッセージを取り出す
+
+    新仕様は {"errors": {"errorCode": ..., "errorMessage": ...}}、
+    旧仕様は {"error": ..., "error_description": ...} の形式。
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text[:200]
+
+    if not isinstance(body, dict):
+        return str(body)[:200]
+
+    errors = body.get("errors")
+    if isinstance(errors, dict):
+        return str(errors.get("errorMessage", errors))
+
+    return str(body.get("error_description") or body.get("error") or body)[:200]
+
+
+def _extract_items(response: dict[str, Any]) -> list[dict[str, Any]]:
+    """レスポンスから商品リストを取り出す（キーの大文字小文字の揺れを吸収）"""
+    items = response.get("Items")
+    if items is None:
+        items = response.get("items", [])
+    return items
 
 
 def search(
@@ -178,6 +215,12 @@ def search(
     if max_items is None:
         max_items = _MAX_RESULTS_PER_REQUEST
 
+    if not config.access_key:
+        logging.error(
+            "[Rakuten] access_key が未設定です（新仕様では必須。store.rakuten.access_key を設定してください）"
+        )
+        return []
+
     logging.info("[Rakuten] 検索開始: keyword=%s", condition.keyword)
 
     results: list[RakutenItem] = []
@@ -189,11 +232,14 @@ def search(
 
         try:
             response = _fetch_page(config, condition, fetch_count, page)
+        except requests.HTTPError:
+            # 詳細は _fetch_page でログ済み
+            break
         except requests.RequestException:
             logging.exception("[Rakuten] API エラー")
             break
 
-        items = response.get("Items", [])
+        items = _extract_items(response)
         if not items:
             logging.info("[Rakuten] 該当なし")
             break
