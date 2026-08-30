@@ -9,7 +9,7 @@ Options:
   -c CONFIG         : CONFIG を設定ファイルとして読み込んで実行します。
                       [default: tests/fixtures/config.example.yaml]
   -t ASIN           : 価格情報を取得する ASIN。[default: B01MUZOWBH]
-  -s DATA_PATH      : Selenium で使うブラウザのデータを格納するディレクトリ。[default: data]
+  -s DATA_PATH      : ブラウザのデータを格納するディレクトリ。[default: data]
   -D                : デバッグモードで動作します。
 """
 
@@ -26,20 +26,17 @@ import traceback
 from typing import TYPE_CHECKING
 
 import PIL.Image
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.wait
 
+import my_lib.browser
+import my_lib.browser.helpers
 import my_lib.notify.slack
-import my_lib.selenium_util
-import my_lib.store.amazon.captcha
+from my_lib.browser import Page, Xpath
 from my_lib.store.amazon.models import AmazonItem
 
 if TYPE_CHECKING:
     from typing import Any
+
+    from my_lib.browser import Element
 
 # デフォルトのSlack設定（空設定）
 _DEFAULT_SLACK_CONFIG: my_lib.notify.slack.SlackEmptyConfig = my_lib.notify.slack.SlackEmptyConfig()
@@ -56,20 +53,36 @@ _PRICE_DATA_XPATH = '//div[contains(@class, "twister-plus-buying-options-price-d
 _USED_BUY_SECTION_XPATH = '//div[@id="usedBuySection"]'
 
 
-def _extract_outlet_price_from_json(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> int | None:
+def _click_if_present(page: Page, xpath: str) -> bool:
+    """指定 XPath の要素が存在すればクリックする（存在しなければ何もしない）。"""
+    element = page.find(Xpath(xpath))
+    if element is None:
+        return False
+    try:
+        element.click()
+    except my_lib.browser.BrowserError:
+        return False
+    return True
+
+
+def _inner_html(element: Element) -> str | None:
+    """要素の innerHTML を取得する（属性ではなく DOM プロパティ）。"""
+    result = element.evaluate("el => el.innerHTML")
+    return str(result) if result is not None else None
+
+
+def _extract_outlet_price_from_json(page: Page) -> int | None:
     """ページ内のJSON価格データからアウトレット価格（USED）を取得する.
 
     Returns:
         アウトレット価格。取得できない場合は None
     """
     try:
-        elems = driver.find_elements(selenium.webdriver.common.by.By.XPATH, _PRICE_DATA_XPATH)
+        elems = page.find_all(Xpath(_PRICE_DATA_XPATH))
         if not elems:
             return None
 
-        inner_html = elems[0].get_attribute("innerHTML")
+        inner_html = _inner_html(elems[0])
         if not inner_html:
             return None
 
@@ -83,8 +96,7 @@ def _extract_outlet_price_from_json(
 
 
 def _fetch_price_impl(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig,
     item: AmazonItem,
 ) -> bool:
@@ -109,92 +121,66 @@ def _fetch_price_impl(
         },
     ]
 
-    if (
-        len(
-            driver.find_elements(
-                selenium.webdriver.common.by.By.XPATH, '//b[@class="h1" and contains(text(), "ご迷惑")]'
-            )
-        )
-        != 0
-    ):
+    if len(page.find_all(Xpath('//b[@class="h1" and contains(text(), "ご迷惑")]'))) != 0:
         logging.warning("Failed to load page: %s", item.url)
         time.sleep(5)
         return False
 
-    my_lib.selenium_util.click_xpath(driver, '//span[@id="black-curtain-yes-button"]', is_warn=False)
-    my_lib.selenium_util.click_xpath(
-        driver,
+    _click_if_present(page, '//span[@id="black-curtain-yes-button"]')
+    _click_if_present(
+        page,
         '//span[contains(@class, "a-button")]//button[normalize-space(text()) = "ショッピングを続ける"]',
-        is_warn=False,
     )
 
-    # my_lib.store.amazon.captcha.resolve(driver, wait, config)
-
-    try:
-        title_elem = driver.find_element(selenium.webdriver.common.by.By.ID, "productTitle")
+    title_elem = page.find(Xpath('//*[@id="productTitle"]'))
+    if title_elem is not None:
         item.name = title_elem.text.strip()
-    except Exception:
+    else:
         logging.warning("Failed to fetch product title: %s", item.url)
 
     try:
-        breadcrumb_list = driver.find_elements(
-            selenium.webdriver.common.by.By.XPATH, "//div[contains(@class, 'a-breadcrumb')]//li//a"
-        )
+        breadcrumb_list = page.find_all(Xpath("//div[contains(@class, 'a-breadcrumb')]//li//a"))
         item.category = next(x.text for x in breadcrumb_list)
-    except Exception:
-        logging.exception("Failed to fetch category")
+    except StopIteration:
+        logging.debug("Failed to fetch category")
 
     # 中古品セクションが存在する場合、新品価格は取得対象外
-    if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, _USED_BUY_SECTION_XPATH)) > 0:
+    if len(page.find_all(Xpath(_USED_BUY_SECTION_XPATH))) > 0:
         logging.info("Used item detected (usedBuySection), skipping price: %s", item.url)
         item.price = 0
         return True
 
     price_text = ""
     for price_elem in PRICE_ELEM_LIST:
-        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, price_elem["xpath"])) == 0:
+        elements = page.find_all(Xpath(price_elem["xpath"]))
+        if len(elements) == 0:
             continue
 
         logging.debug('xpath: "%s', price_elem["xpath"])
 
         if price_elem["type"] == "html":
-            inner_html = driver.find_element(
-                selenium.webdriver.common.by.By.XPATH, price_elem["xpath"]
-            ).get_attribute("innerHTML")
+            inner_html = _inner_html(elements[0])
             if inner_html is not None:
                 price_text = inner_html.strip()
         else:
-            price_text = driver.find_element(selenium.webdriver.common.by.By.XPATH, price_elem["xpath"]).text
+            price_text = elements[0].text
         break
 
     if price_text == "":
-        if (
-            len(
-                driver.find_elements(
-                    selenium.webdriver.common.by.By.XPATH, '//span[contains(@class, "a-color-price")]'
-                )
+        color_price_elems = page.find_all(Xpath('//span[contains(@class, "a-color-price")]'))
+        no_item_elems = page.find_all(
+            Xpath(
+                '//div[contains(@class, "a-box-inner") and contains(@class, "a-padding-medium")]'
+                '/span[contains(text(), "ありません")]'
             )
-            != 0
-        ):
-            price_text = driver.find_element(
-                selenium.webdriver.common.by.By.XPATH, '//span[contains(@class, "a-color-price")]'
-            ).text
+        )
+        if len(color_price_elems) != 0:
+            price_text = color_price_elems[0].text
             if price_text in {"現在在庫切れです。", "この商品は現在お取り扱いできません。"}:
                 logging.warning("Price is NOT displayed: %s", item.url)
                 item.price = 0
                 return True
-        elif (
-            len(
-                driver.find_elements(
-                    selenium.webdriver.common.by.By.XPATH,
-                    (
-                        '//div[contains(@class, "a-box-inner") and contains(@class, "a-padding-medium")]'
-                        '/span[contains(text(), "ありません")]'
-                    ),
-                )
-            )
-            != 0
-        ):
+        elif len(no_item_elems) != 0:
             item.price = 0
             return True
         else:
@@ -205,7 +191,7 @@ def _fetch_price_impl(
                 "価格取得に失敗",
                 f"{item.url}\nprice_text='{price_text}'",
                 my_lib.notify.slack.AttachImage(
-                    data=PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                    data=PIL.Image.open(io.BytesIO(page.screenshot())),
                     text="スクリーンショット",
                 ),
             )
@@ -220,9 +206,9 @@ def _fetch_price_impl(
 
         # buybox が Amazonアウトレットの場合、outlet_price を取得
         # NOTE: buybox が新品の場合、「その他の出品者」にあるアウトレット価格は取得されない
-        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, _AMAZON_OUTLET_SELLER_XPATH)) > 0:
+        if len(page.find_all(Xpath(_AMAZON_OUTLET_SELLER_XPATH))) > 0:
             # JSONデータから USED 価格を取得（新品とアウトレットが混在する場合に対応）
-            outlet_price = _extract_outlet_price_from_json(driver)
+            outlet_price = _extract_outlet_price_from_json(page)
             if outlet_price is not None:
                 item.outlet_price = outlet_price
                 logging.debug("Amazon Outlet price from JSON: %d", item.outlet_price)
@@ -238,7 +224,7 @@ def _fetch_price_impl(
             "価格取得に失敗",
             f"{item.url}\n{traceback.format_exc()}",
             my_lib.notify.slack.AttachImage(
-                data=PIL.Image.open(io.BytesIO(driver.get_screenshot_as_png())),
+                data=PIL.Image.open(io.BytesIO(page.screenshot())),
                 text="スクリーンショット",
             ),
         )
@@ -254,61 +240,45 @@ _503_ERROR_TITLE = "ご迷惑をおかけしています"
 _503_CONTINUE_LINK_XPATH = '//a[contains(@href, "ref=cs_503_link")]'
 
 
-def _wait_for_product_page(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
+def _wait_for_product_page(page: Page) -> None:
     """商品ページのフッターが表示されるまで待機（ボット検出ページのハンドリング付き）"""
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
-            )
-        )
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath(_FOOTER_XPATH))
+    except my_lib.browser.WaitTimeoutError:
         # パターン1: ボット検出ページ（「ショッピングを続ける」ボタン付きの validateCaptcha フォーム）
-        if my_lib.selenium_util.click_xpath(driver, _BOT_DETECT_SUBMIT_XPATH, is_warn=False):
-            logging.warning(
-                "CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
-            )
-            wait.until(
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
-                )
-            )
+        if _click_if_present(page, _BOT_DETECT_SUBMIT_XPATH):
+            logging.warning("CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", page.url)
+            page.wait_visible(Xpath(_FOOTER_XPATH))
             return
 
         # パターン2: 503 エラーページ（「ご迷惑をおかけしています！」）
-        if _503_ERROR_TITLE in driver.title:
-            logging.warning(
-                "503 エラーページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
-            )
-            my_lib.selenium_util.click_xpath(driver, _503_CONTINUE_LINK_XPATH, is_warn=False)
+        if _503_ERROR_TITLE in page.title:
+            logging.warning("503 エラーページを検出、「ショッピングを続ける」をクリック: %s", page.url)
+            _click_if_present(page, _503_CONTINUE_LINK_XPATH)
             time.sleep(3)
 
         raise
 
 
 def fetch_price(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     item: AmazonItem,
     slack_config: my_lib.notify.slack.HasErrorConfig
     | my_lib.notify.slack.SlackEmptyConfig = _DEFAULT_SLACK_CONFIG,
     dump_path: pathlib.Path | None = None,
 ) -> AmazonItem:
     try:
-        with my_lib.selenium_util.browser_tab(driver, item.url):
-            _wait_for_product_page(driver, wait)
+        page.goto(item.url)
+        _wait_for_product_page(page)
 
-            _fetch_price_impl(driver, wait, slack_config, item)
+        _fetch_price_impl(page, slack_config, item)
 
-            if dump_path is not None and (item.price is None or item.price == 0):
-                my_lib.selenium_util.dump_page(
-                    driver,
-                    int(random.random() * 100),  # noqa: S311
-                    dump_path,
-                )
+        if dump_path is not None and (item.price is None or item.price == 0):
+            my_lib.browser.helpers.dump_page(
+                page,
+                random.randint(0, 99),  # noqa: S311
+                dump_path,
+            )
     except Exception:
         logging.exception("Failed to fetch price")
 
@@ -318,12 +288,10 @@ def fetch_price(
 if __name__ == "__main__":
     # TEST Code
     import docopt
-    import selenium.webdriver.support.wait
 
     import my_lib.config
     import my_lib.logger
     import my_lib.pretty
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -337,8 +305,9 @@ if __name__ == "__main__":
 
     config: dict[str, Any] = my_lib.config.load(config_file)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 2)
+    _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     slack_config_parsed = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
     slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
@@ -356,5 +325,8 @@ if __name__ == "__main__":
         pathlib.Path(config["data"]["dump"]) if "data" in config and "dump" in config["data"] else None
     )
 
-    item = AmazonItem.from_asin(asin)
-    logging.info(my_lib.pretty.format(fetch_price(driver, wait, item, slack_config, dump_path).to_dict()))
+    try:
+        item = AmazonItem.from_asin(asin)
+        logging.info(my_lib.pretty.format(fetch_price(_page, item, slack_config, dump_path).to_dict()))
+    finally:
+        _manager.quit()
