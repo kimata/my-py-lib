@@ -131,8 +131,15 @@ def _login_via_line(
 
     page.wait_until(my_lib.browser.helpers.title_contains_js("LINE Login"))
 
-    if page.exists(Xpath('//input[@name="tid"]')):
-        page.wait_visible(Xpath('//input[@name="tid"]')).type(line_login.user)
+    # NOTE: LINE ログインページのフォーム描画には間があるため、tid 入力欄の出現を待ってから分岐する。
+    #       出現すれば認証情報を入力、出現しなければ既存 LINE セッションの同意ボタンを押す。
+    try:
+        tid_input = page.wait_visible(Xpath('//input[@name="tid"]'), timeout=15)
+    except my_lib.browser.WaitTimeoutError:
+        tid_input = None
+
+    if tid_input is not None:
+        tid_input.type(line_login.user)
         page.wait_visible(Xpath('//input[@name="tpasswd"]')).type(line_login.password)
         page.wait_clickable(Xpath('//button[contains(text(), "ログイン")]')).click()
     else:
@@ -142,9 +149,11 @@ def _login_via_line(
         return
 
     code = ""
-    number = page.find(Xpath('//p[contains(@class, "Number")]'))
-    if number is not None:
+    try:
+        number = page.wait_visible(Xpath('//p[contains(@class, "Number")]'), timeout=15)
         code = number.text
+    except my_lib.browser.WaitTimeoutError:
+        logging.warning("LINE 認証番号の要素が見つかりませんでした")
 
     if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
         my_lib.store.captcha.send_request_text_slack(

@@ -39,6 +39,13 @@ class PatchrightElement:
         return (self._loc.inner_text() or "").strip()
 
     def attr(self, name: str) -> str | None:
+        # NOTE: Selenium の get_attribute は href/src を解決済みの絶対 URL で返す。
+        #       Playwright の get_attribute は生の属性値（相対パス）を返すため、
+        #       挙動を合わせるべく href/src は DOM プロパティ（絶対 URL）を優先して返す。
+        if name in ("href", "src"):
+            resolved = self._loc.evaluate("(el, prop) => el[prop] || null", name)
+            if resolved:
+                return str(resolved)
         return self._loc.get_attribute(name)
 
     def click(self) -> None:
