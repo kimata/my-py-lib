@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from my_lib.browser.locator import Locator
+from my_lib.browser.types import BoundingBox
 
 if TYPE_CHECKING:
     from patchright.sync_api import Locator as PwLocator
@@ -69,6 +70,12 @@ class PatchrightElement:
 
     def scroll_into_view(self) -> None:
         self._loc.scroll_into_view_if_needed()
+
+    def bounding_box(self) -> BoundingBox | None:
+        box = self._loc.bounding_box()
+        if box is None:
+            return None
+        return BoundingBox(x=box["x"], y=box["y"], width=box["width"], height=box["height"])
 
     def screenshot(self) -> bytes:
         return self._loc.screenshot()

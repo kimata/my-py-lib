@@ -13,7 +13,7 @@ from contextlib import AbstractContextManager
 from typing import Protocol, runtime_checkable
 
 from my_lib.browser.locator import Locator
-from my_lib.browser.types import ScreenshotSpec
+from my_lib.browser.types import BoundingBox, ScreenshotSpec
 
 # 待機のデフォルトタイムアウト（秒）
 DEFAULT_TIMEOUT_SEC: float = 30.0
@@ -60,6 +60,10 @@ class Element(Protocol):
 
     def scroll_into_view(self) -> None:
         """要素が見える位置までスクロールする。"""
+        ...
+
+    def bounding_box(self) -> BoundingBox | None:
+        """要素の位置とサイズ（見えていなければ None）。"""
         ...
 
     def screenshot(self) -> bytes:
@@ -169,6 +173,10 @@ class Page(Protocol):
 
     def refresh(self) -> None:
         """ページを再読み込みする。"""
+        ...
+
+    def set_viewport(self, width: int, height: int) -> None:
+        """ビューポート（ウィンドウ）サイズを変更する。"""
         ...
 
 

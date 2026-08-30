@@ -109,3 +109,6 @@ class PatchrightPage:
 
     def refresh(self) -> None:
         self._page.reload()
+
+    def set_viewport(self, width: int, height: int) -> None:
+        self._page.set_viewport_size({"width": width, "height": height})

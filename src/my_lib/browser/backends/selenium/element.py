@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import selenium.webdriver.common.by
 
 from my_lib.browser.locator import Locator
+from my_lib.browser.types import BoundingBox
 
 if TYPE_CHECKING:
     from selenium.webdriver.remote.webdriver import WebDriver
@@ -66,6 +67,12 @@ class SeleniumElement:
 
     def scroll_into_view(self) -> None:
         self._driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", self._el)
+
+    def bounding_box(self) -> BoundingBox | None:
+        if not self._el.is_displayed():
+            return None
+        rect = self._el.rect
+        return BoundingBox(x=rect["x"], y=rect["y"], width=rect["width"], height=rect["height"])
 
     def screenshot(self) -> bytes:
         return self._el.screenshot_as_png

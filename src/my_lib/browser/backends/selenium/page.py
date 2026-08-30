@@ -130,6 +130,9 @@ class SeleniumPage(_SeleniumScope):
     def content(self) -> str:
         return self._driver.page_source
 
+    def set_viewport(self, width: int, height: int) -> None:
+        self._driver.set_window_size(width, height)
+
     @contextlib.contextmanager
     def frame(self, locator: Locator) -> Iterator[SeleniumFrame]:
         by, value = _by_and_value(locator, relative=False)

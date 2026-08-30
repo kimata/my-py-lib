@@ -58,6 +58,16 @@ class BrowserProfile:
 
 
 @dataclasses.dataclass(frozen=True)
+class BoundingBox:
+    """要素の位置とサイズ（CSS ピクセル）。"""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+@dataclasses.dataclass(frozen=True)
 class ScreenshotSpec:
     """スクリーンショット取得の指定。
 

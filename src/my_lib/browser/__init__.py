@@ -36,6 +36,7 @@ from my_lib.browser.protocol import (
     Page,
 )
 from my_lib.browser.types import (
+    BoundingBox,
     BrowserBackend,
     BrowserProfile,
     ScreenshotSpec,
@@ -55,6 +56,7 @@ def wrap_selenium_driver(driver: Any) -> Page:
 
 
 __all__ = [
+    "BoundingBox",
     "Browser",
     "BrowserBackend",
     "BrowserError",
