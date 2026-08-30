@@ -15,6 +15,8 @@
     page.wait_visible(my_lib.browser.Xpath('//button[contains(text(), "ログイン")]')).click()
 """
 
+from typing import Any
+
 from my_lib.browser.exceptions import (
     BrowserError,
     ElementNotFoundError,
@@ -40,6 +42,18 @@ from my_lib.browser.types import (
     Viewport,
 )
 
+
+def wrap_selenium_driver(driver: Any) -> Page:
+    """既存の Selenium WebDriver を Page として包む（移行期の橋渡し用）。
+
+    まだ Patchright に移行していないプロジェクトが、Page ベースへ移植済みの共有
+    store 層（例: mercari のログイン）を、既存の Selenium ドライバのまま呼び出すために使う。
+    """
+    from my_lib.browser.backends.selenium.page import SeleniumPage
+
+    return SeleniumPage(driver)
+
+
 __all__ = [
     "Browser",
     "BrowserBackend",
@@ -61,4 +75,5 @@ __all__ = [
     "WaitTimeoutError",
     "Xpath",
     "launch",
+    "wrap_selenium_driver",
 ]

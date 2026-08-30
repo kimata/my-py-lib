@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
+"""メルカリへのログイン（LINE 認証経由）。
+
+ブラウザ操作はバックエンド非依存の my_lib.browser.Page 越しに行う
+（Selenium / Patchright を問わない）。
+"""
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import pathlib
 import random
 import time
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.remote.webelement
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.ui
-import selenium.webdriver.support.wait
-
+import my_lib.browser
+import my_lib.browser.helpers
 import my_lib.notify.slack
-import my_lib.selenium_util
 import my_lib.store.captcha
 import my_lib.store.mercari.config
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Page
 
-_LINE_LOGIN_TIMEOUT: int = 60
+_LINE_LOGIN_TIMEOUT: float = 60.0
 
 _LOGIN_URL: str = "https://jp.mercari.com"
 
 
 def execute(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
@@ -37,76 +36,43 @@ def execute(
     try:
         # NOTE: エラーが起きた後とかだと、一発でページが表示されないことがあるので、事前に一回アクセスさせる。
         logging.info("メルカリにアクセスします。")
-        driver.get(_LOGIN_URL)
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, "//footer")
-            )
-        )
+        page.goto(_LOGIN_URL)
+        page.wait_visible(Xpath("//footer"))
 
-        _execute_impl(driver, wait, mercari_login, line_login, slack_config, dump_path)
+        _execute_impl(page, line_login, slack_config)
     except Exception:
         logging.exception("ログインをリトライします。")
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+        my_lib.browser.helpers.dump_page(page, random.randint(0, 99), dump_path)  # noqa: S311
         # NOTE: 1回だけリトライする
         time.sleep(10)
-        _execute_impl(driver, wait, mercari_login, line_login, slack_config, dump_path)
+        _execute_impl(page, line_login, slack_config)
 
 
 def _execute_impl(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    mercari_login: my_lib.store.mercari.config.MercariLoginConfig,
+    page: Page,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
-    dump_path: pathlib.Path,
 ) -> None:
     logging.info("ログインを行います。")
-    driver.get(_LOGIN_URL)
+    page.goto(_LOGIN_URL)
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//button[contains(@class, "iconButton") and @aria-label="お知らせ"]',
-            )
-        )
-    )
+    page.wait_visible(Xpath('//button[contains(@class, "iconButton") and @aria-label="お知らせ"]'))
 
-    my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "はじめる")]')
-    time.sleep(1)
+    start_button = page.find(Xpath('//button[contains(text(), "はじめる")]'))
+    if start_button is not None:
+        start_button.click()
+        time.sleep(1)
 
-    account_button = driver.find_elements(
-        selenium.webdriver.common.by.By.XPATH,
-        '//button[@data-testid="account-button"]',
-    )
-
-    if len(account_button) != 0:
+    if page.exists(Xpath('//button[@data-testid="account-button"]')):
         logging.info("既にログイン済みでした。")
         return
 
-    my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
+    page.wait_clickable(Xpath('//button[contains(text(), "ログイン")]')).click()
+    page.wait_visible(Xpath('//h1[contains(text(), "ログイン")]'))
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (selenium.webdriver.common.by.By.XPATH, '//h1[contains(text(), "ログイン")]')
-        )
-    )
+    _login_via_line(page, line_login, slack_config)
 
-    _login_via_line(driver, wait, line_login, slack_config)
-
-    # time.sleep(2)
-    # if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, '//div[@id="recaptchaV2"]')) != 0:
-    #     logging.warning("画像認証が要求されました。")
-    #     captcha.resolve_mp3(driver, wait)
-    #     logging.warning("画像認証を突破しました。")
-    #     click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
-
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (selenium.webdriver.common.by.By.XPATH, '//h1[contains(text(), "電話番号の確認")]')
-        )
-    )
+    page.wait_visible(Xpath('//h1[contains(text(), "電話番号の確認")]'))
 
     logging.info("認証番号の対応を行います。")
 
@@ -127,30 +93,18 @@ def _execute_impl(
 
     if code is None:
         raise RuntimeError("Failed to receive authentication code")
-    driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@name="code"]').send_keys(code)
-    my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "認証して完了する")]', wait)
 
-    time.sleep(0.5)
+    # NOTE: 認証番号入力欄は name="authNumber"（one-time-code）。React 制御のため 1 文字ずつ打鍵する。
+    page.wait_visible(Xpath('//input[@name="authNumber"]')).type(code, sequential=True)
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//div[@class="merNavigationTopMenu"]',
-            )
-        )
-    )
+    # NOTE: 全桁入力で自動送信される場合があるため、送信ボタンがあれば押しつつ、無ければ自動遷移を待つ。
+    submit = page.find(Xpath('//button[@data-testid="submit"]'))
+    if submit is not None:
+        with contextlib.suppress(Exception):
+            submit.click()
 
-    time.sleep(0.5)
-
-    wait.until(
-        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                '//button[@data-testid="account-button"]',
-            )
-        )
-    )
+    page.wait_visible(Xpath('//div[@class="merNavigationTopMenu"]'))
+    page.wait_clickable(Xpath('//button[@data-testid="account-button"]'))
 
     if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig) and ts is not None:
         my_lib.notify.slack.send(
@@ -164,69 +118,55 @@ def _execute_impl(
 
 
 def _login_via_line(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     line_login: my_lib.store.mercari.config.LineLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig | my_lib.notify.slack.SlackEmptyConfig,
 ) -> None:
     # NOTE: ログインページが電話番号入力画面になった場合、「SNSでログインする」を先にクリック
-    if my_lib.selenium_util.xpath_exists(driver, '//button[contains(., "SNSでログインする")]'):
-        my_lib.selenium_util.click_xpath(driver, '//button[contains(., "SNSでログインする")]', wait)
+    if page.exists(Xpath('//button[contains(., "SNSでログインする")]')):
+        page.wait_clickable(Xpath('//button[contains(., "SNSでログインする")]')).click()
         time.sleep(1)
 
-    my_lib.selenium_util.click_xpath(driver, '//button[span[contains(text(), "LINEでログイン")]]', wait)
+    page.wait_clickable(Xpath('//button[span[contains(text(), "LINEでログイン")]]')).click()
 
-    wait.until(selenium.webdriver.support.expected_conditions.title_contains("LINE Login"))
+    page.wait_until(my_lib.browser.helpers.title_contains_js("LINE Login"))
 
-    if my_lib.selenium_util.xpath_exists(driver, '//input[@name="tid"]'):
-        my_lib.selenium_util.input_xpath(driver, '//input[@name="tid"]', line_login.user)
-        my_lib.selenium_util.input_xpath(driver, '//input[@name="tpasswd"]', line_login.password)
-        my_lib.selenium_util.click_xpath(driver, '//button[contains(text(), "ログイン")]', wait)
+    if page.exists(Xpath('//input[@name="tid"]')):
+        page.wait_visible(Xpath('//input[@name="tid"]')).type(line_login.user)
+        page.wait_visible(Xpath('//input[@name="tpasswd"]')).type(line_login.password)
+        page.wait_clickable(Xpath('//button[contains(text(), "ログイン")]')).click()
     else:
-        my_lib.selenium_util.click_xpath(driver, '//button[.//span[normalize-space()="ログイン"]]', wait)
+        page.wait_clickable(Xpath('//button[.//span[normalize-space()="ログイン"]]')).click()
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
-            (selenium.webdriver.common.by.By.XPATH, "//body")
+    if "LINE Login" not in page.title:
+        return
+
+    code = ""
+    number = page.find(Xpath('//p[contains(@class, "Number")]'))
+    if number is not None:
+        code = number.text
+
+    if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
+        my_lib.store.captcha.send_request_text_slack(
+            slack_config,
+            "LINE",
+            f"📱 LINE アプリで認証番号「{code}」を入力してください。",
         )
-    )
+    logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
 
-    if "LINE Login" in driver.title:
-        code = my_lib.selenium_util.get_text(driver, '//p[contains(@class, "Number")]', "?", wait)
+    # NOTE: 「許可する」ボタンの出現、または「電話番号の確認」画面への遷移のいずれかを待つ。
+    deadline = _LINE_LOGIN_TIMEOUT
+    step = 2.0
+    while deadline > 0:
+        if page.exists(Xpath('//button[contains(normalize-space(.), "許可する")]')):
+            page.wait_clickable(Xpath('//button[contains(normalize-space(.), "許可する")]')).click()
+            back = page.find(Xpath('//span[contains(normalize-space(.), "戻る")]'))
+            if back is not None:
+                back.click()
+            break
+        if page.exists(Xpath('//h1[contains(text(), "電話番号の確認")]')):
+            break
+        time.sleep(step)
+        deadline -= step
 
-        if not isinstance(slack_config, my_lib.notify.slack.SlackEmptyConfig):
-            my_lib.store.captcha.send_request_text_slack(
-                slack_config,
-                "LINE",
-                f"📱 LINE アプリで認証番号「{code}」を入力してください。",
-            )
-        logging.info("LINE アプリで認証番号「%s」を入力してください。", code)
-
-        login_wait = selenium.webdriver.support.ui.WebDriverWait(driver, _LINE_LOGIN_TIMEOUT)
-
-        elem: selenium.webdriver.remote.webelement.WebElement = login_wait.until(
-            selenium.webdriver.support.expected_conditions.any_of(
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (
-                        selenium.webdriver.common.by.By.XPATH,
-                        '//button[contains(normalize-space(.), "許可する")]',
-                    )
-                ),
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (selenium.webdriver.common.by.By.XPATH, '//h1[contains(text(), "電話番号の確認")]')
-                ),
-            )
-        )
-
-        if elem.tag_name == "button":
-            my_lib.selenium_util.click_xpath(driver, '//button[contains(normalize-space(.), "許可する")]')
-            my_lib.selenium_util.click_xpath(driver, '//span[contains(normalize-space(.), "戻る")]', wait)
-
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (
-                    selenium.webdriver.common.by.By.XPATH,
-                    '//h1[contains(text(), "電話番号の確認")]',
-                )
-            )
-        )
+    page.wait_visible(Xpath('//h1[contains(text(), "電話番号の確認")]'))
