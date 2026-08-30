@@ -26,8 +26,7 @@ def test_search_excludes_auction_items_and_keeps_shops() -> None:
     all_items = [normal_item, shops_item, auction_item]
     auction_only = [auction_item]
 
-    driver = MagicMock()
-    wait = MagicMock()
+    page = MagicMock()
     condition = my_lib.store.flea_market.SearchCondition(keyword="test")
 
     with (
@@ -38,7 +37,7 @@ def test_search_excludes_auction_items_and_keeps_shops() -> None:
         patch.object(mercari_search, "_parse_visible_items", side_effect=[all_items, auction_only]),
         patch.object(mercari_search, "_apply_listing_type_filter", return_value=True),
     ):
-        results = mercari_search.search(driver, wait, condition)
+        results = mercari_search.search(page, condition)
 
     assert len(results) == 2
     urls = {r.url for r in results}
@@ -52,8 +51,7 @@ def test_search_returns_all_when_no_auctions() -> None:
     item1 = _make_result("https://jp.mercari.com/item/m111", "通常出品", 1000)
     item2 = _make_result("https://jp.mercari.com/shops/product/abc", "Shops出品", 2000)
 
-    driver = MagicMock()
-    wait = MagicMock()
+    page = MagicMock()
     condition = my_lib.store.flea_market.SearchCondition(keyword="test")
 
     with (
@@ -64,7 +62,7 @@ def test_search_returns_all_when_no_auctions() -> None:
         patch.object(mercari_search, "_parse_visible_items", side_effect=[[item1, item2], []]),
         patch.object(mercari_search, "_apply_listing_type_filter", return_value=True),
     ):
-        results = mercari_search.search(driver, wait, condition)
+        results = mercari_search.search(page, condition)
 
     assert len(results) == 2
 
@@ -74,8 +72,7 @@ def test_search_returns_all_when_filter_fails() -> None:
     item1 = _make_result("https://jp.mercari.com/item/m111")
     item2 = _make_result("https://jp.mercari.com/shops/product/abc")
 
-    driver = MagicMock()
-    wait = MagicMock()
+    page = MagicMock()
     condition = my_lib.store.flea_market.SearchCondition(keyword="test")
 
     with (
@@ -86,15 +83,14 @@ def test_search_returns_all_when_filter_fails() -> None:
         patch.object(mercari_search, "_parse_visible_items", return_value=[item1, item2]),
         patch.object(mercari_search, "_apply_listing_type_filter", return_value=False),
     ):
-        results = mercari_search.search(driver, wait, condition)
+        results = mercari_search.search(page, condition)
 
     assert len(results) == 2
 
 
 def test_search_returns_empty_when_no_results() -> None:
     """検索結果が0件の場合は空リストが返される."""
-    driver = MagicMock()
-    wait = MagicMock()
+    page = MagicMock()
     condition = my_lib.store.flea_market.SearchCondition(keyword="test")
 
     with (
@@ -103,6 +99,6 @@ def test_search_returns_empty_when_no_results() -> None:
         ),
         patch.object(mercari_search, "_wait_for_search_results", return_value=False),
     ):
-        results = mercari_search.search(driver, wait, condition)
+        results = mercari_search.search(page, condition)
 
     assert results == []

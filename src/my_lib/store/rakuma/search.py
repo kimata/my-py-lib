@@ -30,21 +30,12 @@ import logging
 import re
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.common.keys
-import selenium.webdriver.support.expected_conditions
-
-import my_lib.selenium_util
-
-if TYPE_CHECKING:
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.support.wait
-
-
+import my_lib.browser
 import my_lib.store.flea_market
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Element, Page
 
 # ラクマの商品状態パラメータ名とID対応
 # ラクマは独自の状態ID: 5=新品, 4=未使用に近い, 6=目立った傷なし, 3=やや傷あり, 2=傷あり, 1=状態悪い
@@ -65,17 +56,21 @@ _SEARCH_KEYWORD: str = "ラクマ"
 _ITEM_LIST_XPATH: str = '//div[contains(@class, "item-box")]'
 
 
-def warmup(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _find(scope: Page | Element, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
+
+
+def warmup(page: Page) -> bool:
     """Google検索経由でラクマにアクセスしてウォームアップする
 
     bot検出を回避するため、直接アクセスではなくGoogle検索経由でアクセスする。
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         ウォームアップが成功した場合 True
@@ -85,44 +80,33 @@ def warmup(
 
     try:
         # Googleにアクセス
-        driver.get("https://www.google.com/")
+        page.goto("https://www.google.com/")
         time.sleep(1)
 
-        # 検索ボックスを探して検索
-        by_xpath = selenium.webdriver.common.by.By.XPATH
-        by_name = selenium.webdriver.common.by.By.NAME
-
         # 検索ボックスに入力
-        search_box = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_name, "q"))
-        )
+        search_box = page.wait_visible(Xpath('//*[@name="q"]'))
         search_box.clear()
-        search_box.send_keys(_SEARCH_KEYWORD)
+        search_box.type(_SEARCH_KEYWORD)
         time.sleep(0.5)
 
         # 検索実行（Enterキー）
-        search_box.send_keys(selenium.webdriver.common.keys.Keys.RETURN)
+        search_box.press("Enter")
         time.sleep(2)
 
         # 検索結果からラクマのリンクを探してクリック
         link_xpath = f'//a[contains(@href, "{_TARGET_DOMAIN}")]'
-        link_element = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_xpath, link_xpath))
-        )
-
-        # リンクをクリック
-        driver.execute_script("arguments[0].click();", link_element)
+        page.wait_visible(Xpath(link_xpath)).click()
         time.sleep(2)
 
         # ラクマのページが読み込まれたか確認
-        if _TARGET_DOMAIN in driver.current_url:
-            logging.info("[Rakuma] ウォームアップ完了: %s", driver.current_url)
+        if _TARGET_DOMAIN in page.url:
+            logging.info("[Rakuma] ウォームアップ完了: %s", page.url)
             return True
 
-        logging.warning("[Rakuma] ウォームアップ: 予期しないURL: %s", driver.current_url)
+        logging.warning("[Rakuma] ウォームアップ: 予期しないURL: %s", page.url)
         return False
 
-    except selenium.common.exceptions.TimeoutException:
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Rakuma] ウォームアップ: タイムアウト")
         return False
     except Exception:
@@ -172,42 +156,35 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
 
-def _wait_for_search_results(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _wait_for_search_results(page: Page) -> bool:
     """検索結果の読み込みを待機する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         検索結果が存在する場合は True
 
     """
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, '//div[contains(@class, "content")]')
-            )
-        )
-        time.sleep(1)
-
-        # 検索結果が0件の場合のチェック
-        no_result_xpath = '//p[contains(text(), "見つかりませんでした")]'
-        if my_lib.selenium_util.xpath_exists(driver, no_result_xpath):
-            logging.info("[Rakuma] 該当なし")
-            return False
-
-        return True
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath('//div[contains(@class, "content")]'))
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Rakuma] 読み込みタイムアウト")
         raise
 
+    time.sleep(1)
+
+    # 検索結果が0件の場合のチェック
+    no_result_xpath = '//p[contains(text(), "見つかりませんでした")]'
+    if page.exists(Xpath(no_result_xpath), visible=False):
+        logging.info("[Rakuma] 該当なし")
+        return False
+
+    return True
+
 
 def _parse_search_item(
-    item_element: Any,
+    item_element: Element,
 ) -> my_lib.store.flea_market.SearchResult | None:
     """検索結果の1件をパースする
 
@@ -218,16 +195,14 @@ def _parse_search_item(
         パース結果。パースに失敗した場合は None
 
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
         # URL を取得
         # ラクマのリンクは href="https://item.fril.jp/{id}" 形式
-        link_elements = item_element.find_elements(by_xpath, './/a[contains(@href, "item.fril.jp")]')
+        link_elements = item_element.find_all(Xpath('.//a[contains(@href, "item.fril.jp")]'))
         if not link_elements:
             logging.debug("[Rakuma] パース失敗: リンク要素なし")
             return None
-        url_raw = link_elements[0].get_attribute("href")
+        url_raw = link_elements[0].attr("href")
         if url_raw is None:
             logging.debug("[Rakuma] パース失敗: URL取得失敗")
             return None
@@ -238,38 +213,34 @@ def _parse_search_item(
         thumb_url: str | None = None
 
         # 方法1: p.item-box__item-name 内の span から取得
-        title_elements = item_element.find_elements(
-            by_xpath, './/p[contains(@class, "item-box__item-name")]//span'
-        )
+        title_elements = item_element.find_all(Xpath('.//p[contains(@class, "item-box__item-name")]//span'))
         if title_elements and title_elements[0].text:
             title = title_elements[0].text
 
         # 方法2: p.item-box__item-name のテキストから取得
         if not title:
-            name_elements = item_element.find_elements(
-                by_xpath, './/p[contains(@class, "item-box__item-name")]'
-            )
+            name_elements = item_element.find_all(Xpath('.//p[contains(@class, "item-box__item-name")]'))
             if name_elements and name_elements[0].text:
                 title = name_elements[0].text.strip()
 
         # 方法3: img の alt 属性から取得し、同時に画像URLも取得
         if not title:
-            img_elements = item_element.find_elements(by_xpath, ".//img[@alt]")
+            img_elements = item_element.find_all(Xpath(".//img[@alt]"))
             for img in img_elements:
-                alt = img.get_attribute("alt")
+                alt = img.attr("alt")
                 if alt and alt.strip():
                     title = alt.strip()
                     # 同じ img から画像URLも取得
-                    src = img.get_attribute("src")
+                    src = img.attr("src")
                     if src and not src.startswith("data:"):
                         thumb_url = src
                     break
 
         # 画像URLのフォールバック: 任意の img タグから取得
         if not thumb_url:
-            img_elements = item_element.find_elements(by_xpath, ".//img[@src]")
+            img_elements = item_element.find_all(Xpath(".//img[@src]"))
             for img in img_elements:
-                src = img.get_attribute("src")
+                src = img.attr("src")
                 if src and not src.startswith("data:"):
                     thumb_url = src
                     break
@@ -278,11 +249,11 @@ def _parse_search_item(
         price: int | None = None
 
         # 方法1: p.item-box__item-price 内の data-content 属性から取得（最も正確）
-        price_data_elements = item_element.find_elements(
-            by_xpath, './/p[contains(@class, "item-box__item-price")]//span[@data-content]'
+        price_data_elements = item_element.find_all(
+            Xpath('.//p[contains(@class, "item-box__item-price")]//span[@data-content]')
         )
         for elem in price_data_elements:
-            data_content = elem.get_attribute("data-content")
+            data_content = elem.attr("data-content")
             if data_content and data_content not in ("JPY",):
                 with contextlib.suppress(ValueError):
                     price = int(data_content)
@@ -290,9 +261,7 @@ def _parse_search_item(
 
         # 方法2: p.item-box__item-price のテキストから取得
         if price is None:
-            price_elements = item_element.find_elements(
-                by_xpath, './/p[contains(@class, "item-box__item-price")]'
-            )
+            price_elements = item_element.find_all(Xpath('.//p[contains(@class, "item-box__item-price")]'))
             if price_elements and price_elements[0].text:
                 price_text = price_elements[0].text
                 price_str = re.sub(r"[¥￥,\s]", "", price_text)
@@ -319,8 +288,7 @@ def _parse_search_item(
 
 
 def search(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     condition: my_lib.store.flea_market.SearchCondition,
     max_items: int | None = None,
     scroll_to_load: bool = False,
@@ -328,8 +296,7 @@ def search(
     """ラクマで商品を検索する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         condition: 検索条件
         max_items: 取得する最大件数（None の場合は制限なし）
         scroll_to_load: スクロールして追加の商品を読み込むか
@@ -342,17 +309,15 @@ def search(
     logging.info("[Rakuma] 検索開始: keyword=%s", condition.keyword)
     logging.debug("[Rakuma] 検索URL: %s", url)
 
-    driver.get(url)
+    page.goto(url)
 
-    if not _wait_for_search_results(driver, wait):
+    if not _wait_for_search_results(page):
         return []
-
-    by_xpath = selenium.webdriver.common.by.By.XPATH
 
     results: list[my_lib.store.flea_market.SearchResult] = []
     parsed_urls: set[str] = set()
 
-    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+    item_elements = page.find_all(Xpath(_ITEM_LIST_XPATH))
     logging.debug("[Rakuma] ページ解析: %d 件発見", len(item_elements))
 
     for i, item_element in enumerate(item_elements):
@@ -362,14 +327,12 @@ def search(
 
         if scroll_to_load or i < 20:
             try:
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
-                    item_element,
-                )
+                item_element.scroll_into_view()
                 if i >= 20:
                     time.sleep(0.3)
-            except selenium.common.exceptions.StaleElementReferenceException:
-                logging.debug("[Rakuma] 要素 %d がStale、スキップ", i + 1)
+            except Exception:
+                # 要素が DOM から外れた（Stale）等の場合はスキップ
+                logging.debug("[Rakuma] 要素 %d のスクロールに失敗、スキップ", i + 1)
                 continue
 
         result = _parse_search_item(item_element)
@@ -386,10 +349,9 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
-    import selenium.webdriver.support.wait
 
+    import my_lib.browser.helpers
     import my_lib.logger
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -427,21 +389,21 @@ if __name__ == "__main__":
 
     logging.info("検索条件: %s", condition)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
+    _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     try:
-        results = search(driver, wait, condition, max_items=max_count)
+        results = search(_page, condition, max_items=max_count)
 
         if dump_path:
             dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.selenium_util.dump_page(driver, 0, dump_path)
+            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
             logging.info("ページをダンプしました: %s", dump_path)
 
-            by_xpath = selenium.webdriver.common.by.By.XPATH
-            item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
             if item_elements:
-                first_item_html = item_elements[0].get_attribute("outerHTML")
+                first_item_html = item_elements[0].attr("outerHTML")
                 item_html_path = dump_path / "first_item.html"
                 with item_html_path.open("w", encoding="utf-8") as f:
                     f.write(first_item_html if first_item_html else "")
@@ -468,4 +430,4 @@ if __name__ == "__main__":
             if result.thumb_url:
                 logging.info("    画像: %s", result.thumb_url)
     finally:
-        my_lib.selenium_util.quit_driver_gracefully(driver)
+        _manager.quit()

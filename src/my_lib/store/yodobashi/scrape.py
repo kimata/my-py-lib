@@ -22,17 +22,12 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.support.expected_conditions
-
-import my_lib.selenium_util
+import my_lib.browser
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Page
 
 if TYPE_CHECKING:
     from typing import Any
-
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.support.wait
 
 
 # XPath 定義
@@ -62,33 +57,23 @@ class ProductInfo:
         )
 
 
-def _wait_for_page_load(
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
+def _wait_for_page_load(page: Page) -> None:
     """ページの読み込みを待機する"""
     # //body は常に即時存在するため、実際に抽出対象となる商品タイトル要素の
     # 出現を待つ（負荷時の描画遅れによるタイトル取得失敗を防ぐ）
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, _TITLE_XPATH)
-            )
-        )
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath(_TITLE_XPATH))
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Yodobashi] 読み込みタイムアウト")
         raise
 
 
-def _extract_title(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> str:
+def _extract_title(page: Page) -> str:
     """商品タイトルを取得する"""
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
-        elements = driver.find_elements(by_xpath, _TITLE_XPATH)
+        elements = page.find_all(Xpath(_TITLE_XPATH))
         if elements and elements[0].text:
-            return elements[0].text.strip()
+            return elements[0].text
     except Exception:
         logging.exception("[Yodobashi] タイトル取得失敗")
 
@@ -96,14 +81,10 @@ def _extract_title(
     raise ValueError(msg)
 
 
-def _extract_price(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> int | None:
+def _extract_price(page: Page) -> int | None:
     """価格を取得する"""
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
-        elements = driver.find_elements(by_xpath, _PRICE_XPATH)
+        elements = page.find_all(Xpath(_PRICE_XPATH))
         if elements and elements[0].text:
             price_text = elements[0].text
             # 「¥31,680」のような形式から数値を抽出
@@ -117,16 +98,12 @@ def _extract_price(
     return None
 
 
-def _extract_thumbnail_url(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> str | None:
+def _extract_thumbnail_url(page: Page) -> str | None:
     """サムネイル画像のURLを取得する"""
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
-        elements = driver.find_elements(by_xpath, _THUMBNAIL_XPATH)
+        elements = page.find_all(Xpath(_THUMBNAIL_XPATH))
         if elements:
-            url = elements[0].get_attribute("value")
+            url = elements[0].attr("value")
             if url:
                 return url
     except Exception:
@@ -135,14 +112,10 @@ def _extract_thumbnail_url(
     return None
 
 
-def _check_in_stock(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> bool:
+def _check_in_stock(page: Page) -> bool:
     """在庫があるかどうかを確認する"""
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
-        elements = driver.find_elements(by_xpath, _OUT_OF_STOCK_XPATH)
+        elements = page.find_all(Xpath(_OUT_OF_STOCK_XPATH))
         # 「販売休止」または「販売を終了しました」が見つかった場合は在庫なし
         return len(elements) == 0
     except Exception:
@@ -151,16 +124,11 @@ def _check_in_stock(
         return True
 
 
-def scrape(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    url: str,
-) -> ProductInfo:
+def scrape(page: Page, url: str) -> ProductInfo:
     """商品ページから情報を取得する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         url: 商品ページのURL
 
     Returns:
@@ -169,13 +137,13 @@ def scrape(
     """
     logging.info("[Yodobashi] 商品ページ取得開始: %s", url)
 
-    driver.get(url)
-    _wait_for_page_load(wait)
+    page.goto(url)
+    _wait_for_page_load(page)
 
-    title = _extract_title(driver)
-    price = _extract_price(driver)
-    thumbnail_url = _extract_thumbnail_url(driver)
-    in_stock = _check_in_stock(driver)
+    title = _extract_title(page)
+    price = _extract_price(page)
+    thumbnail_url = _extract_thumbnail_url(page)
+    in_stock = _check_in_stock(page)
 
     logging.info(
         "[Yodobashi] 商品ページ取得完了: title=%s, price=%s, in_stock=%s",
@@ -197,10 +165,8 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
-    import selenium.webdriver.support.wait
 
     import my_lib.logger
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -213,15 +179,16 @@ if __name__ == "__main__":
 
     logging.info("商品URL: %s", url)
 
-    driver = my_lib.selenium_util.create_driver(
-        "yodobashi_test",
-        pathlib.Path(data_path),
-        stealth_mode=True,
+    _profile = my_lib.browser.BrowserProfile(
+        name="yodobashi_test",
+        data_dir=pathlib.Path(data_path),
+        stealth=True,
     )
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     try:
-        result = scrape(driver, wait, url)
+        result = scrape(_page, url)
 
         logging.info("=" * 60)
         logging.info("取得結果")
@@ -234,4 +201,4 @@ if __name__ == "__main__":
         logging.info("サムネイルURL: %s", result.thumbnail_url or "取得失敗")
         logging.info("在庫: %s", "あり" if result.in_stock else "なし")
     finally:
-        my_lib.selenium_util.quit_driver_gracefully(driver)
+        _manager.quit()

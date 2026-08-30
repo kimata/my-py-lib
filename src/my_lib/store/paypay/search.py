@@ -31,21 +31,11 @@ import logging
 import re
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Any
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.common.keys
-import selenium.webdriver.support.expected_conditions
-
-import my_lib.selenium_util
-
-if TYPE_CHECKING:
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.support.wait
-
-
+import my_lib.browser
 import my_lib.store.flea_market
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Element, Page
 
 # PayPayフリマの商品状態パラメータ対応
 # PayPay フリマは5段階: NEW, USED10, USED20, USED40, USED60
@@ -67,17 +57,21 @@ _SEARCH_KEYWORD: str = "PayPayフリマ"
 _ITEM_LIST_XPATH: str = '//div[@id="itm"]//a[contains(@href, "/item/")]'
 
 
-def warmup(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _find(scope: Page | Element, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
+
+
+def warmup(page: Page) -> bool:
     """Google検索経由でPayPayフリマにアクセスしてウォームアップする
 
     bot検出を回避するため、直接アクセスではなくGoogle検索経由でアクセスする。
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         ウォームアップが成功した場合 True
@@ -87,44 +81,33 @@ def warmup(
 
     try:
         # Googleにアクセス
-        driver.get("https://www.google.com/")
+        page.goto("https://www.google.com/")
         time.sleep(1)
 
-        # 検索ボックスを探して検索
-        by_xpath = selenium.webdriver.common.by.By.XPATH
-        by_name = selenium.webdriver.common.by.By.NAME
-
         # 検索ボックスに入力
-        search_box = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_name, "q"))
-        )
+        search_box = page.wait_visible(Xpath('//*[@name="q"]'))
         search_box.clear()
-        search_box.send_keys(_SEARCH_KEYWORD)
+        search_box.type(_SEARCH_KEYWORD)
         time.sleep(0.5)
 
         # 検索実行（Enterキー）
-        search_box.send_keys(selenium.webdriver.common.keys.Keys.RETURN)
+        search_box.press("Enter")
         time.sleep(2)
 
         # 検索結果からPayPayフリマのリンクを探してクリック
         link_xpath = f'//a[contains(@href, "{_TARGET_DOMAIN}")]'
-        link_element = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_xpath, link_xpath))
-        )
-
-        # リンクをクリック
-        driver.execute_script("arguments[0].click();", link_element)
+        page.wait_visible(Xpath(link_xpath)).click()
         time.sleep(2)
 
         # PayPayフリマのページが読み込まれたか確認
-        if _TARGET_DOMAIN in driver.current_url:
-            logging.info("[PayPay] ウォームアップ完了: %s", driver.current_url)
+        if _TARGET_DOMAIN in page.url:
+            logging.info("[PayPay] ウォームアップ完了: %s", page.url)
             return True
 
-        logging.warning("[PayPay] ウォームアップ: 予期しないURL: %s", driver.current_url)
+        logging.warning("[PayPay] ウォームアップ: 予期しないURL: %s", page.url)
         return False
 
-    except selenium.common.exceptions.TimeoutException:
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[PayPay] ウォームアップ: タイムアウト")
         return False
     except Exception:
@@ -175,15 +158,11 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     return url
 
 
-def _wait_for_search_results(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _wait_for_search_results(page: Page) -> bool:
     """検索結果の読み込みを待機する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         検索結果が存在する場合は True
@@ -191,75 +170,64 @@ def _wait_for_search_results(
     """
     try:
         # React アプリのため、メインコンテンツの描画を待機
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, "//main | //div[@id='root']//ul")
-            )
-        )
-        time.sleep(2)  # React の描画完了を待つ
-
-        # 検索結果が0件の場合のチェック
-        # text() は要素直下の text node のみ見るため、子 <span> 内の文言は
-        # contains(., …) で要素配下の文字列値全体を対象にする
-        no_result_xpath = '//p[contains(., "見つかりませんでした")] | //p[contains(., "0件")]'
-        if my_lib.selenium_util.xpath_exists(driver, no_result_xpath):
-            logging.info("[PayPay] 該当なし")
-            return False
-
-        # 並び順を新着順に変更（URL パラメータでは反映されないため select 操作で切り替え）
-        _select_sort_order(driver, wait)
-
-        return True
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath("//main | //div[@id='root']//ul"))
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[PayPay] 読み込みタイムアウト")
         raise
 
+    time.sleep(2)  # React の描画完了を待つ
 
-def _select_sort_order(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
+    # 検索結果が0件の場合のチェック
+    # text() は要素直下の text node のみ見るため、子 <span> 内の文言は
+    # contains(., …) で要素配下の文字列値全体を対象にする
+    no_result_xpath = '//p[contains(., "見つかりませんでした")] | //p[contains(., "0件")]'
+    if page.exists(Xpath(no_result_xpath), visible=False):
+        logging.info("[PayPay] 該当なし")
+        return False
+
+    # 並び順を新着順に変更（URL パラメータでは反映されないため select 操作で切り替え）
+    _select_sort_order(page)
+
+    return True
+
+
+def _select_sort_order(page: Page) -> None:
     """並び順を新着順に変更する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     """
-    import selenium.webdriver.support.select
-
-    by_xpath = selenium.webdriver.common.by.By.XPATH
     select_xpath = '//select[option[@value="newer"]]'
 
     try:
-        select_elements = driver.find_elements(by_xpath, select_xpath)
-        if not select_elements:
+        select_element = page.find(Xpath(select_xpath))
+        if select_element is None:
             logging.warning("[PayPay] 並び替えセレクトボックスが見つかりません")
             return
 
-        select_obj = selenium.webdriver.support.select.Select(select_elements[0])
-        select_obj.select_by_value("newer")
+        # プロトコルに select 操作は無いため、value を設定して change イベントを発火させる
+        select_element.evaluate(
+            "(el, value) => { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); }",
+            "newer",
+        )
         logging.debug("[PayPay] 新着順に切り替え")
 
         # 再描画を待機
         time.sleep(2)
 
         # 商品リストが更新されるのを待つ
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (by_xpath, _ITEM_LIST_XPATH)
-            )
-        )
+        page.wait_visible(Xpath(_ITEM_LIST_XPATH))
         time.sleep(1)
 
-    except selenium.common.exceptions.TimeoutException:
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[PayPay] 新着順への切り替え後のタイムアウト")
     except Exception:
         logging.exception("[PayPay] 並び替え切り替え失敗")
 
 
 def _parse_search_item(
-    item_element: Any,
+    item_element: Element,
 ) -> my_lib.store.flea_market.SearchResult | None:
     """検索結果の1件をパースする
 
@@ -270,11 +238,9 @@ def _parse_search_item(
         パース結果。パースに失敗した場合は None
 
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
         # URL を取得（item_element 自体が <a> タグ）
-        url_raw = item_element.get_attribute("href")
+        url_raw = item_element.attr("href")
         if url_raw is None:
             logging.debug("[PayPay] パース失敗: URL取得失敗")
             return None
@@ -285,13 +251,13 @@ def _parse_search_item(
         thumb_url: str | None = None
 
         # 方法1: img の alt 属性と src 属性から取得（最も安定）
-        img_elements = item_element.find_elements(by_xpath, ".//img[@alt]")
+        img_elements = item_element.find_all(Xpath(".//img[@alt]"))
         for img in img_elements:
-            alt = img.get_attribute("alt")
+            alt = img.attr("alt")
             if alt and alt.strip():
                 title = alt.strip()
                 # 同じ img から画像URLも取得
-                src = img.get_attribute("src")
+                src = img.attr("src")
                 if src and not src.startswith("data:"):
                     thumb_url = f"https://paypayfleamarket.yahoo.co.jp{src}" if src.startswith("/") else src
                 break
@@ -308,9 +274,9 @@ def _parse_search_item(
 
         # 画像URLのフォールバック: 任意の img タグから取得
         if not thumb_url:
-            img_elements = item_element.find_elements(by_xpath, ".//img[@src]")
+            img_elements = item_element.find_all(Xpath(".//img[@src]"))
             for img in img_elements:
-                src = img.get_attribute("src")
+                src = img.attr("src")
                 if src and not src.startswith("data:"):
                     thumb_url = f"https://paypayfleamarket.yahoo.co.jp{src}" if src.startswith("/") else src
                     break
@@ -319,7 +285,7 @@ def _parse_search_item(
         price: int | None = None
 
         # 方法1: <p> 要素のテキストから「数字円」パターンを探す
-        p_elements = item_element.find_elements(by_xpath, ".//p")
+        p_elements = item_element.find_all(Xpath(".//p"))
         for p_elem in p_elements:
             p_text = p_elem.text
             if p_text:
@@ -350,8 +316,7 @@ def _parse_search_item(
 
 
 def search(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     condition: my_lib.store.flea_market.SearchCondition,
     max_items: int | None = None,
     scroll_to_load: bool = False,
@@ -359,8 +324,7 @@ def search(
     """PayPayフリマで商品を検索する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         condition: 検索条件
         max_items: 取得する最大件数（None の場合は制限なし）
         scroll_to_load: スクロールして追加の商品を読み込むか
@@ -373,17 +337,15 @@ def search(
     logging.info("[PayPay] 検索開始: keyword=%s", condition.keyword)
     logging.debug("[PayPay] 検索URL: %s", url)
 
-    driver.get(url)
+    page.goto(url)
 
-    if not _wait_for_search_results(driver, wait):
+    if not _wait_for_search_results(page):
         return []
-
-    by_xpath = selenium.webdriver.common.by.By.XPATH
 
     results: list[my_lib.store.flea_market.SearchResult] = []
     parsed_urls: set[str] = set()
 
-    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+    item_elements = page.find_all(Xpath(_ITEM_LIST_XPATH))
     logging.debug("[PayPay] ページ解析: %d 件発見", len(item_elements))
 
     for i, item_element in enumerate(item_elements):
@@ -393,14 +355,12 @@ def search(
 
         if scroll_to_load or i < 20:
             try:
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
-                    item_element,
-                )
+                item_element.scroll_into_view()
                 if i >= 20:
                     time.sleep(0.3)
-            except selenium.common.exceptions.StaleElementReferenceException:
-                logging.debug("[PayPay] 要素 %d がStale、スキップ", i + 1)
+            except Exception:
+                # 要素が DOM から外れた（Stale）等の場合はスキップ
+                logging.debug("[PayPay] 要素 %d のスクロールに失敗、スキップ", i + 1)
                 continue
 
         result = _parse_search_item(item_element)
@@ -417,10 +377,9 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
-    import selenium.webdriver.support.wait
 
+    import my_lib.browser.helpers
     import my_lib.logger
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -462,21 +421,21 @@ if __name__ == "__main__":
 
     logging.info("検索条件: %s", condition)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 15)
+    _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     try:
-        results = search(driver, wait, condition, max_items=max_count, scroll_to_load=scroll_to_load)
+        results = search(_page, condition, max_items=max_count, scroll_to_load=scroll_to_load)
 
         if dump_path:
             dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.selenium_util.dump_page(driver, 0, dump_path)
+            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
             logging.info("ページをダンプしました: %s", dump_path)
 
-            by_xpath = selenium.webdriver.common.by.By.XPATH
-            item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
             if item_elements:
-                first_item_html = item_elements[0].get_attribute("outerHTML")
+                first_item_html = item_elements[0].attr("outerHTML")
                 item_html_path = dump_path / "first_item.html"
                 with item_html_path.open("w", encoding="utf-8") as f:
                     f.write(first_item_html if first_item_html else "")
@@ -503,4 +462,4 @@ if __name__ == "__main__":
             if result.thumb_url:
                 logging.info("    画像: %s", result.thumb_url)
     finally:
-        my_lib.selenium_util.quit_driver_gracefully(driver)
+        _manager.quit()

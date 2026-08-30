@@ -24,19 +24,10 @@ import re
 import time
 import urllib.parse
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.support.expected_conditions
-
-import my_lib.selenium_util
-
-if TYPE_CHECKING:
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.remote.webelement
-    import selenium.webdriver.support.wait
-
+import my_lib.browser
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Element, Page
 
 _SEARCH_BASE_URL: str = "https://www.yodobashi.com/"
 # 商品リンクのみを取得（評価リンク等を除外するため cImg クラスを条件に追加）
@@ -78,56 +69,44 @@ def _is_product_page(url: str) -> bool:
     return "/product/" in url and "/ec/product/stock/" not in url
 
 
-def _wait_for_search_results(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _wait_for_search_results(page: Page) -> bool:
     """検索結果の読み込みを待機する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         検索結果が存在する場合は True
 
     """
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, "//body")
-            )
-        )
-        time.sleep(2)
-
-        # 検索結果が0件の場合のチェック
-        page_source = driver.page_source
-        if "一致する商品はありませんでした" in page_source:
-            logging.info("[Yodobashi] 該当なし")
-            return False
-
-        return True
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath("//body"))
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Yodobashi] 読み込みタイムアウト")
         raise
 
+    time.sleep(2)
 
-def _parse_product_page(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-) -> SearchResult | None:
+    # 検索結果が0件の場合のチェック
+    if "一致する商品はありませんでした" in page.content:
+        logging.info("[Yodobashi] 該当なし")
+        return False
+
+    return True
+
+
+def _parse_product_page(page: Page) -> SearchResult | None:
     """商品ページから情報を取得する
 
     Args:
-        driver: WebDriver インスタンス
+        page: 操作対象のページ
 
     Returns:
         商品情報。取得に失敗した場合は None
 
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
-        url = _clean_url(driver.current_url)
+        url = _clean_url(page.url)
 
         # 商品名を取得
         name: str | None = None
@@ -138,9 +117,9 @@ def _parse_product_page(
             "//h1",
         ]
         for selector in name_selectors:
-            elements = driver.find_elements(by_xpath, selector)
-            if elements and elements[0].text.strip():
-                name = elements[0].text.strip()
+            elements = page.find_all(Xpath(selector))
+            if elements and elements[0].text:
+                name = elements[0].text
                 break
 
         # 価格を取得
@@ -151,7 +130,7 @@ def _parse_product_page(
             '//span[contains(@class, "salesPrice")]',
         ]
         for selector in price_selectors:
-            elements = driver.find_elements(by_xpath, selector)
+            elements = page.find_all(Xpath(selector))
             if elements and elements[0].text:
                 price_text = elements[0].text
                 price_str = re.sub(r"[¥￥,\s円]", "", price_text)
@@ -164,18 +143,14 @@ def _parse_product_page(
         # サムネイル画像を取得
         thumb_url: str | None = None
         thumb_selectors = [
-            '//img[@id="mainImg"]/@src',
-            '//div[contains(@class, "productPhoto")]//img/@src',
-            '//img[@itemprop="image"]/@src',
+            '//img[@id="mainImg"]',
+            '//div[contains(@class, "productPhoto")]//img',
+            '//img[@itemprop="image"]',
         ]
         for selector in thumb_selectors:
-            elements = driver.find_elements(by_xpath, selector)
+            elements = page.find_all(Xpath(selector))
             if elements:
-                thumb_url = (
-                    elements[0].get_attribute("src")
-                    if hasattr(elements[0], "get_attribute")
-                    else str(elements[0])
-                )
+                thumb_url = elements[0].attr("src")
                 if thumb_url:
                     break
 
@@ -191,7 +166,7 @@ def _parse_product_page(
 
 
 def _parse_search_item(
-    item_element: selenium.webdriver.remote.webelement.WebElement,
+    item_element: Element,
 ) -> SearchResult | None:
     """検索結果の1件をパースする
 
@@ -202,36 +177,29 @@ def _parse_search_item(
         パース結果。パースに失敗した場合は None
 
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
         # URL を取得
-        href = item_element.get_attribute("href")
+        href = item_element.attr("href")
         if not href or not _is_product_page(href):
             return None
         url = _clean_url(href)
 
         # 商品名を取得（リンクのテキスト）
-        name = item_element.text.strip() if item_element.text else None
+        name = item_element.text or None
 
         # サムネイル画像を取得（リンク内の img タグから）
         thumb_url: str | None = None
-        try:
-            img_elements = item_element.find_elements(by_xpath, ".//img")
-            if img_elements:
-                thumb_url = img_elements[0].get_attribute("src")
-        except selenium.common.exceptions.NoSuchElementException:
-            pass
+        img_elements = item_element.find_all(Xpath(".//img"))
+        if img_elements:
+            thumb_url = img_elements[0].attr("src")
 
         if not name:
             # 親要素から商品名を探す
-            try:
-                parent = item_element.find_element(by_xpath, "./..")
-                name_elements = parent.find_elements(by_xpath, './/p[contains(@class, "pName")]')
+            parent = item_element.find(Xpath("./.."))
+            if parent is not None:
+                name_elements = parent.find_all(Xpath('.//p[contains(@class, "pName")]'))
                 if name_elements and name_elements[0].text:
-                    name = name_elements[0].text.strip()
-            except selenium.common.exceptions.NoSuchElementException:
-                pass
+                    name = name_elements[0].text
 
         if not name:
             logging.debug("[Yodobashi] パース失敗: 商品名取得失敗 url=%s", url)
@@ -245,16 +213,14 @@ def _parse_search_item(
 
 
 def search(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     keyword: str,
     max_items: int | None = None,
 ) -> list[SearchResult]:
     """ヨドバシ.com で商品を検索する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         keyword: 検索キーワード
         max_items: 取得する最大件数（None の場合は制限なし）
 
@@ -266,28 +232,26 @@ def search(
     logging.info("[Yodobashi] 検索開始: keyword=%s", keyword)
     logging.debug("[Yodobashi] 検索URL: %s", url)
 
-    driver.get(url)
+    page.goto(url)
 
-    if not _wait_for_search_results(driver, wait):
+    if not _wait_for_search_results(page):
         return []
 
-    current_url = driver.current_url
+    current_url = page.url
 
     # 商品ページに直接遷移した場合（1件のみヒット）
     if _is_product_page(current_url):
         logging.info("[Yodobashi] 商品ページに直接遷移")
-        result = _parse_product_page(driver)
+        result = _parse_product_page(page)
         if result:
             return [result]
         return []
 
     # 検索結果一覧から商品を取得
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     results: list[SearchResult] = []
     parsed_urls: set[str] = set()
 
-    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+    item_elements = page.find_all(Xpath(_ITEM_LIST_XPATH))
     logging.debug("[Yodobashi] ページ解析: %d 件発見", len(item_elements))
 
     for item_element in item_elements:
@@ -304,16 +268,14 @@ def search(
 
 
 def search_by_name(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     brand: str,
     product_name: str,
 ) -> SearchResult | None:
     """ブランド名と商品名で検索し、最も一致する商品を返す
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         brand: ブランド名（例: "Canon", "ソニー", "Nikon"）
         product_name: 商品名
 
@@ -322,7 +284,7 @@ def search_by_name(
 
     """
     keyword = f"{brand} {product_name}"
-    results = search(driver, wait, keyword, max_items=10)
+    results = search(page, keyword, max_items=10)
 
     if not results:
         return None
@@ -355,10 +317,9 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
-    import selenium.webdriver.support.wait
 
+    import my_lib.browser.helpers
     import my_lib.logger
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -376,25 +337,25 @@ if __name__ == "__main__":
 
     logging.info("検索キーワード: %s", keyword)
 
-    driver = my_lib.selenium_util.create_driver(
-        "yodobashi_test",
-        pathlib.Path(data_path),
-        stealth_mode=True,
+    _profile = my_lib.browser.BrowserProfile(
+        name="yodobashi_test",
+        data_dir=pathlib.Path(data_path),
+        stealth=True,
     )
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     try:
-        results = search(driver, wait, keyword, max_items=max_count)
+        results = search(_page, keyword, max_items=max_count)
 
         if dump_path:
             dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.selenium_util.dump_page(driver, 0, dump_path)
+            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
             logging.info("ページをダンプしました: %s", dump_path)
 
-            by_xpath = selenium.webdriver.common.by.By.XPATH
-            item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
             if item_elements:
-                first_item_html = item_elements[0].get_attribute("outerHTML")
+                first_item_html = item_elements[0].attr("outerHTML")
                 item_html_path = dump_path / "first_item.html"
                 with item_html_path.open("w", encoding="utf-8") as f:
                     f.write(first_item_html if first_item_html else "")
@@ -410,4 +371,4 @@ if __name__ == "__main__":
                 logging.info("    価格: ¥%s", f"{result.price:,}")
             logging.info("    URL: %s", result.url)
     finally:
-        my_lib.selenium_util.quit_driver_gracefully(driver)
+        _manager.quit()

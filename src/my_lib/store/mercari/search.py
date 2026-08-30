@@ -30,21 +30,12 @@ import contextlib
 import logging
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.common.keys
-import selenium.webdriver.support.expected_conditions
-
-import my_lib.selenium_util
-
-if TYPE_CHECKING:
-    import selenium.webdriver.remote.webdriver
-    import selenium.webdriver.support.wait
-
-
+import my_lib.browser
 import my_lib.store.flea_market
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Element, Page
 
 _SEARCH_BASE_URL: str = "https://jp.mercari.com/search"
 _TARGET_DOMAIN: str = "mercari.com"
@@ -53,17 +44,21 @@ _SEARCH_KEYWORD: str = "メルカリ"
 _ITEM_LIST_XPATH: str = '//div[@id="item-grid"]//li[@data-testid="item-cell"]'
 
 
-def warmup(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _find(scope: Page | Element, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
+
+
+def warmup(page: Page) -> bool:
     """Google検索経由でメルカリにアクセスしてウォームアップする
 
     bot検出を回避するため、直接アクセスではなくGoogle検索経由でアクセスする。
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         ウォームアップが成功した場合 True
@@ -73,44 +68,33 @@ def warmup(
 
     try:
         # Googleにアクセス
-        driver.get("https://www.google.com/")
+        page.goto("https://www.google.com/")
         time.sleep(1)
 
-        # 検索ボックスを探して検索
-        by_xpath = selenium.webdriver.common.by.By.XPATH
-        by_name = selenium.webdriver.common.by.By.NAME
-
         # 検索ボックスに入力
-        search_box = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_name, "q"))
-        )
+        search_box = page.wait_visible(Xpath('//*[@name="q"]'))
         search_box.clear()
-        search_box.send_keys(_SEARCH_KEYWORD)
+        search_box.type(_SEARCH_KEYWORD)
         time.sleep(0.5)
 
         # 検索実行（Enterキー）
-        search_box.send_keys(selenium.webdriver.common.keys.Keys.RETURN)
+        search_box.press("Enter")
         time.sleep(2)
 
         # 検索結果からメルカリのリンクを探してクリック
         link_xpath = f'//a[contains(@href, "{_TARGET_DOMAIN}")]'
-        link_element = wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located((by_xpath, link_xpath))
-        )
-
-        # リンクをクリック
-        driver.execute_script("arguments[0].click();", link_element)
+        page.wait_visible(Xpath(link_xpath)).click()
         time.sleep(2)
 
         # メルカリのページが読み込まれたか確認
-        if _TARGET_DOMAIN in driver.current_url:
-            logging.info("[Mercari] ウォームアップ完了: %s", driver.current_url)
+        if _TARGET_DOMAIN in page.url:
+            logging.info("[Mercari] ウォームアップ完了: %s", page.url)
             return True
 
-        logging.warning("[Mercari] ウォームアップ: 予期しないURL: %s", driver.current_url)
+        logging.warning("[Mercari] ウォームアップ: 予期しないURL: %s", page.url)
         return False
 
-    except selenium.common.exceptions.TimeoutException:
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Mercari] ウォームアップ: タイムアウト")
         return False
     except Exception:
@@ -161,109 +145,76 @@ def build_search_url(condition: my_lib.store.flea_market.SearchCondition) -> str
     return f"{_SEARCH_BASE_URL}?{'&'.join(query_parts)}"
 
 
-def _apply_listing_type_filter(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    label: str,
-) -> bool:
+def _apply_listing_type_filter(page: Page, label: str) -> bool:
     """絞り込みUIで出品形式の指定ラベルを選択する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         label: 選択するフィルタラベル（例: "オークション", "通常出品"）
 
     Returns:
         フィルタ適用に成功した場合は True
 
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
         logging.debug("[Mercari] 出品形式セクションを探索中...")
-        listing_type_xpath = '//div[@data-testid="出品形式"]'
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (by_xpath, listing_type_xpath)
-            )
-        )
+        page.wait_visible(Xpath('//div[@data-testid="出品形式"]'))
 
         # アコーディオンが閉じていれば展開
-        accordion_button_xpath = '//div[@data-testid="出品形式"]//button[@id="accordion_button"]'
-        accordion_buttons = driver.find_elements(by_xpath, accordion_button_xpath)
-        if accordion_buttons:
-            accordion_button = accordion_buttons[0]
-            if accordion_button.get_attribute("aria-expanded") == "false":
-                accordion_button.click()
-                logging.debug("[Mercari] 出品形式セクションを展開")
-                time.sleep(0.3)
+        accordion_button = page.find(Xpath('//div[@data-testid="出品形式"]//button[@id="accordion_button"]'))
+        if accordion_button is not None and accordion_button.attr("aria-expanded") == "false":
+            accordion_button.click()
+            logging.debug("[Mercari] 出品形式セクションを展開")
+            time.sleep(0.3)
 
         target_xpath = f'//div[@data-testid="出品形式"]//label[.//span[text()="{label}"]]'
-        wait.until(
-            selenium.webdriver.support.expected_conditions.element_to_be_clickable((by_xpath, target_xpath))
-        )
-        target_label = driver.find_element(by_xpath, target_xpath)
-        target_label.click()
+        page.wait_clickable(Xpath(target_xpath)).click()
         logging.debug("[Mercari] 「%s」をクリック", label)
         time.sleep(0.5)
 
         logging.info("[Mercari] 出品形式「%s」フィルタを適用", label)
         return True
 
-    except selenium.common.exceptions.TimeoutException:
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Mercari] 絞り込みUIの操作に失敗（タイムアウト）")
         return False
-    except selenium.common.exceptions.NoSuchElementException:
-        logging.warning("[Mercari] 絞り込みUIの要素が見つかりません")
-        return False
 
 
-def _wait_for_search_results(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> bool:
+def _wait_for_search_results(page: Page) -> bool:
     """検索結果の読み込みを待機する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
 
     Returns:
         検索結果が存在する場合は True
 
     """
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, "//main")
-            )
-        )
-        time.sleep(1)
-
-        # 検索結果が0件の場合のチェック
-        no_result_xpath = '//p[contains(text(), "新着のお知らせを受け取る")]'
-        if my_lib.selenium_util.xpath_exists(driver, no_result_xpath):
-            logging.info("[Mercari] 該当なし")
-            return False
-
-        # アイテム要素の出現を待機（遅延ロード対策）
-        try:
-            wait.until(
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (selenium.webdriver.common.by.By.XPATH, _ITEM_LIST_XPATH)
-                )
-            )
-        except selenium.common.exceptions.TimeoutException:
-            logging.debug("[Mercari] アイテム要素の出現待ちタイムアウト")
-
-        return True
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath("//main"))
+    except my_lib.browser.WaitTimeoutError:
         logging.warning("[Mercari] 読み込みタイムアウト")
         raise
 
+    time.sleep(1)
+
+    # 検索結果が0件の場合のチェック
+    no_result_xpath = '//p[contains(text(), "新着のお知らせを受け取る")]'
+    if page.exists(Xpath(no_result_xpath), visible=False):
+        logging.info("[Mercari] 該当なし")
+        return False
+
+    # アイテム要素の出現を待機（遅延ロード対策）
+    try:
+        page.wait_visible(Xpath(_ITEM_LIST_XPATH))
+    except my_lib.browser.WaitTimeoutError:
+        logging.debug("[Mercari] アイテム要素の出現待ちタイムアウト")
+
+    return True
+
 
 def _parse_search_item(
-    item_element: Any,
+    item_element: Element,
 ) -> my_lib.store.flea_market.SearchResult | None:
     """検索結果の1件をパースする
 
@@ -277,24 +228,20 @@ def _parse_search_item(
     """
     import re
 
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     try:
         # PR（広告）アイテムをスキップ
         # <p class="merText ...">PR</p> があれば除外
-        pr_elements = item_element.find_elements(
-            by_xpath, './/p[contains(@class, "merText") and text()="PR"]'
-        )
+        pr_elements = item_element.find_all(Xpath('.//p[contains(@class, "merText") and text()="PR"]'))
         if pr_elements:
             logging.debug("[Mercari] 広告アイテムをスキップ")
             return None
 
         # URL を取得
-        link_elements = item_element.find_elements(by_xpath, ".//a")
+        link_elements = item_element.find_all(Xpath(".//a"))
         if not link_elements:
             logging.debug("[Mercari] パース失敗: リンク要素なし")
             return None
-        url_raw = link_elements[0].get_attribute("href")
+        url_raw = link_elements[0].attr("href")
         if url_raw is None:
             logging.debug("[Mercari] パース失敗: URL取得失敗")
             return None
@@ -304,12 +251,12 @@ def _parse_search_item(
         # タイトルを取得
         # 商品名は data-testid="thumbnail-item-name" から取得するのが最も安定
         title: str | None = None
-        title_elements = item_element.find_elements(by_xpath, './/span[@data-testid="thumbnail-item-name"]')
+        title_elements = item_element.find_all(Xpath('.//span[@data-testid="thumbnail-item-name"]'))
         if title_elements and title_elements[0].text:
             title = title_elements[0].text
         else:
             # フォールバック: itemName クラスを持つ span から取得
-            title_elements = item_element.find_elements(by_xpath, ".//span[contains(@class, 'itemName')]")
+            title_elements = item_element.find_all(Xpath(".//span[contains(@class, 'itemName')]"))
             if title_elements and title_elements[0].text:
                 title = title_elements[0].text
 
@@ -317,7 +264,7 @@ def _parse_search_item(
         price: int | None = None
 
         # 方法1: span.number__xxxxx クラスから取得
-        price_number_elements = item_element.find_elements(by_xpath, ".//span[contains(@class, 'number__')]")
+        price_number_elements = item_element.find_all(Xpath(".//span[contains(@class, 'number__')]"))
         if price_number_elements and price_number_elements[0].text:
             price_text = price_number_elements[0].text
             price_str = price_text.replace("¥", "").replace(",", "").strip()
@@ -328,9 +275,9 @@ def _parse_search_item(
         if price is None or title is None:
             # div[@role="img"] の aria-label から取得
             # 例: "iPad（第9世代）10.2インチ Wi-Fiモデル 64GB スペースグレイの画像 30,000円"
-            img_elements = item_element.find_elements(by_xpath, './/div[@role="img"][@aria-label]')
+            img_elements = item_element.find_all(Xpath('.//div[@role="img"][@aria-label]'))
             if img_elements:
-                aria_label = img_elements[0].get_attribute("aria-label")
+                aria_label = img_elements[0].attr("aria-label")
                 if aria_label:
                     # 価格を抽出（"30,000円" のような形式）
                     price_match = re.search(r"([\d,]+)円", aria_label)
@@ -346,10 +293,10 @@ def _parse_search_item(
 
         if not title or price is None:
             # デバッグ: aria-label の値を確認
-            img_elements = item_element.find_elements(by_xpath, './/div[@role="img"][@aria-label]')
+            img_elements = item_element.find_all(Xpath('.//div[@role="img"][@aria-label]'))
             aria_debug = None
             if img_elements:
-                aria_debug = img_elements[0].get_attribute("aria-label")
+                aria_debug = img_elements[0].attr("aria-label")
             logging.debug("[Mercari] パース失敗: title=%s, price=%s, aria_label=%s", title, price, aria_debug)
             return None
 
@@ -357,9 +304,9 @@ def _parse_search_item(
         thumb_url: str | None = None
 
         # 方法1: img タグの srcset から最大解像度を取得
-        img_elements = item_element.find_elements(by_xpath, ".//img[@srcset]")
+        img_elements = item_element.find_all(Xpath(".//img[@srcset]"))
         if img_elements:
-            srcset = img_elements[0].get_attribute("srcset")
+            srcset = img_elements[0].attr("srcset")
             if srcset:
                 # srcset は "url1 240w, url2 480w, url3 720w" 形式
                 # 最大の解像度のURLを取得
@@ -375,9 +322,9 @@ def _parse_search_item(
 
         # 方法2: img タグの src から取得
         if not thumb_url:
-            img_elements = item_element.find_elements(by_xpath, ".//img[@src]")
+            img_elements = item_element.find_all(Xpath(".//img[@src]"))
             if img_elements:
-                src = img_elements[0].get_attribute("src")
+                src = img_elements[0].attr("src")
                 if src and not src.startswith("data:"):
                     thumb_url = src
 
@@ -389,18 +336,16 @@ def _parse_search_item(
 
 
 def _parse_visible_items(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    page: Page,
     *,
     max_items: int | None = None,
     scroll_to_load: bool = False,
 ) -> list[my_lib.store.flea_market.SearchResult]:
     """現在表示されている検索結果をパースする"""
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     results: list[my_lib.store.flea_market.SearchResult] = []
     parsed_urls: set[str] = set()
 
-    item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+    item_elements = page.find_all(Xpath(_ITEM_LIST_XPATH))
     logging.debug("[Mercari] ページ解析: %d 件発見", len(item_elements))
 
     for i, item_element in enumerate(item_elements):
@@ -409,14 +354,12 @@ def _parse_visible_items(
 
         if scroll_to_load or i < 20:
             try:
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
-                    item_element,
-                )
+                item_element.scroll_into_view()
                 if i >= 20:
                     time.sleep(0.3)
-            except selenium.common.exceptions.StaleElementReferenceException:
-                logging.debug("[Mercari] 要素 %d がStale、スキップ", i + 1)
+            except Exception:
+                # 要素が DOM から外れた（Stale）等の場合はスキップ
+                logging.debug("[Mercari] 要素 %d のスクロールに失敗、スキップ", i + 1)
                 continue
 
         result = _parse_search_item(item_element)
@@ -428,8 +371,7 @@ def _parse_visible_items(
 
 
 def search(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     condition: my_lib.store.flea_market.SearchCondition,
     max_items: int | None = None,
     scroll_to_load: bool = False,
@@ -437,8 +379,7 @@ def search(
     """メルカリで商品を検索する
 
     Args:
-        driver: WebDriver インスタンス
-        wait: WebDriverWait インスタンス
+        page: 操作対象のページ
         condition: 検索条件
         max_items: 取得する最大件数（None の場合は制限なし）
         scroll_to_load: スクロールして追加の商品を読み込むか
@@ -451,13 +392,13 @@ def search(
     logging.info("[Mercari] 検索開始: keyword=%s", condition.keyword)
     logging.debug("[Mercari] 検索URL: %s", url)
 
-    driver.get(url)
+    page.goto(url)
 
-    if not _wait_for_search_results(driver, wait):
+    if not _wait_for_search_results(page):
         return []
 
     # 1. フィルタなしで全結果をパース（通常出品 + Shops + オークション）
-    all_results = _parse_visible_items(driver, max_items=max_items, scroll_to_load=scroll_to_load)
+    all_results = _parse_visible_items(page, max_items=max_items, scroll_to_load=scroll_to_load)
 
     if not all_results:
         logging.info("[Mercari] 検索完了: 0 件")
@@ -465,8 +406,8 @@ def search(
 
     # 2. 「オークション」フィルタを適用してオークション出品の URL を収集
     auction_urls: set[str] = set()
-    if _apply_listing_type_filter(driver, wait, "オークション") and _wait_for_search_results(driver, wait):
-        auction_items = _parse_visible_items(driver, max_items=None, scroll_to_load=False)
+    if _apply_listing_type_filter(page, "オークション") and _wait_for_search_results(page):
+        auction_items = _parse_visible_items(page, max_items=None, scroll_to_load=False)
         auction_urls = {item.url for item in auction_items}
         if auction_urls:
             logging.info("[Mercari] オークション %d 件を除外", len(auction_urls))
@@ -483,10 +424,9 @@ if __name__ == "__main__":
     import pathlib
 
     import docopt
-    import selenium.webdriver.support.wait
 
+    import my_lib.browser.helpers
     import my_lib.logger
-    import my_lib.selenium_util
 
     assert __doc__ is not None  # noqa: S101
     args = docopt.docopt(__doc__)
@@ -530,23 +470,23 @@ if __name__ == "__main__":
 
     logging.info("検索条件: %s", condition)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 10)
+    _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     try:
-        results = search(driver, wait, condition, max_items=max_count, scroll_to_load=scroll_to_load)
+        results = search(_page, condition, max_items=max_count, scroll_to_load=scroll_to_load)
 
         # ダンプパスが指定された場合は、検索結果ページをダンプ
         if dump_path:
             dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.selenium_util.dump_page(driver, 0, dump_path)
+            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
             logging.info("ページをダンプしました: %s", dump_path)
 
             # 最初の商品のHTMLを個別にダンプ
-            by_xpath = selenium.webdriver.common.by.By.XPATH
-            item_elements = driver.find_elements(by_xpath, _ITEM_LIST_XPATH)
+            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
             if item_elements:
-                first_item_html = item_elements[0].get_attribute("outerHTML")
+                first_item_html = item_elements[0].attr("outerHTML")
                 item_html_path = dump_path / "first_item.html"
                 with item_html_path.open("w", encoding="utf-8") as f:
                     f.write(first_item_html if first_item_html else "")
@@ -573,6 +513,4 @@ if __name__ == "__main__":
             if result.thumb_url:
                 logging.info("    画像: %s", result.thumb_url)
     finally:
-        my_lib.selenium_util.quit_driver_gracefully(driver)
-        # NOTE: undetected_chromedriver の __del__ で ImportError が出ることがあるが、
-        # ドライバは正常終了済みのため実害なし（ライブラリ側の既知の問題）
+        _manager.quit()

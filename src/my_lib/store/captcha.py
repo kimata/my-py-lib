@@ -20,6 +20,7 @@ import tempfile
 import time
 import urllib.request
 import warnings
+from typing import TypeAlias
 
 import PIL.Image
 
@@ -27,21 +28,36 @@ import PIL.Image
 # https://github.com/jiaaro/pydub/issues/795
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pydub")
 import pydub  # noqa: E402
-import selenium.webdriver.common.by  # noqa: E402
-import selenium.webdriver.common.keys  # noqa: E402
-import selenium.webdriver.remote.webdriver  # noqa: E402
-import selenium.webdriver.support  # noqa: E402
-import selenium.webdriver.support.expected_conditions  # noqa: E402
-import selenium.webdriver.support.wait  # noqa: E402
 import slack_sdk  # noqa: E402
 import slack_sdk.errors  # noqa: E402
 
 import my_lib.notify.mail  # noqa: E402
 import my_lib.notify.slack  # noqa: E402
-import my_lib.selenium_util  # noqa: E402
+from my_lib.browser import Xpath  # noqa: E402
+from my_lib.browser.protocol import Element, FrameScope, Page  # noqa: E402
 
 _RESPONSE_WAIT_SEC: int = 5
 _RESPONSE_TIMEOUT_SEC: int = 300
+
+# find 系ヘルパーのスコープ（Page / FrameScope / Element はいずれも find/find_all を持つ）
+_Findable: TypeAlias = Page | FrameScope | Element
+
+
+def _find(scope: _Findable, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
+
+
+def _click_if_exists(scope: FrameScope, xpath: str) -> bool:
+    """要素が存在すればクリックして True を返す（存在しなければ False）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        return False
+    element.click()
+    return True
 
 
 def recognize_audio(audio_url: str) -> str:
@@ -71,143 +87,91 @@ def recognize_audio(audio_url: str) -> str:
         pathlib.Path(wav_file_name).unlink(missing_ok=True)
 
 
-def resolve_recaptcha_auto(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
-    wait.until(
-        selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
-            (selenium.webdriver.common.by.By.XPATH, '//iframe[@title="reCAPTCHA"]')
-        )
-    )
-    my_lib.selenium_util.click_xpath(
-        driver,
-        '//span[contains(@class, "recaptcha-checkbox")]',
-        move=True,
-    )
-    driver.switch_to.default_content()
-    wait.until(
-        selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
-            (selenium.webdriver.common.by.By.XPATH, '//iframe[contains(@title, "reCAPTCHA による確認")]')
-        )
-    )
-    wait.until(
-        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-            (selenium.webdriver.common.by.By.XPATH, '//div[@id="rc-imageselect-target"]')
-        )
-    )
-    my_lib.selenium_util.click_xpath(driver, '//button[contains(@title, "確認用の文字を音声")]', move=True)
-    time.sleep(0.5)
+def resolve_recaptcha_auto(page: Page) -> None:
+    # チェックボックス iframe: 「私はロボットではありません」をクリック
+    with page.frame(Xpath('//iframe[@title="reCAPTCHA"]')) as checkbox_frame:
+        checkbox_frame.wait_clickable(Xpath('//span[contains(@class, "recaptcha-checkbox")]')).click()
 
-    audio_url = driver.find_element(
-        selenium.webdriver.common.by.By.XPATH, '//audio[@id="audio-source"]'
-    ).get_attribute("src")
-
-    if audio_url is None:
-        raise RuntimeError("Failed to get audio URL for CAPTCHA")
-
-    text = recognize_audio(audio_url)
-
-    input_elem = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="audio-response"]')
-    input_elem.send_keys(text.lower())
-    input_elem.send_keys(selenium.webdriver.common.keys.Keys.ENTER)
-
-    driver.switch_to.default_content()
-
-
-def resolve_recaptcha_mail(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    config: my_lib.notify.mail.MailConfigTypes,
-) -> None:
-    wait.until(
-        selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
-            (selenium.webdriver.common.by.By.XPATH, '//iframe[@title="reCAPTCHA"]')
-        )
-    )
-    my_lib.selenium_util.click_xpath(
-        driver,
-        '//span[contains(@class, "recaptcha-checkbox")]',
-        move=True,
-    )
-    driver.switch_to.default_content()
-    wait.until(
-        selenium.webdriver.support.expected_conditions.frame_to_be_available_and_switch_to_it(
-            (selenium.webdriver.common.by.By.XPATH, '//iframe[contains(@title, "reCAPTCHA による確認")]')
-        )
-    )
-    wait.until(
-        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-            (selenium.webdriver.common.by.By.XPATH, '//div[@id="rc-imageselect-target"]')
-        )
-    )
-    while True:
-        # NOTE: 問題画像を切り抜いてメールで送信
-        my_lib.notify.mail.send(
-            config,
-            my_lib.notify.mail.build_message(
-                "reCAPTCHA",
-                "reCAPTCHA",
-                my_lib.notify.mail.ImageAttachmentFromData(
-                    id="recaptcha",
-                    data=driver.find_element(
-                        selenium.webdriver.common.by.By.XPATH, "//body"
-                    ).screenshot_as_png,
-                ),
-            ),
-        )
-
-        tile_list = driver.find_elements(
-            selenium.webdriver.common.by.By.XPATH,
-            '//table[contains(@class, "rc-imageselect-table")]//td[@role="button"]',
-        )
-        tile_idx_list = [elem.get_attribute("tabindex") for elem in tile_list]
-
-        # NOTE: メールを見て人間に選択するべき画像のインデックスを入力してもらう。
-        # インデックスは左上を 0 として横方向に 1, 2, ... とする形。
-        # 入力を簡単にするため、10以上は a, b, ..., g で指定。
-        # 0 は入力の完了を意味する。
-        select_str = input("選択タイル(1-9,a-g,end=0): ").strip()
-
-        if select_str == "0":
-            if my_lib.selenium_util.click_xpath(
-                driver, '//button[contains(text(), "スキップ")]', move=True, is_warn=False
-            ):
-                time.sleep(0.5)
-                continue
-            if my_lib.selenium_util.click_xpath(
-                driver, '//button[contains(text(), "確認")]', move=True, is_warn=False
-            ):
-                time.sleep(0.5)
-
-                if my_lib.selenium_util.is_display(
-                    driver, '//div[contains(text(), "新しい画像も")]'
-                ) or my_lib.selenium_util.is_display(driver, '//div[contains(text(), "もう一度")]'):
-                    continue
-                break
-            my_lib.selenium_util.click_xpath(
-                driver, '//button[contains(text(), "次へ")]', move=True, is_warn=False
-            )
-            time.sleep(0.5)
-
-        for idx in list(select_str):
-            if ord(idx) <= 57:  # noqa: SIM108
-                tile_idx = ord(idx) - 48
-            else:
-                tile_idx = ord(idx) - 97 + 10
-
-            if tile_idx >= len(tile_idx_list):
-                continue
-
-            index = tile_idx_list[tile_idx - 1]
-            my_lib.selenium_util.click_xpath(
-                driver,
-                f'//table[contains(@class, "rc-imageselect-table")]//td[@tabindex="{index}"]',
-                move=True,
-            )
+    # チャレンジ iframe: 音声チャレンジに切り替えて回答する
+    with page.frame(Xpath('//iframe[contains(@title, "reCAPTCHA による確認")]')) as challenge_frame:
+        challenge_frame.wait_clickable(Xpath('//div[@id="rc-imageselect-target"]'))
+        challenge_frame.wait_clickable(Xpath('//button[contains(@title, "確認用の文字を音声")]')).click()
         time.sleep(0.5)
 
-    driver.switch_to.default_content()
+        audio_url = _find(challenge_frame, '//audio[@id="audio-source"]').attr("src")
+        if audio_url is None:
+            raise RuntimeError("Failed to get audio URL for CAPTCHA")
+
+        text = recognize_audio(audio_url)
+
+        input_elem = _find(challenge_frame, '//input[@id="audio-response"]')
+        input_elem.type(text.lower())
+        input_elem.press("Enter")
+
+
+def resolve_recaptcha_mail(page: Page, config: my_lib.notify.mail.MailConfigTypes) -> None:
+    # チェックボックス iframe: 「私はロボットではありません」をクリック
+    with page.frame(Xpath('//iframe[@title="reCAPTCHA"]')) as checkbox_frame:
+        checkbox_frame.wait_clickable(Xpath('//span[contains(@class, "recaptcha-checkbox")]')).click()
+
+    # チャレンジ iframe: 画像チャレンジをメール経由で人間に解いてもらう
+    with page.frame(Xpath('//iframe[contains(@title, "reCAPTCHA による確認")]')) as challenge_frame:
+        challenge_frame.wait_clickable(Xpath('//div[@id="rc-imageselect-target"]'))
+        while True:
+            # NOTE: 問題画像を切り抜いてメールで送信
+            my_lib.notify.mail.send(
+                config,
+                my_lib.notify.mail.build_message(
+                    "reCAPTCHA",
+                    "reCAPTCHA",
+                    my_lib.notify.mail.ImageAttachmentFromData(
+                        id="recaptcha",
+                        data=_find(challenge_frame, "//body").screenshot(),
+                    ),
+                ),
+            )
+
+            tile_list = challenge_frame.find_all(
+                Xpath('//table[contains(@class, "rc-imageselect-table")]//td[@role="button"]')
+            )
+            tile_idx_list = [elem.attr("tabindex") for elem in tile_list]
+
+            # NOTE: メールを見て人間に選択するべき画像のインデックスを入力してもらう。
+            # インデックスは左上を 0 として横方向に 1, 2, ... とする形。
+            # 入力を簡単にするため、10以上は a, b, ..., g で指定。
+            # 0 は入力の完了を意味する。
+            select_str = input("選択タイル(1-9,a-g,end=0): ").strip()
+
+            if select_str == "0":
+                if _click_if_exists(challenge_frame, '//button[contains(text(), "スキップ")]'):
+                    time.sleep(0.5)
+                    continue
+                if _click_if_exists(challenge_frame, '//button[contains(text(), "確認")]'):
+                    time.sleep(0.5)
+
+                    if challenge_frame.exists(
+                        Xpath('//div[contains(text(), "新しい画像も")]')
+                    ) or challenge_frame.exists(Xpath('//div[contains(text(), "もう一度")]')):
+                        continue
+                    break
+                _click_if_exists(challenge_frame, '//button[contains(text(), "次へ")]')
+                time.sleep(0.5)
+
+            for idx in list(select_str):
+                if ord(idx) <= 57:  # noqa: SIM108
+                    tile_idx = ord(idx) - 48
+                else:
+                    tile_idx = ord(idx) - 97 + 10
+
+                if tile_idx >= len(tile_idx_list):
+                    continue
+
+                index = tile_idx_list[tile_idx - 1]
+                _click_if_exists(
+                    challenge_frame,
+                    f'//table[contains(@class, "rc-imageselect-table")]//td[@tabindex="{index}"]',
+                )
+            time.sleep(0.5)
 
 
 def send_request_text_slack(

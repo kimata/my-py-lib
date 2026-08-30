@@ -24,16 +24,21 @@ import urllib.parse
 from dataclasses import dataclass
 from typing import Any, Literal
 
-import selenium.webdriver.common.by
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.wait
-
-import my_lib.selenium_util
+import my_lib.browser
+import my_lib.browser.helpers
 import my_lib.store.captcha
+from my_lib.browser import Xpath
+from my_lib.browser.protocol import Element, Page
 
 _TIMEOUT_SEC: int = 4
+
+
+def _find(scope: Page | Element, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = scope.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
 
 
 # === Action 型定義 ===
@@ -114,8 +119,7 @@ def _resolve_template(template: str, item: dict[str, Any]) -> str:
 
 
 def process_action(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     item: dict[str, Any],
     action_list: list[Action],
     name: str = "action",
@@ -128,47 +132,44 @@ def process_action(
         logging.debug("action: %s.", action.type)
         if isinstance(action, InputAction):
             xpath = _resolve_template(action.xpath, item)
-            if not my_lib.selenium_util.xpath_exists(driver, xpath):
+            if not page.exists(Xpath(xpath), visible=False):
                 logging.debug("Element not found. Interrupted.")
                 return
             value = _resolve_template(action.value, item)
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).send_keys(value)
+            _find(page, xpath).type(value)
         elif isinstance(action, ClickAction):
             xpath = _resolve_template(action.xpath, item)
-            if not my_lib.selenium_util.xpath_exists(driver, xpath):
+            if not page.exists(Xpath(xpath), visible=False):
                 logging.debug("Element not found. Interrupted.")
                 return
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath).click()
+            _find(page, xpath).click()
         elif isinstance(action, RecaptchaAction):
-            my_lib.store.captcha.resolve_recaptcha_auto(driver, wait)
+            my_lib.store.captcha.resolve_recaptcha_auto(page)
         elif isinstance(action, CaptchaAction):
             input_xpath = '//input[@id="captchacharacters"]'
-            if not my_lib.selenium_util.xpath_exists(driver, input_xpath):
+            if not page.exists(Xpath(input_xpath), visible=False):
                 logging.debug("Element not found.")
                 continue
-            domain = urllib.parse.urlparse(driver.current_url).netloc
+            domain = urllib.parse.urlparse(page.url).netloc
 
             logging.warning("Resolve captche is needed at %s.", domain)
 
-            my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+            my_lib.browser.helpers.dump_page(page, random.randint(0, 99), dump_path)  # noqa: S311
             code = input(f"{domain} captcha: ")
 
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, input_xpath).send_keys(code)
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//button[@type="submit"]').click()
+            _find(page, input_xpath).type(code)
+            _find(page, '//button[@type="submit"]').click()
         elif isinstance(action, SixDigitAction):
             # NOTE: これは今のところ Ubiquiti Store USA 専用
-            digit_code = input(f"{urllib.parse.urlparse(driver.current_url).netloc} app code: ")
+            digit_code = input(f"{urllib.parse.urlparse(page.url).netloc} app code: ")
             for i, code in enumerate(list(digit_code)):
-                driver.find_element(
-                    selenium.webdriver.common.by.By.XPATH, '//input[@data-id="' + str(i) + '"]'
-                ).send_keys(code)
+                _find(page, '//input[@data-id="' + str(i) + '"]').type(code)
 
         time.sleep(4)
 
 
 def _process_preload(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     item: dict[str, Any],
     loop: int,
     *,
@@ -183,55 +184,49 @@ def _process_preload(
         logging.info("Skip preload. (loop=%d)", loop)
         return
 
-    driver.get(item["preload"]["url"])
+    page.goto(item["preload"]["url"])
     time.sleep(2)
 
     actions = parse_action_list(item["preload"]["action"])
-    process_action(driver, wait, item, actions, "preload action", dump_path=dump_path)
+    process_action(page, item, actions, "preload action", dump_path=dump_path)
 
 
 def _fetch_price_impl(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    page: Page,
     item: dict[str, Any],
     loop: int,
     *,
     dump_path: pathlib.Path,
 ) -> dict[str, Any] | bool:
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, _TIMEOUT_SEC)
-
-    _process_preload(driver, wait, item, loop, dump_path=dump_path)
+    _process_preload(page, item, loop, dump_path=dump_path)
 
     logging.info("Fetch: %s", item["url"])
 
-    driver.get(item["url"])
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (selenium.webdriver.common.by.By.XPATH, "//body")
-        )
-    )
+    page.goto(item["url"])
+    page.wait_visible(Xpath("//body"), timeout=_TIMEOUT_SEC)
     time.sleep(2)
 
     if "action" in item:
-        process_action(driver, wait, item, parse_action_list(item["action"]), dump_path=dump_path)
+        process_action(page, item, parse_action_list(item["action"]), dump_path=dump_path)
 
     logging.info("Parse: %s", item["name"])
 
-    if not my_lib.selenium_util.xpath_exists(driver, item["price_xpath"]):
+    if not page.exists(Xpath(item["price_xpath"]), visible=False):
         logging.warning("%s: price not found.", item["name"])
         item["stock"] = 0
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
+        my_lib.browser.helpers.dump_page(page, random.randint(0, 99), dump_path)  # noqa: S311
 
         return False
 
     if "unavailable_xpath" in item:
-        if len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, item["unavailable_xpath"])) != 0:
+        if page.exists(Xpath(item["unavailable_xpath"]), visible=False):
             item["stock"] = 0
         else:
             item["stock"] = 1
     else:
         item["stock"] = 1
 
-    price_text = driver.find_element(selenium.webdriver.common.by.By.XPATH, item["price_xpath"]).text
+    price_text = _find(page, item["price_xpath"]).text
     try:
         m = re.match(r".*?(\d{1,3}(?:,\d{3})*)", price_text)
         if m is None:
@@ -247,19 +242,12 @@ def _fetch_price_impl(
             raise
 
     if "thumb_url" not in item:
-        if ("thumb_img_xpath" in item) and my_lib.selenium_util.xpath_exists(driver, item["thumb_img_xpath"]):
-            item["thumb_url"] = urllib.parse.urljoin(
-                driver.current_url,
-                driver.find_element(
-                    selenium.webdriver.common.by.By.XPATH, item["thumb_img_xpath"]
-                ).get_attribute("src"),
-            )
-    elif ("thumb_block_xpath" in item) and my_lib.selenium_util.xpath_exists(
-        driver, item["thumb_block_xpath"]
-    ):
-        style_text = driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, item["thumb_block_xpath"]
-        ).get_attribute("style")
+        if ("thumb_img_xpath" in item) and page.exists(Xpath(item["thumb_img_xpath"]), visible=False):
+            src = _find(page, item["thumb_img_xpath"]).attr("src")
+            if src is not None:
+                item["thumb_url"] = urllib.parse.urljoin(page.url, src)
+    elif ("thumb_block_xpath" in item) and page.exists(Xpath(item["thumb_block_xpath"]), visible=False):
+        style_text = _find(page, item["thumb_block_xpath"]).attr("style")
         if style_text is not None:
             m = re.match(
                 r"background-image: url\([\"'](.*)[\"']\)",
@@ -270,13 +258,13 @@ def _fetch_price_impl(
                 if not re.compile(r"^\.\.").search(thumb_url):
                     thumb_url = "/" + thumb_url
 
-                item["thumb_url"] = urllib.parse.urljoin(driver.current_url, thumb_url)
+                item["thumb_url"] = urllib.parse.urljoin(page.url, thumb_url)
 
     return item
 
 
 def fetch_price(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    page: Page,
     item: dict[str, Any],
     loop: int = 0,
     *,
@@ -285,11 +273,11 @@ def fetch_price(
     try:
         logging.info("Check %s", item["name"])
 
-        return _fetch_price_impl(driver, item, loop, dump_path=dump_path)
+        return _fetch_price_impl(page, item, loop, dump_path=dump_path)
     except Exception:
-        logging.exception("Failed to check %s", driver.current_url)
-        my_lib.selenium_util.dump_page(driver, int(random.random() * 100), dump_path)  # noqa: S311
-        my_lib.selenium_util.clean_dump(dump_path)
+        logging.exception("Failed to check %s", page.url)
+        my_lib.browser.helpers.dump_page(page, random.randint(0, 99), dump_path)  # noqa: S311
+        my_lib.browser.helpers.clean_dump(dump_path)
         raise
 
 
@@ -311,7 +299,9 @@ if __name__ == "__main__":
 
     config = my_lib.config.load(config_file)
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(data_path))
+    _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
+    _manager = my_lib.browser.BrowserManager(_profile)
+    _page = _manager.get_page()
 
     item = {
         "name": "Raspberry Pi 5 / 8GB (switch-science)",
@@ -321,4 +311,7 @@ if __name__ == "__main__":
         "unavailable_xpath": '//button[contains(@id, "BIS_trigger") and contains(text(), "入荷通知登録")]',
     }
 
-    logging.info(fetch_price(driver, item, dump_path=pathlib.Path(data_path)))
+    try:
+        logging.info(fetch_price(_page, item, dump_path=pathlib.Path(data_path)))
+    finally:
+        _manager.quit()

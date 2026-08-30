@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import datetime
 import inspect
 import logging
 import pathlib
@@ -38,6 +39,28 @@ def dump_page(page: Page, index: int, dump_path: pathlib.Path, *, prefix: str | 
     logging.info(
         "page dump: %02d from %s in %s line %d", index, caller.function, caller.filename, caller.lineno
     )
+
+
+def clean_dump(dump_path: pathlib.Path, keep_days: int = 1) -> None:
+    """ダンプディレクトリから古いファイルを削除する（バックエンド非依存の FS 操作）。"""
+    if not dump_path.exists():
+        return
+
+    time_threshold = datetime.timedelta(keep_days)
+
+    for item in dump_path.iterdir():
+        if not item.is_file():
+            continue
+        try:
+            time_diff = datetime.datetime.now(datetime.UTC) - datetime.datetime.fromtimestamp(
+                item.stat().st_mtime, datetime.UTC
+            )
+        except FileNotFoundError:
+            # ファイルが別プロセスにより削除された場合（SQLite の一時ファイルなど）
+            continue
+        if time_diff > time_threshold:
+            logging.warning("remove %s [%s day(s) old].", item.absolute(), f"{time_diff.days:,}")
+            item.unlink(missing_ok=True)
 
 
 def title_contains_js(text: str) -> str:
