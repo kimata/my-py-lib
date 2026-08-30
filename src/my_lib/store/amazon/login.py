@@ -2,6 +2,9 @@
 """
 Amazon へのログインをを行います。
 
+ブラウザ操作はバックエンド非依存の my_lib.browser.Page 越しに行う
+（Selenium / Patchright を問わない）。
+
 Usage:
   login.py [-c CONFIG] [-t TARGET] [-D]
 
@@ -18,20 +21,20 @@ import logging
 import pathlib
 import random
 import time
+from typing import TYPE_CHECKING
 
 import PIL.Image
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.wait
 
+import my_lib.browser
+import my_lib.browser.helpers
 import my_lib.notify.slack
-import my_lib.selenium_util
 import my_lib.store.amazon.captcha
 import my_lib.store.captcha
+from my_lib.browser import Xpath
 from my_lib.store.amazon.credentials import AmazonLoginConfig
+
+if TYPE_CHECKING:
+    from my_lib.browser import Element, Page
 
 _LOGIN_URL: str = "https://www.amazon.co.jp/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.co.jp%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=jpflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0"
 
@@ -55,122 +58,115 @@ _503_CONTINUE_LINK_XPATH = '//a[contains(@href, "ref=cs_503_link")]'
 _MAX_ERROR_PAGE_RETRIES = 2
 
 
-def _wait_for_footer(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    *,
-    _retry_count: int = 0,
-) -> None:
+def _find(page: Page, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = page.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
+
+
+def _click_if_present(page: Page, xpath: str) -> bool:
+    """指定 XPath の要素が存在すればクリックする（存在しなければ何もしない）。"""
+    element = page.find(Xpath(xpath))
+    if element is None:
+        return False
+    try:
+        element.click()
+    except my_lib.browser.BrowserError:
+        return False
+    return True
+
+
+def _wait_for_footer(page: Page, *, _retry_count: int = 0) -> None:
     """フッターが表示されるまで待機（エラーページ自動対応付き）
 
     Amazon がボット検出や一時エラーで「ショッピングを続ける」ページを返す場合、
     自動でボタン/リンクをクリックしてリトライする。
     """
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                (selenium.webdriver.common.by.By.XPATH, _FOOTER_XPATH)
-            )
-        )
-    except selenium.common.exceptions.TimeoutException:
+        page.wait_visible(Xpath(_FOOTER_XPATH))
+    except my_lib.browser.WaitTimeoutError:
         if _retry_count >= _MAX_ERROR_PAGE_RETRIES:
             raise
 
         # パターン1: CAPTCHA 検証ページの「ショッピングを続ける」ボタン
-        if my_lib.selenium_util.click_xpath(driver, _CONTINUE_SHOPPING_BUTTON_XPATH, is_warn=False):
-            logging.warning(
-                "CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
-            )
-            return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
+        if _click_if_present(page, _CONTINUE_SHOPPING_BUTTON_XPATH):
+            logging.warning("CAPTCHA 検証ページを検出、「ショッピングを続ける」をクリック: %s", page.url)
+            _wait_for_footer(page, _retry_count=_retry_count + 1)
+            return
 
         # パターン2: 503 エラーページの「ショッピングを続ける」リンク
-        if _503_ERROR_TITLE in driver.title:
-            logging.warning(
-                "503 エラーページを検出、「ショッピングを続ける」をクリック: %s", driver.current_url
-            )
-            my_lib.selenium_util.click_xpath(driver, _503_CONTINUE_LINK_XPATH, is_warn=False)
+        if _503_ERROR_TITLE in page.title:
+            logging.warning("503 エラーページを検出、「ショッピングを続ける」をクリック: %s", page.url)
+            _click_if_present(page, _503_CONTINUE_LINK_XPATH)
             time.sleep(3)
-            return _wait_for_footer(driver, wait, _retry_count=_retry_count + 1)
+            _wait_for_footer(page, _retry_count=_retry_count + 1)
+            return
 
         raise
 
 
 def _resolve_puzzle(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
 ) -> None:
     logging.info("Try to resolve PUZZLE")
 
     my_lib.store.amazon.captcha.resolve(
-        driver,
-        wait,
+        page,
         slack_config,
         {"image": '//img[@alt="captcha"]', "text": '//input[@name="cvf_captcha_input"]'},
     )
 
-    driver.find_element(
-        selenium.webdriver.common.by.By.XPATH, '//input[@name="cvf_captcha_captcha_action"]'
-    ).click()
+    _find(page, '//input[@name="cvf_captcha_captcha_action"]').click()
 
-    _wait_for_footer(driver, wait)
+    _wait_for_footer(page)
     time.sleep(0.1)
 
 
 def _handle_email_input(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    page: Page,
     login_config: AmazonLoginConfig,
 ) -> None:
     """メールアドレス入力処理"""
     email_xpath = '//input[@type="email" and (@id="ap_email_login" or @id="ap_email")]'
-    if my_lib.selenium_util.xpath_exists(driver, email_xpath):
+    if page.exists(Xpath(email_xpath), visible=False):
         logging.debug("Input email")
-        email_input = driver.find_element(selenium.webdriver.common.by.By.XPATH, email_xpath)
+        email_input = _find(page, email_xpath)
         email_input.clear()
-        email_input.send_keys(login_config.user)
+        email_input.type(login_config.user)
 
         logging.debug("Click continue")
-        if my_lib.selenium_util.xpath_exists(driver, '//input[@type="submit"]'):
-            driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@type="submit"]').click()
+        if page.exists(Xpath('//input[@type="submit"]'), visible=False):
+            _find(page, '//input[@type="submit"]').click()
             time.sleep(3)
 
 
 def _handle_password_input(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     login_config: AmazonLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
 ) -> None:
     """パスワード入力処理"""
-    if not my_lib.selenium_util.xpath_exists(driver, '//input[@id="ap_password"]'):
+    if not page.exists(Xpath('//input[@id="ap_password"]'), visible=False):
         return
 
     logging.debug("Input password")
-    pass_input = wait.until(
-        selenium.webdriver.support.expected_conditions.element_to_be_clickable(
-            (selenium.webdriver.common.by.By.XPATH, '//input[@id="ap_password"]')
-        )
-    )
-    driver.execute_script(
-        "arguments[0].value = arguments[1];",
-        pass_input,
-        login_config.password,
-    )
+    pass_input = page.wait_clickable(Xpath('//input[@id="ap_password"]'))
+    pass_input.evaluate("(el, value) => { el.value = value; }", login_config.password)
 
-    if my_lib.selenium_util.xpath_exists(driver, '//input[@name="rememberMe"]'):
-        remember_checkbox = driver.find_element(
-            selenium.webdriver.common.by.By.XPATH, '//input[@name="rememberMe"]'
-        )
-        if not remember_checkbox.get_attribute("checked"):
+    if page.exists(Xpath('//input[@name="rememberMe"]'), visible=False):
+        remember_checkbox = _find(page, '//input[@name="rememberMe"]')
+        if not remember_checkbox.evaluate("el => el.checked"):
             logging.debug("Check remember")
             remember_checkbox.click()
 
-    if my_lib.selenium_util.xpath_exists(driver, '//input[@id="auth-captcha-guess"]'):
+    if page.exists(Xpath('//input[@id="auth-captcha-guess"]'), visible=False):
         if slack_config is None:
             raise ValueError("captcha 設定がありません")
         my_lib.store.amazon.captcha.resolve(
-            driver,
-            wait,
+            page,
             slack_config,
             {
                 "image": '//img[@id="auth-captcha-image"]',
@@ -181,30 +177,23 @@ def _handle_password_input(
     time.sleep(0.1)
 
     logging.debug("Click submit")
-    submit_button = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="signInSubmit"]')
-    driver.execute_script("arguments[0].click();", submit_button)
+    _find(page, '//input[@id="signInSubmit"]').click()
 
-    _wait_for_footer(driver, wait)
+    _wait_for_footer(page)
 
 
 def _handle_quiz(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
+    page: Page,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     dump_path: pathlib.Path,
 ) -> None:
-    if not my_lib.selenium_util.xpath_exists(driver, '//h1[contains(normalize-space(.), "クイズ")]'):
+    if not page.exists(Xpath('//h1[contains(normalize-space(.), "クイズ")]'), visible=False):
         return
 
     file_id = my_lib.store.captcha.send_challenge_image_slack(
         slack_config,
         "Amazon Login",
-        PIL.Image.open(
-            io.BytesIO(
-                driver.find_element(
-                    selenium.webdriver.common.by.By.XPATH, '//div[contains(@class, "amzn-captcha-modal")]'
-                ).screenshot_as_png
-            )
-        ),
+        PIL.Image.open(io.BytesIO(_find(page, '//div[contains(@class, "amzn-captcha-modal")]').screenshot())),
         "画像クイズ",
     )
 
@@ -218,38 +207,34 @@ def _handle_quiz(
     digits = [int(ch) for ch in captcha if ch.isdigit()]
     for digit in digits:
         xpath = f'//canvas/button[normalize-space(text())="{digit}"]'
-        button = driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath)
-        button.click()
+        _find(page, xpath).click()
         time.sleep(0.2)
 
-    my_lib.selenium_util.dump_page(
-        driver,
-        int(random.random() * 100),  # noqa: S311
+    my_lib.browser.helpers.dump_page(
+        page,
+        random.randint(0, 99),  # noqa: S311
         dump_path,
     )
 
-    driver.find_element(
-        selenium.webdriver.common.by.By.XPATH, '//button[@id="amzn-btn-verify-internal"]'
-    ).click()
+    _find(page, '//button[@id="amzn-btn-verify-internal"]').click()
     time.sleep(2)
 
 
 def _handle_phone_verification(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     dump_path: pathlib.Path,
 ) -> None:
     """携帯電話番号確認画面の処理（SMS認証）"""
     phone_verify_xpath = '//h1[contains(., "携帯電話番号を確認する")]'
-    if not my_lib.selenium_util.xpath_exists(driver, phone_verify_xpath):
+    if not page.exists(Xpath(phone_verify_xpath), visible=False):
         return
 
     logging.info("SMS認証が要求されました。")
 
-    my_lib.selenium_util.dump_page(
-        driver,
-        int(random.random() * 100),  # noqa: S311
+    my_lib.browser.helpers.dump_page(
+        page,
+        random.randint(0, 99),  # noqa: S311
         dump_path,
     )
 
@@ -267,22 +252,18 @@ def _handle_phone_verification(
         raise RuntimeError("Failed to receive authentication code")
 
     logging.info("認証番号を入力します。")
-    code_input = driver.find_element(selenium.webdriver.common.by.By.XPATH, '//input[@id="cvf-input-code"]')
-    code_input.send_keys(code)
+    _find(page, '//input[@id="cvf-input-code"]').type(code)
 
     logging.info("「携帯電話番号を確認する」ボタンをクリックします。")
-    submit_button = driver.find_element(
-        selenium.webdriver.common.by.By.XPATH, '//span[@id="cvf-submit-otp-button"]//input[@type="submit"]'
-    )
-    submit_button.click()
+    _find(page, '//span[@id="cvf-submit-otp-button"]//input[@type="submit"]').click()
 
     time.sleep(0.5)
 
-    _wait_for_footer(driver, wait)
+    _wait_for_footer(page)
 
-    my_lib.selenium_util.dump_page(
-        driver,
-        int(random.random() * 100),  # noqa: S311
+    my_lib.browser.helpers.dump_page(
+        page,
+        random.randint(0, 99),  # noqa: S311
         dump_path,
     )
 
@@ -297,34 +278,32 @@ def _handle_phone_verification(
 
 
 def _execute_impl(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     login_config: AmazonLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     login_mark_xpath: str,
 ) -> None:
-    _wait_for_footer(driver, wait)
+    _wait_for_footer(page)
 
-    if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
+    if page.exists(Xpath(login_mark_xpath), visible=False):
         logging.info("Login succeeded")
         return
 
-    if my_lib.selenium_util.xpath_exists(driver, '//input[@name="cvf_captcha_input"]'):
-        _resolve_puzzle(driver, wait, slack_config)
+    if page.exists(Xpath('//input[@name="cvf_captcha_input"]'), visible=False):
+        _resolve_puzzle(page, slack_config)
 
-    _handle_email_input(driver, login_config)
-    _handle_password_input(driver, wait, login_config, slack_config)
+    _handle_email_input(page, login_config)
+    _handle_password_input(page, login_config, slack_config)
 
-    _handle_quiz(driver, slack_config, login_config.dump_path)
-    _handle_phone_verification(driver, wait, slack_config, login_config.dump_path)
+    _handle_quiz(page, slack_config, login_config.dump_path)
+    _handle_phone_verification(page, slack_config, login_config.dump_path)
 
-    _wait_for_footer(driver, wait)
+    _wait_for_footer(page)
     time.sleep(0.1)
 
 
 def execute(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     login_config: AmazonLoginConfig,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     login_url: str = _LOGIN_URL,
@@ -333,21 +312,21 @@ def execute(
 ) -> bool:
     logging.info("Login start")
 
-    driver.get(login_url)
+    page.goto(login_url)
 
     for i in range(retry):
-        _execute_impl(driver, wait, login_config, slack_config, login_mark_xpath)
+        _execute_impl(page, login_config, slack_config, login_mark_xpath)
 
-        if my_lib.selenium_util.xpath_exists(driver, login_mark_xpath):
+        if page.exists(Xpath(login_mark_xpath), visible=False):
             logging.info("Login sccessful!")
             return True
 
         if i != (retry - 1):
             logging.warning("Login retry")
 
-            my_lib.selenium_util.dump_page(
-                driver,
-                int(random.random() * 100),  # noqa: S311
+            my_lib.browser.helpers.dump_page(
+                page,
+                random.randint(0, 99),  # noqa: S311
                 login_config.dump_path,
             )
 
@@ -369,7 +348,6 @@ if __name__ == "__main__":
     args = docopt.docopt(__doc__)
 
     config_file = args["-c"]
-    target_file = args["-t"]
     debug_mode = args["-D"]
 
     my_lib.logger.init("test", level=logging.DEBUG if debug_mode else logging.INFO)
@@ -377,8 +355,9 @@ if __name__ == "__main__":
     config: dict[str, Any] = my_lib.config.load(config_file)
     login_config = AmazonLoginConfig.parse(config["store"]["amazon"], pathlib.Path(config["data"]["dump"]))
 
-    driver = my_lib.selenium_util.create_driver("Test", pathlib.Path(config["data"]["selenium"]))
-    wait = selenium.webdriver.support.wait.WebDriverWait(driver, 5)
+    profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(config["data"]["selenium"]))
+    manager = my_lib.browser.BrowserManager(profile)
+    page = manager.get_page()
 
     if "slack" not in config:
         raise ValueError("slack 設定がありません")
@@ -391,14 +370,14 @@ if __name__ == "__main__":
     slack_config: my_lib.notify.slack.HasCaptchaConfig = slack_config_parsed
 
     try:
-        execute(driver, wait, login_config, slack_config)
+        execute(page, login_config, slack_config)
     except Exception:
-        logging.exception("URL: %s", driver.current_url)
+        logging.exception("URL: %s", page.url)
 
-        my_lib.selenium_util.dump_page(
-            driver,
-            int(random.random() * 100),  # noqa: S311
+        my_lib.browser.helpers.dump_page(
+            page,
+            random.randint(0, 99),  # noqa: S311
             login_config.dump_path,
         )
 
-    driver.quit()
+    manager.quit()

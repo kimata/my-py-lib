@@ -3,32 +3,35 @@
 from __future__ import annotations
 
 import io
+from typing import TYPE_CHECKING
 
 import PIL.Image
-import selenium.webdriver.common.by
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.wait
 
 import my_lib.notify.slack
 import my_lib.store.captcha
+from my_lib.browser import Xpath
+
+if TYPE_CHECKING:
+    from my_lib.browser import Element, Page
+
+
+def _find(page: Page, xpath: str) -> Element:
+    """要素を 1 つ取得する（存在しなければ例外）。"""
+    element = page.find(Xpath(xpath))
+    if element is None:
+        raise RuntimeError(f"要素が見つかりません: {xpath}")
+    return element
 
 
 def resolve(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     slack_config: my_lib.notify.slack.HasCaptchaConfig,
     xpath: dict[str, str],
 ) -> None:
     file_id = my_lib.store.captcha.send_challenge_image_slack(
         slack_config,
         "Amazon Login",
-        PIL.Image.open(
-            io.BytesIO(
-                driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath["image"]).screenshot_as_png
-            )
-        ),
+        PIL.Image.open(io.BytesIO(_find(page, xpath["image"]).screenshot())),
         "画像 CAPTCHA",
     )
 
@@ -39,4 +42,4 @@ def resolve(
     if captcha is None:
         raise RuntimeError("CAPTCHA を解決できませんでした。")
 
-    driver.find_element(selenium.webdriver.common.by.By.XPATH, xpath["text"]).send_keys(captcha)
+    _find(page, xpath["text"]).type(captcha)
