@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import my_lib.selenium_util
 from my_lib.browser.backends.selenium.maintenance import SeleniumMaintenance
 from my_lib.browser.backends.selenium.page import SeleniumPage
+from my_lib.browser.exceptions import BrowserError
 from my_lib.browser.types import BrowserProfile
 
 if TYPE_CHECKING:
@@ -65,10 +66,14 @@ class SeleniumBrowser:
 
 def launch(profile: BrowserProfile) -> SeleniumBrowser:
     """既存 create_driver で Selenium ドライバを生成して Browser を返す。"""
-    driver = my_lib.selenium_util.create_driver(
-        profile.name,
-        profile.data_dir,
-        is_headless=profile.headless,
-        stealth_mode=profile.stealth,
-    )
+    try:
+        driver = my_lib.selenium_util.create_driver(
+            profile.name,
+            profile.data_dir,
+            is_headless=profile.headless,
+            stealth_mode=profile.stealth,
+        )
+    except Exception as e:
+        # NOTE: 起動失敗を BrowserError に正規化する。
+        raise BrowserError(str(e)) from e
     return SeleniumBrowser(driver)

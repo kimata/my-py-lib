@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from my_lib.browser.backends.patchright.maintenance import PatchrightMaintenance
 from my_lib.browser.backends.patchright.page import PatchrightPage
+from my_lib.browser.exceptions import BrowserError
 from my_lib.browser.types import BrowserProfile
 
 if TYPE_CHECKING:
@@ -88,5 +89,15 @@ def launch(profile: BrowserProfile) -> PatchrightBrowser:
         launch_kwargs["user_agent"] = profile.user_agent
 
     logging.info("Launching Patchright (headless=%s, profile=%s)", profile.headless, profile.name)
-    context = playwright.chromium.launch_persistent_context(**launch_kwargs)
+    try:
+        context = playwright.chromium.launch_persistent_context(**launch_kwargs)
+    except Exception as e:
+        # NOTE: 起動失敗（XServer 無し等）を BrowserError に正規化して原因を明示する。
+        #       headful なのに X ディスプレイが無い場合は xvfb-run 経由での実行が必要。
+        with contextlib.suppress(Exception):
+            playwright.stop()
+        message = str(e)
+        if not profile.headless and "XServer" in message:
+            message += "（headful 起動には X ディスプレイが必要です。xvfb-run 経由で実行してください）"
+        raise BrowserError(message) from e
     return PatchrightBrowser(playwright, context, profile)
