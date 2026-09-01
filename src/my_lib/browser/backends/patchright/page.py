@@ -61,6 +61,16 @@ class PatchrightPage:
             return False
         return loc.first.is_visible() if visible else True
 
+    def wait_present(self, locator: Locator, *, timeout: float = 30.0) -> PatchrightElement:
+        # NOTE: state="attached" は DOM 存在のみを待つ（可視不問）。
+        #       Selenium の presence_of_element_located 相当。
+        loc = self._page.locator(_to_selector(locator, relative=False)).first
+        try:
+            loc.wait_for(state="attached", timeout=timeout * 1000)
+        except Exception as e:
+            raise WaitTimeoutError(str(e)) from e
+        return PatchrightElement(loc)
+
     def wait_visible(self, locator: Locator, *, timeout: float = 30.0) -> PatchrightElement:
         loc = self._page.locator(_to_selector(locator, relative=False)).first
         try:

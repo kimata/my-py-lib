@@ -70,6 +70,7 @@ dev = [
     "pytest-forked>=1.6.0",
     "pytest-rerunfailures>=16.1",
     "undetected-chromedriver>=3.5.5",
+    "patchright>=1.62.0",
 ]
 
 [tool.hatch.build.targets.wheel]

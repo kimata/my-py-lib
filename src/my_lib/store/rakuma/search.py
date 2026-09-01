@@ -56,14 +56,6 @@ _SEARCH_KEYWORD: str = "ラクマ"
 _ITEM_LIST_XPATH: str = '//div[contains(@class, "item-box")]'
 
 
-def _find(scope: Page | Element, xpath: str) -> Element:
-    """要素を 1 つ取得する（存在しなければ例外）。"""
-    element = scope.find(Xpath(xpath))
-    if element is None:
-        raise RuntimeError(f"要素が見つかりません: {xpath}")
-    return element
-
-
 def warmup(page: Page) -> bool:
     """Google検索経由でラクマにアクセスしてウォームアップする
 
@@ -167,7 +159,9 @@ def _wait_for_search_results(page: Page) -> bool:
 
     """
     try:
-        page.wait_visible(Xpath('//div[contains(@class, "content")]'))
+        # NOTE: content コンテナは DOM には存在するが非可視のことがあるため
+        #       presence（存在）で待つ。可視待ちだと検索結果があっても誤タイムアウトする。
+        page.wait_present(Xpath('//div[contains(@class, "content")]'))
     except my_lib.browser.WaitTimeoutError:
         logging.warning("[Rakuma] 読み込みタイムアウト")
         raise

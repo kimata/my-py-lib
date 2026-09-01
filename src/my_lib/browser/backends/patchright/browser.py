@@ -18,6 +18,7 @@ from my_lib.browser.types import BrowserProfile
 
 if TYPE_CHECKING:
     from patchright.sync_api import BrowserContext as PwContext
+    from patchright.sync_api import Page as PwPage
 
 
 class PatchrightBrowser:
@@ -29,18 +30,48 @@ class PatchrightBrowser:
         self._profile = profile
         pages = context.pages
         pw_page = pages[0] if pages else context.new_page()
+        self._apply_stealth_ua(pw_page)
         self._default_page = PatchrightPage(pw_page)
+
+    def _apply_stealth_ua(self, pw_page: PwPage) -> None:
+        """headless 時に UA から "HeadlessChrome" 痕跡を除去する。
+
+        Patchright は headless で navigator.userAgent に "HeadlessChrome" を残す。
+        ヨドバシ等の anti-bot はこれを検知して接続を拒否する（ERR_HTTP2_PROTOCOL_ERROR）。
+        明示 UA 未指定のページ生成ごとに CDP で "HeadlessChrome"→"Chrome" 補正した UA を
+        適用する（ページ生成経路が限られるため context の page イベントに頼らず明示的に呼ぶ）。
+        headful では UA に痕跡が無いため no-op。
+        """
+        if self._profile.user_agent is not None:
+            # 明示指定 UA は launch 時に context 全体へ適用済み。
+            return
+        try:
+            ua = pw_page.evaluate("() => navigator.userAgent")
+        except Exception:
+            logging.debug("Failed to read UA for stealth override")
+            return
+        if not isinstance(ua, str) or "HeadlessChrome" not in ua:
+            return
+        modified = ua.replace("HeadlessChrome", "Chrome")
+        try:
+            cdp = self._context.new_cdp_session(pw_page)
+            cdp.send("Network.setUserAgentOverride", {"userAgent": modified})
+        except Exception:
+            logging.debug("Failed to override UA via CDP")
 
     @property
     def default_page(self) -> PatchrightPage:
         return self._default_page
 
     def new_page(self) -> PatchrightPage:
-        return PatchrightPage(self._context.new_page())
+        pw_page = self._context.new_page()
+        self._apply_stealth_ua(pw_page)
+        return PatchrightPage(pw_page)
 
     @contextlib.contextmanager
     def tab(self, url: str) -> Iterator[PatchrightPage]:
         pw_page = self._context.new_page()
+        self._apply_stealth_ua(pw_page)
         page = PatchrightPage(pw_page)
         try:
             page.goto(url)

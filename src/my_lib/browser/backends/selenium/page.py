@@ -48,6 +48,14 @@ class _SeleniumScope:
             return False
         return found[0].is_displayed() if visible else True
 
+    def wait_present(self, locator: Locator, *, timeout: float = 30.0) -> SeleniumElement:
+        by, value = _by_and_value(locator, relative=False)
+        try:
+            el = _wait(self._driver, timeout).until(ec.presence_of_element_located((by, value)))
+        except selenium.common.exceptions.TimeoutException as e:
+            raise WaitTimeoutError(str(e)) from e
+        return SeleniumElement(self._driver, el)
+
     def wait_visible(self, locator: Locator, *, timeout: float = 30.0) -> SeleniumElement:
         by, value = _by_and_value(locator, relative=False)
         try:
