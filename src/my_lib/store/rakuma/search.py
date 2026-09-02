@@ -53,7 +53,9 @@ _SEARCH_BASE_URL: str = "https://fril.jp/s"
 _TARGET_DOMAIN: str = "fril.jp"
 _SEARCH_KEYWORD: str = "ラクマ"
 # 商品リストのアイテム要素
-_ITEM_LIST_XPATH: str = '//div[contains(@class, "item-box")]'
+# NOTE: contains(@class, "item-box") だと item-box__image-wrapper 等の内側の div にも
+#       一致して要素数が 6 倍になり、解析失敗と無駄な走査が増えるため class 単語で厳密一致させる。
+_ITEM_LIST_XPATH: str = '//div[contains(concat(" ", normalize-space(@class), " "), " item-box ")]'
 
 
 def warmup(page: Page) -> bool:

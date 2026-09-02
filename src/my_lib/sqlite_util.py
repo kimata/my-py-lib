@@ -20,6 +20,7 @@ import logging
 import os
 import pathlib
 import sqlite3
+import struct
 import threading
 import time
 from dataclasses import dataclass
@@ -117,10 +118,10 @@ def init_connection(
 def mark_cleanup_done(db_path: pathlib.Path | str) -> None:
     """指定した DB を、このプロセスで WAL/SHM クリーンアップ実施済みとして登録する
 
-    cleanup_stale_files はプロセスごとの初回接続時に WAL/SHM を削除するが、
-    親プロセスが使用中の DB に短命なサブプロセスから接続する場合、その削除は
-    使用中のライブ WAL を消してデータ喪失や DB 破損を引き起こし得る。
-    そのようなプロセスでは、最初の接続前にこの関数を呼んで削除を抑止する。
+    cleanup_stale_files はプロセスごとの初回接続時に、他プロセスが使用していない
+    残存 SHM を削除する。使用中かどうかは -shm 上のロックで判定するが、
+    判定に頼らず確実に削除を抑止したいプロセス（親プロセスが使用中の DB に
+    接続する短命なサブプロセス等）では、最初の接続前にこの関数を呼ぶ。
 
     Args:
         db_path: データベースファイルのパス
@@ -131,16 +132,57 @@ def mark_cleanup_done(db_path: pathlib.Path | str) -> None:
         _cleaned_up_paths.add(resolved_path)
 
 
+# SQLite（unix VFS）が WAL インデックス（-shm）上で接続ごとに SHARED ロックを保持する
+# バイト位置（DMS: dead-man switch = UNIX_SHM_BASE(120) + SQLITE_SHM_NLOCK(8)）。
+# ここに他プロセスのロックがあれば、その DB は使用中である。
+_SHM_DMS_LOCK_OFFSET = 128
+# struct flock: l_type, l_whence, l_start, l_len, l_pid（64bit Linux / LFS 有効時の配置）
+_FLOCK_STRUCT_FORMAT = "hhqqi"
+
+
+def is_shm_in_use_by_other_process(shm_path: pathlib.Path) -> bool | None:
+    """-shm ファイルを他プロセスが使用中か（DMS ロックを保持しているか）を判定する
+
+    F_GETLK は自プロセスのロックを報告しないため、同一プロセス内の重複接続は
+    cleanup_stale_files の「プロセスごとに 1 回」の仕組みで防ぐ。
+
+    Args:
+        shm_path: -shm ファイルのパス
+
+    Returns:
+        True: 他プロセスが使用中、False: 未使用、None: 判定不能
+    """
+    try:
+        with shm_path.open("rb") as shm_file:
+            request = struct.pack(
+                _FLOCK_STRUCT_FORMAT, fcntl.F_WRLCK, os.SEEK_SET, _SHM_DMS_LOCK_OFFSET, 1, 0
+            )
+            result = fcntl.fcntl(shm_file.fileno(), fcntl.F_GETLK, request)
+            lock_type = struct.unpack(_FLOCK_STRUCT_FORMAT, result[: struct.calcsize(_FLOCK_STRUCT_FORMAT)])[
+                0
+            ]
+            return lock_type != fcntl.F_UNLCK
+    except (OSError, struct.error) as e:
+        logging.warning("SHM ファイルの使用状況を判定できません: %s (%s)", shm_path, e)
+        return None
+
+
 def cleanup_stale_files(db_path: pathlib.Path) -> None:
     """
-    CephFS/NFS環境で残存するWAL/SHMファイルを削除する
+    CephFS/NFS環境で残存する SHM ファイルを削除する
 
-    Podクラッシュ後などにこれらのファイルが残っていると
-    「locking protocol」エラーが発生するため、接続前に削除する。
+    Podクラッシュ後などに -shm が残っていると「locking protocol」エラーが
+    発生するため、接続前に削除する。ただし削除するのは、他のプロセスが
+    その DB を使用していない（-shm 上の DMS ロックを誰も保持していない）場合のみ。
+    稼働中プロセスの -shm を消すと、そのプロセスと新しい接続が別々の WAL
+    インデックスを持つことになり DB を破損させる。
+
+    -wal はコミット済みデータを含み、SQLite が次回オープン時に自動で復旧
+    （再生）するため削除しない。
 
     注意: 同一プロセス内では同じ DB パスに対して1回だけクリーンアップを実行する。
     これにより、複数スレッドが同時に接続する場合（例: ワーカースレッドと API ハンドラ）に
-    アクティブな接続の WAL ファイルを削除してしまう問題を防ぐ。
+    アクティブな接続の SHM ファイルを削除してしまう問題を防ぐ。
 
     Args:
         db_path: データベースファイルのパス
@@ -151,18 +193,23 @@ def cleanup_stale_files(db_path: pathlib.Path) -> None:
         if resolved_path in _cleaned_up_paths:
             logging.debug("既にクリーンアップ済み: %s", db_path)
             return
-
-        wal_path = db_path.with_suffix(db_path.suffix + "-wal")
-        shm_path = db_path.with_suffix(db_path.suffix + "-shm")
-
-        if wal_path.exists() or shm_path.exists():
-            logging.warning("残存するWAL/SHMファイルを削除します: %s", db_path)
-            with contextlib.suppress(Exception):
-                wal_path.unlink(missing_ok=True)
-            with contextlib.suppress(Exception):
-                shm_path.unlink(missing_ok=True)
-
         _cleaned_up_paths.add(resolved_path)
+
+        shm_path = db_path.with_suffix(db_path.suffix + "-shm")
+        if not shm_path.exists():
+            return
+
+        in_use = is_shm_in_use_by_other_process(shm_path)
+        if in_use is None:
+            logging.warning("使用状況を判定できないため SHM ファイルの削除をスキップします: %s", db_path)
+            return
+        if in_use:
+            logging.info("他プロセスが使用中のため SHM ファイルの削除をスキップします: %s", db_path)
+            return
+
+        logging.warning("残存する SHM ファイルを削除します: %s", shm_path)
+        with contextlib.suppress(OSError):
+            shm_path.unlink(missing_ok=True)
 
 
 class DatabaseConnection:

@@ -46,14 +46,13 @@ class PatchrightPage:
         return self._page.content()
 
     def find(self, locator: Locator) -> PatchrightElement | None:
-        loc = self._page.locator(_to_selector(locator, relative=False))
-        if loc.count() == 0:
-            return None
-        return PatchrightElement(loc.first)
+        # NOTE: find / find_all は ElementHandle で返す（理由は element.py 冒頭の NOTE 参照）。
+        found = self._page.query_selector(_to_selector(locator, relative=False))
+        return PatchrightElement(found) if found is not None else None
 
     def find_all(self, locator: Locator) -> list[PatchrightElement]:
-        loc = self._page.locator(_to_selector(locator, relative=False))
-        return [PatchrightElement(loc.nth(i)) for i in range(loc.count())]
+        handles = self._page.query_selector_all(_to_selector(locator, relative=False))
+        return [PatchrightElement(h) for h in handles]
 
     def exists(self, locator: Locator, *, visible: bool = True) -> bool:
         loc = self._page.locator(_to_selector(locator, relative=False))

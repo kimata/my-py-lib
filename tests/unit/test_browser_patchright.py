@@ -3,6 +3,7 @@
 """my_lib.browser.backends.patchright.browser のユニットテスト"""
 
 import pathlib
+import time
 import unittest.mock
 
 import pytest
@@ -203,3 +204,90 @@ class TestWaitVisible:
                 assert element.attr("id") == "navFooter"
             finally:
                 browser.close()
+
+
+class TestElementHandleFind:
+    """find / find_all が ElementHandle ベースで動作するテスト（実ブラウザ・headless）
+
+    Locator ベースだと操作ごとにセレクタ再評価とオートウェイトが入り、検索結果一覧の
+    走査（ラクマ 20 件）に 535 秒かかっていた。ElementHandle なら数秒で済む。
+    """
+
+    @pytest.fixture
+    def pw_page(self):
+        from patchright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True, channel="chrome", args=["--no-sandbox"])
+            try:
+                yield browser.new_page()
+            finally:
+                browser.close()
+
+    def test_find_all_parses_many_items_quickly(self, pw_page):
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        items = "".join(
+            f'<div class="item"><a href="/item/{i}">title{i}</a>'
+            f'<span data-price="{i * 100}">¥{i * 100:,}</span></div>'
+            for i in range(200)
+        )
+        pw_page.set_content(f"<html><body>{items}</body></html>")
+        page = PatchrightPage(pw_page)
+
+        start = time.monotonic()
+        elements = page.find_all(Xpath('//div[@class="item"]'))
+        parsed = []
+        for element in elements:
+            link = element.find(Xpath(".//a"))
+            assert link is not None
+            spans = element.find_all(Xpath(".//span[@data-price]"))
+            parsed.append((link.attr("href"), spans[0].attr("data-price"), link.text))
+        elapsed = time.monotonic() - start
+
+        assert len(parsed) == 200
+        assert parsed[1][0] is not None and parsed[1][0].endswith("/item/1")
+        assert parsed[1][1:] == ("100", "title1")
+        # Locator ベースでは 1 要素あたり数秒かかる（200 要素で数百秒）
+        assert elapsed < 30
+
+    def test_find_returns_none_when_absent(self, pw_page):
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        pw_page.set_content('<div id="root"><p>hello</p></div>')
+        page = PatchrightPage(pw_page)
+
+        assert page.find(Xpath('//div[@id="none"]')) is None
+        root = page.find(Xpath('//div[@id="root"]'))
+        assert root is not None
+        assert root.find(Xpath(".//span")) is None
+        assert root.find_all(Xpath(".//span")) == []
+
+    def test_scroll_into_view_on_hidden_element_does_not_wait(self, pw_page):
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        pw_page.set_content('<div id="hidden" style="display:none">x</div>')
+        page = PatchrightPage(pw_page)
+        element = page.find(Xpath('//div[@id="hidden"]'))
+        assert element is not None
+
+        start = time.monotonic()
+        element.scroll_into_view()
+        # scroll_into_view_if_needed だと非可視要素で 30 秒待ってタイムアウトする
+        assert time.monotonic() - start < 5
+
+    def test_locator_based_element_supports_find_all(self, pw_page):
+        """wait_* が返す Locator ベースの要素でも find / find_all が使える"""
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        pw_page.set_content('<ul id="list"><li>a</li><li>b</li></ul>')
+        page = PatchrightPage(pw_page)
+        container = page.wait_visible(Xpath('//ul[@id="list"]'))
+
+        assert [e.text for e in container.find_all(Xpath(".//li"))] == ["a", "b"]
+        first = container.find(Xpath(".//li"))
+        assert first is not None and first.text == "a"

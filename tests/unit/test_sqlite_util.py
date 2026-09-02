@@ -553,15 +553,98 @@ class TestMarkCleanupDone:
         assert wal_path.exists()
         assert shm_path.exists()
 
-    def test_cleanup_removes_wal_without_mark(self, temp_dir):
-        """mark_cleanup_done を呼んでいない DB は WAL/SHM が削除されること"""
+    def test_cleanup_removes_stale_shm_and_keeps_wal(self, temp_dir):
+        """誰も使っていない残存 SHM は削除し、コミット済みデータを含む WAL は残すこと"""
         import my_lib.sqlite_util
 
         db_path = temp_dir / "test_no_mark.db"
         db_path.touch()
         wal_path = temp_dir / "test_no_mark.db-wal"
         wal_path.touch()
+        shm_path = temp_dir / "test_no_mark.db-shm"
+        shm_path.touch()
 
         my_lib.sqlite_util.cleanup_stale_files(db_path)
 
-        assert not wal_path.exists()
+        assert wal_path.exists()
+        assert not shm_path.exists()
+
+
+def _start_db_holder(db_path, *, wait_for_stdin: bool):
+    """別プロセスで DB 接続を開いたまま保持する（DMS ロックを持つ）"""
+    import subprocess
+    import sys
+
+    tail = "sys.stdin.readline()" if wait_for_stdin else "time.sleep(60)"
+    code = (
+        "import sqlite3, sys, time; "
+        f"c = sqlite3.connect({str(db_path)!r}); c.execute('PRAGMA user_version').fetchall(); "
+        f"print('ready', flush=True); {tail}"
+    )
+    proc = subprocess.Popen(  # noqa: S603
+        [sys.executable, "-c", code], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True
+    )
+    assert proc.stdout is not None
+    assert proc.stdout.readline().strip() == "ready"
+    return proc
+
+
+def _create_wal_db(db_path):
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE t (x INTEGER)")
+    conn.execute("INSERT INTO t VALUES (1)")
+    conn.commit()
+    conn.close()
+
+
+class TestCleanupStaleFilesInUse:
+    """稼働中の DB の SHM を消さないこと（healthz プローブ等の別プロセスから接続するケース）"""
+
+    def test_cleanup_skips_shm_in_use_by_other_process(self, temp_dir):
+        import my_lib.sqlite_util
+
+        db_path = temp_dir / "test_in_use.db"
+        _create_wal_db(db_path)
+        shm_path = temp_dir / "test_in_use.db-shm"
+
+        holder = _start_db_holder(db_path, wait_for_stdin=True)
+        try:
+            assert shm_path.exists()
+            assert my_lib.sqlite_util.is_shm_in_use_by_other_process(shm_path) is True
+
+            my_lib.sqlite_util.cleanup_stale_files(db_path)
+
+            assert shm_path.exists()
+        finally:
+            assert holder.stdin is not None
+            holder.stdin.write("\n")
+            holder.stdin.flush()
+            holder.wait(timeout=10)
+
+    def test_cleanup_removes_shm_left_by_killed_process(self, temp_dir):
+        import my_lib.sqlite_util
+
+        db_path = temp_dir / "test_killed.db"
+        _create_wal_db(db_path)
+        shm_path = temp_dir / "test_killed.db-shm"
+
+        holder = _start_db_holder(db_path, wait_for_stdin=False)
+        holder.kill()
+        holder.wait(timeout=10)
+
+        # SIGKILL された接続は SHM を片付けられない
+        assert shm_path.exists()
+        assert my_lib.sqlite_util.is_shm_in_use_by_other_process(shm_path) is False
+
+        my_lib.sqlite_util.cleanup_stale_files(db_path)
+
+        assert not shm_path.exists()
+        # 掃除後も DB は正常に開ける
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        assert conn.execute("SELECT COUNT(*) FROM t").fetchone()[0] == 1
+        conn.close()
