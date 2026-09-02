@@ -328,6 +328,10 @@ def error(
 
     thread_ts = _split_send(config.bot_token, config.error.channel.name, title, message, formatter)
 
+    # 分割される長さのエラーは全文をテキストファイルでも添付する
+    if thread_ts is not None and len(message.splitlines()) > _LINE_SPLIT:
+        _attach_error_text(config, message, thread_ts)
+
     # NOTE: 送信に成功した場合のみレート制限を発動させる。
     # 失敗時にも発動させると「一度きり」の通知が恒久的に失われる。
     if thread_ts is not None:
@@ -365,6 +369,10 @@ def error_with_image(
             raise ValueError("error channel id is not configured")
 
         _upload_image(config.bot_token, ch_id, title, attach_img.data, attach_img.text, thread_ts)
+
+    # 分割される長さのエラーは、スクリーンショットに加えて全文もテキストファイルで添付する
+    if thread_ts is not None and len(message.splitlines()) > _LINE_SPLIT:
+        _attach_error_text(config, message, thread_ts)
 
     # NOTE: 送信に成功した場合のみレート制限を発動させる (error() と同様)
     if thread_ts is not None:
@@ -427,6 +435,32 @@ def notify_error_with_page(
             _attach_page_source_gzip(config, ch_id, page_source, thread_ts)
 
     return thread_ts
+
+
+def _attach_error_text(
+    config: HasErrorConfig,
+    message: str,
+    thread_ts: str,
+) -> None:
+    """分割送信されたエラーの全文をテキストファイルとしてスレッドに添付する
+
+    分割送信は途中のメッセージが流れたり欠けたりして全文を追いにくいため、
+    複数に分割される長さのエラーは全文を 1 ファイルで添付する。
+    """
+    ch_id = config.error.channel.id
+    if ch_id is None:
+        logging.debug("error channel id is not configured; skip attaching error text")
+        return
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w", encoding="utf-8") as tmp:
+            tmp.write(message)
+            tmp_path = pathlib.Path(tmp.name)
+
+        _upload_file(config.bot_token, ch_id, tmp_path, "error.txt", None, thread_ts)
+
+        tmp_path.unlink()
+    except Exception:
+        logging.debug("Failed to attach error text")
 
 
 def _attach_page_source_gzip(
@@ -610,6 +644,10 @@ def _update(
         return None
 
 
+# 1通あたりの最大行数。超えた分はスレッドへ分割送信される
+_LINE_SPLIT = 20
+
+
 def _split_send(
     token: str,
     ch_name: str,
@@ -617,7 +655,7 @@ def _split_send(
     message: str,
     formatter: Callable[[str, str], FormattedMessage] = format_simple,
 ) -> str | None:
-    LINE_SPLIT = 20
+    LINE_SPLIT = _LINE_SPLIT
 
     logging.info("Post slack channel: %s", ch_name)
 

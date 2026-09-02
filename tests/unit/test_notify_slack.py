@@ -283,6 +283,107 @@ class TestError:
         assert "test message" in hist
 
 
+class TestErrorTextAttachment:
+    """分割される長さのエラーで全文テキストが添付されるテスト"""
+
+    def _make_config(self):
+        from my_lib.notify.slack import (
+            SlackChannelConfig,
+            SlackErrorConfig,
+            SlackErrorOnlyConfig,
+        )
+
+        error_channel = SlackChannelConfig(name="error", id="C123")
+        error_config = SlackErrorConfig(channel=error_channel, interval_min=0)
+        return SlackErrorOnlyConfig(
+            bot_token="dummy-token",  # noqa: S106
+            from_name="test",
+            error=error_config,
+        )
+
+    def _setup_mock_client(self, mocker):
+        import pathlib
+
+        uploaded: list[tuple[dict, str]] = []
+
+        mock_client = mocker.MagicMock()
+        mock_client.chat_postMessage.return_value = {"ts": "111.222"}
+
+        def record_upload(**kwargs):
+            # アップロード後に一時ファイルが削除されるため、呼び出し時点で内容を記録する
+            # （画像などバイナリの場合もあるため errors="replace" で読む）
+            content = pathlib.Path(kwargs["file"]).read_text(encoding="utf-8", errors="replace")
+            uploaded.append((kwargs, content))
+            return {"files": [{"id": "F123"}]}
+
+        mock_client.files_upload_v2.side_effect = record_upload
+        mocker.patch("slack_sdk.WebClient", return_value=mock_client)
+        return mock_client, uploaded
+
+    def test_long_error_attaches_full_text(self, mocker):
+        """分割される長さのエラーは全文の .txt がスレッドに添付される"""
+        from my_lib.notify.slack import _hist_clear, _interval_clear, error
+
+        _hist_clear()
+        _interval_clear()
+        mocker.patch("my_lib.notify.slack.time.sleep")
+        uploaded = self._setup_mock_client(mocker)[1]
+
+        message = "\n".join(f"line {i}" for i in range(30))
+        error(self._make_config(), "test", message)
+
+        assert len(uploaded) == 1
+        kwargs, content = uploaded[0]
+        assert kwargs["channel"] == "C123"
+        assert kwargs["title"] == "error.txt"
+        assert kwargs["thread_ts"] == "111.222"
+        assert content == message
+
+    def test_short_error_does_not_attach_text(self, mocker):
+        """分割されない短いエラーではテキスト添付しない"""
+        from my_lib.notify.slack import _hist_clear, _interval_clear, error
+
+        _hist_clear()
+        _interval_clear()
+        mocker.patch("my_lib.notify.slack.time.sleep")
+        mock_client = self._setup_mock_client(mocker)[0]
+
+        error(self._make_config(), "test", "short message")
+
+        mock_client.files_upload_v2.assert_not_called()
+
+    def test_long_error_with_image_attaches_both(self, mocker):
+        """スクリーンショット付きの長いエラーは画像と全文テキストの両方が添付される"""
+        import PIL.Image
+
+        from my_lib.notify.slack import (
+            AttachImage,
+            _hist_clear,
+            _interval_clear,
+            error_with_image,
+        )
+
+        _hist_clear()
+        _interval_clear()
+        mocker.patch("my_lib.notify.slack.time.sleep")
+        uploaded = self._setup_mock_client(mocker)[1]
+
+        message = "\n".join(f"line {i}" for i in range(30))
+        img = PIL.Image.new("RGB", (10, 10))
+        error_with_image(
+            self._make_config(),
+            "test",
+            message,
+            AttachImage(data=img, text="screenshot"),
+        )
+
+        assert len(uploaded) == 2
+        # 1つ目はスクリーンショット、2つ目が全文テキスト
+        text_uploads = [(k, c) for k, c in uploaded if k.get("title") == "error.txt"]
+        assert len(text_uploads) == 1
+        assert text_uploads[0][1] == message
+
+
 class TestSend:
     """send 関数のテスト"""
 

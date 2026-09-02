@@ -11,6 +11,7 @@ import logging
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
+import my_lib.chrome_util
 from my_lib.browser.backends.patchright.maintenance import PatchrightMaintenance
 from my_lib.browser.backends.patchright.page import PatchrightPage
 from my_lib.browser.exceptions import BrowserError
@@ -102,9 +103,17 @@ def launch(profile: BrowserProfile) -> PatchrightBrowser:
 
     args = ["--no-sandbox", "--disable-dev-shm-usage", f"--lang={profile.locale}"]
 
+    # NOTE: 既存 Selenium 実装・chrome_util.delete_profile と同じ data_dir/chrome/<name> 配下に置く。
+    user_data_dir = profile.data_dir / "chrome" / profile.name
+
+    # NOTE: SIGKILL 等で残った SingletonLock があると、Chrome は
+    # PROFILE_IN_USE（exit code 21）のダイアログで停止し launch がタイムアウトする。
+    # 特にコンテナ再起動でホスト名が変わると恒久的に起動不能になるため、
+    # 旧 Selenium 実装と同様に起動前へ掃除する（1 プロファイル 1 プロセスが前提）。
+    my_lib.chrome_util._cleanup_profile_lock(user_data_dir)
+
     launch_kwargs: dict = {
-        # NOTE: 既存 Selenium 実装・chrome_util.delete_profile と同じ data_dir/chrome/<name> 配下に置く。
-        "user_data_dir": str(profile.data_dir / "chrome" / profile.name),
+        "user_data_dir": str(user_data_dir),
         "headless": profile.headless,
         "locale": profile.locale,
         "viewport": {"width": profile.viewport.width, "height": profile.viewport.height},
