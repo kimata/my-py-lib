@@ -8,12 +8,107 @@ import unittest.mock
 import pytest
 
 import my_lib.browser.backends.patchright.browser
+from my_lib.browser.exceptions import BrowserError
 from my_lib.browser.types import BrowserProfile
 
 
 @pytest.fixture
 def temp_dir(tmp_path: pathlib.Path) -> pathlib.Path:
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def reset_playwright_holder():
+    """スレッド共有の Playwright インスタンスをテストごとに初期化する"""
+    holder = my_lib.browser.backends.patchright.browser._holder
+    holder.playwright = None
+    holder.refcount = 0
+    yield
+    holder.playwright = None
+    holder.refcount = 0
+
+
+def _patch_sync_playwright(mock_playwright: unittest.mock.MagicMock):
+    return unittest.mock.patch(
+        "patchright.sync_api.sync_playwright",
+        return_value=unittest.mock.MagicMock(start=lambda: mock_playwright),
+    )
+
+
+class TestSharedPlaywrightInstance:
+    """同一スレッドでの Playwright インスタンス共有のテスト
+
+    Playwright Sync API は 1 スレッドに 1 インスタンスしか起動できない
+    （2 つ目の start() は "inside the asyncio loop" エラー）。
+    メーカー別プロファイルのように複数ブラウザを同時に保持しても
+    インスタンスを共有し、最後のブラウザが閉じるまで stop しないことを検証する。
+    """
+
+    def _make_profile(self, temp_dir: pathlib.Path, name: str) -> BrowserProfile:
+        return BrowserProfile(name=name, data_dir=temp_dir)
+
+    def test_multiple_launches_share_one_instance(self, temp_dir: pathlib.Path):
+        mock_playwright = unittest.mock.MagicMock()
+
+        with _patch_sync_playwright(mock_playwright) as sync_playwright_mock:
+            first = my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "A"))
+            second = my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "B"))
+
+            assert sync_playwright_mock.call_count == 1
+            assert mock_playwright.chromium.launch_persistent_context.call_count == 2
+
+            first.close()
+            mock_playwright.stop.assert_not_called()
+
+            second.close()
+            mock_playwright.stop.assert_called_once()
+
+            # 全て閉じた後の再起動で新しいインスタンスが作られる
+            my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "C"))
+            assert sync_playwright_mock.call_count == 2
+
+    def test_double_close_releases_once(self, temp_dir: pathlib.Path):
+        mock_playwright = unittest.mock.MagicMock()
+
+        with _patch_sync_playwright(mock_playwright):
+            first = my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "A"))
+            second = my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "B"))
+
+            first.close()
+            first.close()
+            # 二重 close で second の分まで解放されないこと
+            mock_playwright.stop.assert_not_called()
+
+            second.close()
+            mock_playwright.stop.assert_called_once()
+
+    def test_launch_failure_releases_instance(self, temp_dir: pathlib.Path):
+        mock_playwright = unittest.mock.MagicMock()
+        mock_playwright.chromium.launch_persistent_context.side_effect = RuntimeError("boom")
+
+        with _patch_sync_playwright(mock_playwright), pytest.raises(BrowserError):
+            my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "A"))
+
+        # 誰も使っていないので停止される
+        mock_playwright.stop.assert_called_once()
+        assert my_lib.browser.backends.patchright.browser._holder.playwright is None
+
+    def test_launch_failure_keeps_instance_for_other_browser(self, temp_dir: pathlib.Path):
+        mock_playwright = unittest.mock.MagicMock()
+        mock_playwright.chromium.launch_persistent_context.side_effect = [
+            unittest.mock.MagicMock(),
+            RuntimeError("boom"),
+        ]
+
+        with _patch_sync_playwright(mock_playwright):
+            first = my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "A"))
+            with pytest.raises(BrowserError):
+                my_lib.browser.backends.patchright.browser.launch(self._make_profile(temp_dir, "B"))
+
+            # 起動中のブラウザが残っている間は停止しない
+            mock_playwright.stop.assert_not_called()
+            first.close()
+            mock_playwright.stop.assert_called_once()
 
 
 class TestLaunchProfileLockCleanup:

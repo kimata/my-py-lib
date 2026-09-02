@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import threading
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import my_lib.chrome_util
 from my_lib.browser.backends.patchright.maintenance import PatchrightMaintenance
@@ -22,6 +23,49 @@ if TYPE_CHECKING:
     from patchright.sync_api import Page as PwPage
 
 
+class _PlaywrightHolder(threading.local):
+    """スレッドごとに共有する Playwright インスタンスと参照カウント。
+
+    Playwright Sync API は 1 スレッドに 1 インスタンスしか起動できない。
+    起動中に 2 つ目の sync_playwright().start() を呼ぶと
+    "It looks like you are using Playwright Sync API inside the asyncio loop" で失敗する。
+    複数プロファイルのブラウザ（メーカー別プールなど）を同一スレッドで同時に保持するため、
+    インスタンスを共有し、最後のブラウザが閉じた時点で stop する。
+    """
+
+    def __init__(self) -> None:
+        self.playwright: Any = None
+        self.refcount = 0
+
+
+_holder = _PlaywrightHolder()
+
+
+def _acquire_playwright() -> Any:
+    """現在のスレッドの Playwright インスタンスを取得する（未起動なら起動）。"""
+    if _holder.playwright is None:
+        from patchright.sync_api import sync_playwright
+
+        _holder.playwright = sync_playwright().start()
+        _holder.refcount = 0
+    _holder.refcount += 1
+    return _holder.playwright
+
+
+def _release_playwright() -> None:
+    """参照を 1 つ返し、誰も使っていなければ Playwright を停止する。"""
+    if _holder.playwright is None:
+        return
+    _holder.refcount -= 1
+    if _holder.refcount > 0:
+        return
+    playwright = _holder.playwright
+    _holder.playwright = None
+    _holder.refcount = 0
+    with contextlib.suppress(Exception):
+        playwright.stop()
+
+
 class PatchrightBrowser:
     """永続コンテキストを 1 つ束ねる Browser 実装。"""
 
@@ -29,6 +73,7 @@ class PatchrightBrowser:
         self._pw = playwright
         self._context = context
         self._profile = profile
+        self._closed = False
         pages = context.pages
         pw_page = pages[0] if pages else context.new_page()
         self._apply_stealth_ua(pw_page)
@@ -89,17 +134,19 @@ class PatchrightBrowser:
         return PatchrightMaintenance(self._context, self._default_page.raw)
 
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         with contextlib.suppress(Exception):
             self._context.close()
-        with contextlib.suppress(Exception):
-            self._pw.stop()  # type: ignore[attr-defined]
+        # NOTE: Playwright インスタンスはスレッド内で共有しているため、
+        #       他のブラウザが残っていれば stop しない（参照カウントで管理）。
+        _release_playwright()
 
 
 def launch(profile: BrowserProfile) -> PatchrightBrowser:
     """Patchright で永続コンテキストを起動して Browser を返す。"""
-    from patchright.sync_api import sync_playwright
-
-    playwright = sync_playwright().start()
+    playwright = _acquire_playwright()
 
     args = ["--no-sandbox", "--disable-dev-shm-usage", f"--lang={profile.locale}"]
 
@@ -134,8 +181,7 @@ def launch(profile: BrowserProfile) -> PatchrightBrowser:
     except Exception as e:
         # NOTE: 起動失敗（XServer 無し等）を BrowserError に正規化して原因を明示する。
         #       headful なのに X ディスプレイが無い場合は xvfb-run 経由での実行が必要。
-        with contextlib.suppress(Exception):
-            playwright.stop()
+        _release_playwright()
         message = str(e)
         if not profile.headless and "XServer" in message:
             message += "（headful 起動には X ディスプレイが必要です。xvfb-run 経由で実行してください）"
