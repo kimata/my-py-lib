@@ -72,7 +72,11 @@ class PatchrightPage:
         return PatchrightElement(loc)
 
     def wait_visible(self, locator: Locator, *, timeout: float = 30.0) -> PatchrightElement:
-        loc = self._page.locator(_to_selector(locator, relative=False)).first
+        # NOTE: 複数マッチ時は「いずれかが可視になる」を待つ（Selenium の
+        # visibility_of_any_elements_located 相当）。.first 固定だと DOM 先頭の
+        # 不可視要素（例: Amazon の hidden な rhf-footer）にロックされ、
+        # 後方に可視の要素があってもタイムアウトする。
+        loc = self._page.locator(_to_selector(locator, relative=False)).filter(visible=True).first
         try:
             loc.wait_for(state="visible", timeout=timeout * 1000)
         except Exception as e:

@@ -73,3 +73,38 @@ class TestLaunchProfileLockCleanup:
             my_lib.browser.backends.patchright.browser.launch(profile)
 
         mock_playwright.chromium.launch_persistent_context.assert_called_once()
+
+
+class TestWaitVisible:
+    """PatchrightPage.wait_visible のテスト（実ブラウザ・headless）"""
+
+    def test_skips_hidden_first_match(self):
+        """DOM 先頭のマッチが不可視でも、後方の可視要素を検出できる
+
+        Amazon のページは hidden な rhf-footer が可視の navFooter より前に
+        あるため、.first 固定だと可視のフッターがあってもタイムアウトする
+        （本番でログインが全滅した実障害の再現）。
+        """
+        from patchright.sync_api import sync_playwright
+
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True, channel="chrome", args=["--no-sandbox"])
+            try:
+                pw_page = browser.new_page()
+                pw_page.set_content(
+                    '<div class="rhf-footer" style="display:none">hidden</div>'
+                    '<div id="navFooter" class="navLeftFooter">visible footer</div>'
+                )
+                page = PatchrightPage(pw_page)
+
+                element = page.wait_visible(
+                    Xpath('//div[contains(@class, "footer") or contains(@class, "Footer")]'),
+                    timeout=5.0,
+                )
+
+                assert element.attr("id") == "navFooter"
+            finally:
+                browser.close()
