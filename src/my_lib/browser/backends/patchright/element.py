@@ -10,6 +10,10 @@ NOTE: find / find_all の結果は ElementHandle で返す。
       2 桁遅かった。ElementHandle なら同じ処理が 2 秒で済む。
       wait_* 系が返す要素は操作対象（クリック・入力）なのでオートウェイト付きの
       Locator のまま維持する。
+
+NOTE: ElementHandle はナビゲーションでは解放されない。生成したハンドルは
+      HandleRegistry（handle_registry.py）に登録し、ラッパーの GC 時とナビゲーション
+      直前に dispose する。ハンドルを生成する箇所は必ず wrap_handle() を通すこと。
 """
 
 from __future__ import annotations
@@ -22,6 +26,8 @@ from my_lib.browser.types import BoundingBox
 if TYPE_CHECKING:
     from patchright.sync_api import ElementHandle as PwElementHandle
     from patchright.sync_api import Locator as PwLocator
+
+    from my_lib.browser.backends.patchright.handle_registry import HandleRegistry
 
 
 def _to_selector(locator: Locator, *, relative: bool) -> str:
@@ -38,13 +44,24 @@ def _to_selector(locator: Locator, *, relative: bool) -> str:
     return f"css={locator.value}"
 
 
+def wrap_handle(handle: PwElementHandle, registry: HandleRegistry | None) -> PatchrightElement:
+    """ElementHandle をラップし、台帳に登録する。"""
+    element = PatchrightElement(handle, registry=registry)
+    if registry is not None:
+        registry.register(element, handle)
+    return element
+
+
 class PatchrightElement:
     """Playwright の Locator または ElementHandle をラップした Element 実装。"""
 
-    def __init__(self, target: PwLocator | PwElementHandle) -> None:
+    def __init__(
+        self, target: PwLocator | PwElementHandle, *, registry: HandleRegistry | None = None
+    ) -> None:
         # ElementHandle は query_selector_all を持ち、Locator は持たない
         self._handle: PwElementHandle | None = None
         self._loc: PwLocator | None = None
+        self._registry = registry
         if callable(getattr(target, "query_selector_all", None)):
             self._handle = cast("PwElementHandle", target)
         else:
@@ -111,9 +128,9 @@ class PatchrightElement:
         selector = _to_selector(locator, relative=True)
         if self._handle is not None:
             found = self._handle.query_selector(selector)
-            return PatchrightElement(found) if found is not None else None
+            return wrap_handle(found, self._registry) if found is not None else None
         handles = cast("PwLocator", self._loc).locator(selector).element_handles()
-        return PatchrightElement(handles[0]) if handles else None
+        return wrap_handle(handles[0], self._registry) if handles else None
 
     def find_all(self, locator: Locator) -> list[PatchrightElement]:
         selector = _to_selector(locator, relative=True)
@@ -121,7 +138,7 @@ class PatchrightElement:
             handles = self._handle.query_selector_all(selector)
         else:
             handles = cast("PwLocator", self._loc).locator(selector).element_handles()
-        return [PatchrightElement(h) for h in handles]
+        return [wrap_handle(h, self._registry) for h in handles]
 
     def evaluate(self, script: str, *args: object) -> Any:
         # NOTE: Playwright の evaluate は第 1 引数に要素を束ねる。追加引数は 2 要素目以降。

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from my_lib.browser.backends.patchright.element import PatchrightElement, _to_selector
+from my_lib.browser.backends.patchright.element import PatchrightElement, _to_selector, wrap_handle
 from my_lib.browser.exceptions import WaitTimeoutError
 from my_lib.browser.locator import Locator
 from my_lib.browser.types import ScreenshotSpec
@@ -19,22 +19,31 @@ if TYPE_CHECKING:
     from patchright.sync_api import FrameLocator as PwFrameLocator
     from patchright.sync_api import Page as PwPage
 
+    from my_lib.browser.backends.patchright.handle_registry import HandleRegistry
+
 
 class PatchrightFrame:
     """iframe 内にスコープした Page 相当。captcha 等で必要な操作サブセットを提供する。"""
 
-    def __init__(self, pw_page: PwPage, frame_locator: PwFrameLocator) -> None:
+    def __init__(
+        self, pw_page: PwPage, frame_locator: PwFrameLocator, registry: HandleRegistry | None = None
+    ) -> None:
         self._page = pw_page
         self._frame = frame_locator
+        self._registry = registry
 
     def find(self, locator: Locator) -> PatchrightElement | None:
         # NOTE: find / find_all は ElementHandle で返す（理由は element.py 冒頭の NOTE 参照）。
+        if self._registry is not None:
+            self._registry.flush()
         handles = self._frame.locator(_to_selector(locator, relative=False)).element_handles()
-        return PatchrightElement(handles[0]) if handles else None
+        return wrap_handle(handles[0], self._registry) if handles else None
 
     def find_all(self, locator: Locator) -> list[PatchrightElement]:
+        if self._registry is not None:
+            self._registry.flush()
         handles = self._frame.locator(_to_selector(locator, relative=False)).element_handles()
-        return [PatchrightElement(h) for h in handles]
+        return [wrap_handle(h, self._registry) for h in handles]
 
     def exists(self, locator: Locator, *, visible: bool = True) -> bool:
         loc = self._frame.locator(_to_selector(locator, relative=False))
@@ -95,4 +104,6 @@ class PatchrightFrame:
         return self._page.screenshot(full_page=full)
 
     def refresh(self) -> None:
+        if self._registry is not None:
+            self._registry.dispose_all()
         self._page.reload()

@@ -6,8 +6,9 @@ import contextlib
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-from my_lib.browser.backends.patchright.element import PatchrightElement, _to_selector
+from my_lib.browser.backends.patchright.element import PatchrightElement, _to_selector, wrap_handle
 from my_lib.browser.backends.patchright.frame import PatchrightFrame
+from my_lib.browser.backends.patchright.handle_registry import registry_for
 from my_lib.browser.exceptions import NavigationError, WaitTimeoutError
 from my_lib.browser.locator import Locator
 from my_lib.browser.types import ScreenshotSpec
@@ -21,6 +22,8 @@ class PatchrightPage:
 
     def __init__(self, pw_page: PwPage) -> None:
         self._page = pw_page
+        # NOTE: 台帳は生の Page に紐づく（このラッパーは都度生成されるため）。
+        self._registry = registry_for(pw_page)
 
     @property
     def raw(self) -> PwPage:
@@ -28,6 +31,8 @@ class PatchrightPage:
         return self._page
 
     def goto(self, url: str) -> None:
+        # ナビゲーション後のハンドルは使えないので、実行コンテキストが生きている間に全て解放する。
+        self._registry.dispose_all()
         try:
             self._page.goto(url, wait_until="domcontentloaded")
         except Exception as e:
@@ -47,12 +52,14 @@ class PatchrightPage:
 
     def find(self, locator: Locator) -> PatchrightElement | None:
         # NOTE: find / find_all は ElementHandle で返す（理由は element.py 冒頭の NOTE 参照）。
+        self._registry.flush()
         found = self._page.query_selector(_to_selector(locator, relative=False))
-        return PatchrightElement(found) if found is not None else None
+        return wrap_handle(found, self._registry) if found is not None else None
 
     def find_all(self, locator: Locator) -> list[PatchrightElement]:
+        self._registry.flush()
         handles = self._page.query_selector_all(_to_selector(locator, relative=False))
-        return [PatchrightElement(h) for h in handles]
+        return [wrap_handle(h, self._registry) for h in handles]
 
     def exists(self, locator: Locator, *, visible: bool = True) -> bool:
         loc = self._page.locator(_to_selector(locator, relative=False))
@@ -117,10 +124,11 @@ class PatchrightPage:
     @contextlib.contextmanager
     def frame(self, locator: Locator) -> Iterator[PatchrightFrame]:
         frame_locator = self._page.frame_locator(_to_selector(locator, relative=False))
-        yield PatchrightFrame(self._page, frame_locator)
+        yield PatchrightFrame(self._page, frame_locator, self._registry)
         # NOTE: FrameLocator はステートレスなので明示的な戻り処理は不要。
 
     def refresh(self) -> None:
+        self._registry.dispose_all()
         self._page.reload()
 
     def set_viewport(self, width: int, height: int) -> None:

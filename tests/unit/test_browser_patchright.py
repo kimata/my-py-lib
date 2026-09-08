@@ -291,3 +291,155 @@ class TestElementHandleFind:
         assert [e.text for e in container.find_all(Xpath(".//li"))] == ["a", "b"]
         first = container.find(Xpath(".//li"))
         assert first is not None and first.text == "a"
+
+
+class _Wrapper:
+    """weakref 可能なダミーラッパー（object() は弱参照を作れない）"""
+
+
+class TestHandleRegistry:
+    """HandleRegistry 単体のテスト（ブラウザ不要）"""
+
+    def test_collected_wrapper_moves_handle_to_pending_and_flush_disposes(self):
+        import gc
+
+        from my_lib.browser.backends.patchright.handle_registry import HandleRegistry
+
+        registry = HandleRegistry()
+        handle = unittest.mock.MagicMock()
+        wrapper = _Wrapper()
+        registry.register(wrapper, handle)
+        assert registry.live_count == 1
+
+        del wrapper
+        gc.collect()
+        # GC コールバックでは dispose せず、破棄待ちへ移すだけ
+        assert registry.live_count == 0
+        assert registry.pending_count == 1
+        handle.dispose.assert_not_called()
+
+        registry.flush()
+        handle.dispose.assert_called_once()
+        assert registry.pending_count == 0
+
+    def test_dispose_all_releases_live_handles(self):
+        from my_lib.browser.backends.patchright.handle_registry import HandleRegistry
+
+        registry = HandleRegistry()
+        handles = [unittest.mock.MagicMock() for _ in range(3)]
+        wrappers = [_Wrapper() for _ in handles]
+        for wrapper, handle in zip(wrappers, handles, strict=True):
+            registry.register(wrapper, handle)
+
+        registry.dispose_all()
+
+        for handle in handles:
+            handle.dispose.assert_called_once()
+        assert registry.live_count == 0
+        assert registry.pending_count == 0
+
+    def test_flush_ignores_dispose_failure(self):
+        from my_lib.browser.backends.patchright.handle_registry import HandleRegistry
+
+        registry = HandleRegistry()
+        broken = unittest.mock.MagicMock()
+        broken.dispose.side_effect = RuntimeError("already disposed")
+        healthy = unittest.mock.MagicMock()
+        wrappers = [_Wrapper(), _Wrapper()]
+        registry.register(wrappers[0], broken)
+        registry.register(wrappers[1], healthy)
+
+        registry.dispose_all()
+
+        healthy.dispose.assert_called_once()
+
+
+class TestElementHandleLifecycle:
+    """find / find_all が生成した ElementHandle が解放されるテスト（実ブラウザ・headless）
+
+    ElementHandle はナビゲーションでは解放されないため、同じページを使い回すと
+    node ドライバと Python 双方にハンドルが溜まり続ける（price-watch で 1 巡回が
+    40 分 → 120 分に劣化した実障害）。Python 側の接続オブジェクト数で解放を検証する。
+    """
+
+    @pytest.fixture
+    def pw_page(self):
+        from patchright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True, channel="chrome", args=["--no-sandbox"])
+            try:
+                yield browser.new_page()
+            finally:
+                browser.close()
+
+    @staticmethod
+    def _object_count(pw_page) -> int:
+        # NOTE: Playwright Python はサーバー側オブジェクトを接続単位の辞書で保持する。
+        #       ElementHandle が dispose されると __dispose__ で辞書から消える。
+        return len(pw_page._impl_obj._connection._objects)
+
+    @staticmethod
+    def _set_items(pw_page, count: int) -> None:
+        items = "".join(
+            f'<div class="item"><a href="/item/{i}">title{i}</a><span>{i}</span></div>' for i in range(count)
+        )
+        pw_page.set_content(f"<html><body>{items}</body></html>")
+
+    def test_handles_are_released_after_wrappers_are_collected(self, pw_page):
+        import gc
+
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        self._set_items(pw_page, 100)
+        page = PatchrightPage(pw_page)
+        baseline = self._object_count(pw_page)
+
+        def parse() -> int:
+            parsed = 0
+            for element in page.find_all(Xpath('//div[@class="item"]')):
+                link = element.find(Xpath(".//a"))
+                spans = element.find_all(Xpath(".//span"))
+                assert link is not None
+                parsed += len(spans)
+            return parsed
+
+        assert parse() == 100
+        # 300 個のハンドルが生成され、ラッパーはループ終了時に解放されている
+        assert self._object_count(pw_page) >= baseline + 300
+
+        gc.collect()
+        # 次の find 呼び出しで破棄待ちが flush される
+        page.find(Xpath("//body"))
+        assert self._object_count(pw_page) <= baseline + 2
+
+    def test_navigation_disposes_all_live_handles(self, pw_page):
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        self._set_items(pw_page, 50)
+        page = PatchrightPage(pw_page)
+        baseline = self._object_count(pw_page)
+
+        kept = page.find_all(Xpath('//div[@class="item"]'))
+        assert len(kept) == 50
+        assert self._object_count(pw_page) >= baseline + 50
+
+        # 参照を保持したままでもナビゲーション前に全て解放される
+        page.refresh()
+        assert self._object_count(pw_page) <= baseline + 2
+        assert len(kept) == 50
+
+    def test_registry_is_shared_across_wrappers_of_same_page(self, pw_page):
+        from my_lib.browser import Xpath
+        from my_lib.browser.backends.patchright.page import PatchrightPage
+
+        self._set_items(pw_page, 20)
+        baseline = self._object_count(pw_page)
+
+        # Browser.pages() のようにラッパーが都度生成されても台帳は共有される
+        kept = PatchrightPage(pw_page).find_all(Xpath('//div[@class="item"]'))
+        assert len(kept) == 20
+        PatchrightPage(pw_page).refresh()
+        assert self._object_count(pw_page) <= baseline + 2
