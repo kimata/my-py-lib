@@ -56,6 +56,11 @@ _SEARCH_KEYWORD: str = "PayPayフリマ"
 # div#itm 内の <a href="/item/z..."> を直接取得
 _ITEM_LIST_XPATH: str = '//div[@id="itm"]//a[contains(@href, "/item/")]'
 
+# 検索結果 0 件の文言
+_NO_RESULT_XPATH: str = '//p[contains(., "見つかりませんでした")] | //p[contains(., "0件")]'
+# 完全一致なし → 近い商品を表示している旨の通知文（このとき HTTP ステータスは 404）
+_NEAR_MATCH_NOTICE_XPATH: str = '//p[contains(., "一致する商品が見つからなかったため")]'
+
 
 def _find(scope: Page | Element, xpath: str) -> Element:
     """要素を 1 つ取得する（存在しなければ例外）。"""
@@ -180,9 +185,15 @@ def _wait_for_search_results(page: Page) -> bool:
     # 検索結果が0件の場合のチェック
     # text() は要素直下の text node のみ見るため、子 <span> 内の文言は
     # contains(., …) で要素配下の文字列値全体を対象にする
-    no_result_xpath = '//p[contains(., "見つかりませんでした")] | //p[contains(., "0件")]'
-    if page.exists(Xpath(no_result_xpath), visible=False):
+    if page.exists(Xpath(_NO_RESULT_XPATH), visible=False):
         logging.info("[PayPay] 該当なし")
+        return False
+
+    # 完全一致が無いと PayPay は HTTP 404 で「近い商品」を最大 100 件表示する。
+    # これを解析しても後段のキーワード判定で全件除外されるだけ（1 回あたり約 30 秒の無駄）
+    # なので、通知文を検出したら 0 件として扱う。
+    if page.exists(Xpath(_NEAR_MATCH_NOTICE_XPATH), visible=False):
+        logging.info("[PayPay] 該当なし（一致する商品が無く、近い商品のみ表示）")
         return False
 
     # 並び順を新着順に変更（URL パラメータでは反映されないため select 操作で切り替え）
