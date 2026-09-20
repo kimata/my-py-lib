@@ -1,31 +1,28 @@
 #!/usr/bin/env python3
+"""メルカリの出品一覧を巡回し、各アイテムに対して処理を実行する。
+
+ブラウザ操作は `my_lib.browser.Page` 抽象のみに依存する（Selenium / Patchright 非依存）。
+呼び出し側は `page()` スコープ内で得た Page を渡し、`item_func_list` の各関数は
+``func(page, item, debug_mode)`` の形で呼ばれる。
+"""
 
 from __future__ import annotations
 
 import contextlib
 import logging
+import random
 import re
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-import selenium.common.exceptions
-import selenium.webdriver.common.by
-import selenium.webdriver.common.keys
-import selenium.webdriver.remote.webdriver
-import selenium.webdriver.remote.webelement
-import selenium.webdriver.support
-import selenium.webdriver.support.expected_conditions
-import selenium.webdriver.support.ui
-import selenium.webdriver.support.wait
-
-import my_lib.notify.slack
-import my_lib.selenium_util
-import my_lib.store.captcha
+import my_lib.browser
 import my_lib.store.mercari.config
+from my_lib.browser import Xpath
 
 if TYPE_CHECKING:
     import my_lib.store.mercari.progress
+    from my_lib.browser import Element, Page
 
 _TRY_COUNT: int = 3
 _LOAD_URL_TIMEOUT_SEC: int = 30
@@ -38,53 +35,55 @@ _POPUP_CLOSE_XPATHS: list[str] = [
 ]
 _DIALOG_XPATH: str = '//*[@role="dialog" and @aria-modal="true"]'
 _ACCOUNT_BUTTON_XPATH: str = '//button[@data-testid="account-button"]'
+_MORE_BUTTON_XPATH: str = '//div[contains(@class, "merButton")]/button[contains(text(), "もっと見る")]'
+_PAGE_ERROR_XPATH: str = '//div[contains(@class, "titleContainer")]/p[text()="エラーが発生しました"]'
+
+ItemFunc = Callable[["Page", my_lib.store.mercari.config.MercariItem, bool], Any]
+
+
+def random_sleep(sec: float) -> None:
+    """検知回避のため、指定秒数の 0.8〜1.2 倍のランダムな時間スリープする。"""
+    ratio = 0.8
+    time.sleep((sec * ratio) + (sec * (1 - ratio) * 2) * random.random())  # noqa: S311
 
 
 def iter_items_on_display(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     debug_mode: bool,
-    item_func_list: list[Callable[..., Any]],
+    item_func_list: list[ItemFunc],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
     max_consecutive_failures: int | None = None,
 ) -> None:
     """出品中の全アイテムに対して item_func_list の処理を実行する。
 
     Args:
+        page: ログイン済みのページ。
+        debug_mode: True なら最初のアイテムだけ処理する。
+        item_func_list: ``func(page, item, debug_mode)`` の形で呼ばれる処理のリスト。
+        progress_observer: 進捗通知先。
         max_consecutive_failures: アイテム単位の処理が連続して失敗した場合に中断する閾値。
             None の場合は最初の失敗で即座に例外を送出する（従来動作）。
             指定した場合、失敗したアイテムはスキップして次に進み、
             連続失敗数が閾値に達した時点で最後の例外を送出する。
+
     """
     # NOTE: ログイン直後にキャンペーン用のモーダルダイアログが表示され、account-button への
     # クリックが遮断されることがあるため、先にポップアップを閉じる。
-    close_popup(driver)
+    close_popup(page)
 
-    _click_account_button_with_retry(driver, wait)
-    my_lib.selenium_util.click_xpath(driver, '//a[contains(text(), "出品した商品")]', wait)
+    _click_account_button_with_retry(page)
+    page.wait_clickable(Xpath('//a[contains(text(), "出品した商品")]')).click()
 
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_element_located(
-            (
-                selenium.webdriver.common.by.By.XPATH,
-                _ITEM_LIST_XPATH,
-            )
-        )
-    )
+    page.wait_present(Xpath(_ITEM_LIST_XPATH))
 
     time.sleep(1)
 
-    list_url = driver.current_url
+    list_url = page.url
 
     # NOTE: リトライ付きでアイテムを列挙させたいので、_load_url を使う。
-    _load_url(driver, wait, list_url)
+    _load_url(page, list_url)
 
-    item_count = len(
-        driver.find_elements(
-            selenium.webdriver.common.by.By.XPATH,
-            _ITEM_LIST_XPATH,
-        )
-    )
+    item_count = len(page.find_all(Xpath(_ITEM_LIST_XPATH)))
 
     logging.info("%d 個の出品があります。", item_count)
 
@@ -95,7 +94,7 @@ def iter_items_on_display(
     for i in range(1, item_count + 1):
         try:
             _execute_item_with_retry(
-                driver, wait, debug_mode, item_count, i, item_func_list, progress_observer, list_url
+                page, debug_mode, item_count, i, item_func_list, progress_observer, list_url
             )
             consecutive_failures = 0
         except Exception:
@@ -116,27 +115,24 @@ def iter_items_on_display(
         if debug_mode:
             break
 
-        my_lib.selenium_util.random_sleep(10)
+        random_sleep(10)
 
         # NOTE: _load_url は内部的でリトライ処理が入っているので、try では囲わない。
-        _load_url(driver, wait, list_url)
+        _load_url(page, list_url)
 
 
 def _execute_item_with_retry(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     debug_mode: bool,
     item_count: int,
     index: int,
-    item_func_list: list[Callable[..., Any]],
+    item_func_list: list[ItemFunc],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None,
     list_url: str,
 ) -> None:
     for retry in range(_TRY_COUNT):
         try:
-            item = _execute_item(
-                driver, wait, debug_mode, item_count, index, item_func_list, progress_observer
-            )
+            item = _execute_item(page, debug_mode, item_count, index, item_func_list, progress_observer)
             if progress_observer is not None and item is not None:
                 progress_observer.on_item_complete(index, item_count, item)
             return
@@ -146,26 +142,18 @@ def _execute_item_with_retry(
                 raise
 
             logging.warning("リトライします。(retry=%d)", retry + 1)
-            my_lib.selenium_util.random_sleep(10)
-            _load_url(driver, wait, list_url)
+            random_sleep(10)
+            _load_url(page, list_url)
 
 
-def _load_url(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-    url: str,
-) -> None:
-    load_wait = selenium.webdriver.support.ui.WebDriverWait(driver, _LOAD_URL_TIMEOUT_SEC)
+def _load_url(page: Page, url: str) -> None:
     for retry in range(_TRY_COUNT):
         try:
-            driver.execute_script(f'window.location.href = "{url}";')
-            load_wait.until(
-                selenium.webdriver.support.expected_conditions.presence_of_element_located(
-                    (selenium.webdriver.common.by.By.XPATH, _ITEM_LIST_XPATH)
-                )
-            )
-            _expand_all(driver, wait)
-        except selenium.common.exceptions.TimeoutException:
+            page.goto(url)
+            page.wait_present(Xpath(_ITEM_LIST_XPATH), timeout=_LOAD_URL_TIMEOUT_SEC)
+            _expand_all(page)
+            return
+        except (my_lib.browser.WaitTimeoutError, my_lib.browser.NavigationError):
             logging.exception("エラーが発生しました。")
 
             if retry == _TRY_COUNT - 1:
@@ -173,36 +161,26 @@ def _load_url(
                 raise
 
             logging.warning("リトライします。(retry=%d)", retry + 1)
-            my_lib.selenium_util.random_sleep(10)
+            random_sleep(10)
 
 
-def _expand_all(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
-    MORE_BUTTON_XPATH = '//div[contains(@class, "merButton")]/button[contains(text(), "もっと見る")]'
+def _expand_all(page: Page) -> None:
+    while page.exists(Xpath(_MORE_BUTTON_XPATH), visible=False):
+        page.wait_clickable(Xpath(_MORE_BUTTON_XPATH)).click()
 
-    while len(driver.find_elements(selenium.webdriver.common.by.By.XPATH, MORE_BUTTON_XPATH)) != 0:
-        my_lib.selenium_util.click_xpath(driver, MORE_BUTTON_XPATH, wait)
-
-        wait.until(
-            selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
-                (selenium.webdriver.common.by.By.XPATH, "//body")
-            )
-        )
+        page.wait_present(Xpath("//body"))
         time.sleep(2)
 
 
 def _execute_item(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
+    page: Page,
     debug_mode: bool,
     item_count: int,
     index: int,
-    item_func_list: list[Callable[..., Any]],
+    item_func_list: list[ItemFunc],
     progress_observer: my_lib.store.mercari.progress.ProgressObserver | None = None,
 ) -> my_lib.store.mercari.config.MercariItem:
-    item, item_element, item_link = _parse_item(driver, index)
+    item, item_link = _parse_item(page, index)
 
     logging.info(
         "[%d/%d] %s [%s] [%s円] [%s view] [%s favorite] を処理します。",
@@ -223,39 +201,32 @@ def _execute_item(
         return item
 
     # NOTE: ポップアップがリンクを覆い隠す場合があるため、先に閉じる
-    close_popup(driver)
+    close_popup(page)
 
-    driver.execute_script("window.scrollTo(0, 0);")
+    page.evaluate("() => window.scrollTo(0, 0)")
     # NOTE: アイテムにスクロールしてから、ヘッダーに隠れないようちょっと前に戻す
-    item_link.location_once_scrolled_into_view  # noqa: B018
-    driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
+    item_link.scroll_into_view()
+    page.evaluate("() => window.scrollTo(0, window.pageYOffset - 200)")
     item_link.click()
 
-    _auto_reload(driver, wait)
+    _auto_reload(page)
 
     try:
-        wait.until(
-            selenium.webdriver.support.expected_conditions.text_to_be_present_in_element(
-                (selenium.webdriver.common.by.By.XPATH, "//h1"), re.sub(" +", " ", item.name)
-            )
-        )
-    except selenium.common.exceptions.TimeoutException:
-        logging.exception("Invalid title: %s", driver.title)
+        page.wait_text(Xpath("//h1"), re.sub(" +", " ", item.name))
+    except my_lib.browser.WaitTimeoutError:
+        logging.exception("Invalid title: %s", page.title)
         raise
 
-    item_url = driver.current_url
+    item_url = page.url
 
     fail_count = 0
     for item_func in item_func_list:
         while True:
             try:
-                item_func(driver, wait, item, debug_mode)
+                item_func(page, item, debug_mode)
                 fail_count = 0
                 break
-            except (
-                selenium.common.exceptions.TimeoutException,
-                selenium.common.exceptions.ElementNotInteractableException,
-            ):
+            except (my_lib.browser.WaitTimeoutError, my_lib.browser.ElementNotFoundError):
                 logging.exception("エラーが発生しました")
                 fail_count += 1
 
@@ -263,105 +234,73 @@ def _execute_item(
                     logging.warning("エラーが %d 回続いたので諦めます。", fail_count)
                     raise
 
-                if driver.current_url != item_url:
-                    driver.back()
-                    time.sleep(1)
-                if driver.current_url != item_url:
-                    driver.get(item_url)
+                if page.url != item_url:
+                    page.goto(item_url)
 
-                my_lib.selenium_util.random_sleep(10)
+                random_sleep(10)
 
         time.sleep(10)
 
     return item
 
 
-def _auto_reload(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
-    wait.until(
-        selenium.webdriver.support.expected_conditions.presence_of_all_elements_located(
-            (selenium.webdriver.common.by.By.XPATH, "//body")
-        )
-    )
+def _auto_reload(page: Page) -> None:
+    page.wait_present(Xpath("//body"))
 
-    if my_lib.selenium_util.xpath_exists(
-        driver, '//div[contains(@class, "titleContainer")]/p[text()="エラーが発生しました"]'
-    ):
+    if page.exists(Xpath(_PAGE_ERROR_XPATH), visible=False):
         logging.warning("ページの表示でエラーが発生したのでリロードします。")
-        driver.refresh()
+        page.refresh()
 
 
-def _parse_item(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    index: int,
-) -> tuple[
-    my_lib.store.mercari.config.MercariItem,
-    selenium.webdriver.remote.webelement.WebElement,
-    selenium.webdriver.remote.webelement.WebElement,
-]:
+def _parse_item(page: Page, index: int) -> tuple[my_lib.store.mercari.config.MercariItem, Element]:
+    """一覧の index 番目（1 始まり）のアイテムを解析し、アイテムと詳細ページへのリンク要素を返す。"""
     time.sleep(5)
     item_xpath = f"{_ITEM_LIST_XPATH}[{index}]"
 
-    # 親要素を最初に取得
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-    item_element = driver.find_element(by_xpath, item_xpath)
+    item_element = page.find(Xpath(item_xpath))
+    link = item_element.find(Xpath(".//a[@data-testid='listed-item']")) if item_element is not None else None
+    name_element = (
+        item_element.find(Xpath(".//p[@data-testid='item-label']")) if item_element is not None else None
+    )
+    price_elements = (
+        item_element.find_all(Xpath(".//span[@data-testid='price']/span[2]"))
+        if item_element is not None
+        else []
+    )
 
-    # 全ての子要素を一度に取得してキャッシュ
-    elements_cache: dict[str, Any] = {}
-
-    try:
-        # 必須要素を一括取得
-        elements_cache["link"] = item_element.find_element(by_xpath, ".//a[@data-testid='listed-item']")
-        elements_cache["name"] = item_element.find_element(by_xpath, ".//p[@data-testid='item-label']")
-
-        # 価格要素を取得（存在しない場合はリトライ）
-        price_elements = item_element.find_elements(by_xpath, ".//span[@data-testid='price']/span[2]")
-        if not price_elements:
-            driver.refresh()
-            time.sleep(5)
-            return _parse_item(driver, index)
-        elements_cache["price"] = price_elements[0]
-
-        # オプション要素を一括取得
-        elements_cache["favorite"] = item_element.find_elements(
-            by_xpath, ".//span[@data-testid='price']/following-sibling::div/div[1]/span"
-        )
-        elements_cache["view"] = item_element.find_elements(
-            by_xpath, ".//span[@data-testid='price']/following-sibling::div/div[3]/span"
-        )
-        elements_cache["private"] = item_element.find_elements(
-            by_xpath, ".//span[contains(text(), '公開停止中')]"
-        )
-
-    except selenium.common.exceptions.NoSuchElementException:
-        driver.refresh()
+    if item_element is None or link is None or name_element is None or not price_elements:
+        # NOTE: 一覧の描画が終わっていないと要素が欠けるため、リロードして取り直す
+        page.refresh()
         time.sleep(5)
-        return _parse_item(driver, index)
+        return _parse_item(page, index)
 
-    # キャッシュした要素から値を抽出
-    item_url_raw = elements_cache["link"].get_attribute("href")
-    if item_url_raw is None:
+    favorite_elements = item_element.find_all(
+        Xpath(".//span[@data-testid='price']/following-sibling::div/div[1]/span")
+    )
+    view_elements = item_element.find_all(
+        Xpath(".//span[@data-testid='price']/following-sibling::div/div[3]/span")
+    )
+    private_elements = item_element.find_all(Xpath(".//span[contains(text(), '公開停止中')]"))
+
+    item_url = link.attr("href")
+    if item_url is None:
         raise RuntimeError("Failed to get item URL")
-    item_url: str = item_url_raw
     item_id = item_url.split("/")[-1]
-    name: str = elements_cache["name"].text
-    price = int(elements_cache["price"].text.replace(",", ""))
+    name = name_element.text
+    price = int(price_elements[0].text.replace(",", ""))
 
-    # オプション値の取得（デフォルト値で初期化）
     view = 0
     favorite = 0
 
-    if elements_cache["view"]:
+    if view_elements:
         with contextlib.suppress(ValueError, AttributeError):
-            view = int(elements_cache["view"][0].text)
+            view = int(view_elements[0].text)
 
-    if elements_cache["favorite"]:
+    if favorite_elements:
         with contextlib.suppress(ValueError, AttributeError):
-            favorite = int(elements_cache["favorite"][0].text)
+            favorite = int(favorite_elements[0].text)
 
-    is_stop = 1 if elements_cache["private"] else 0
+    is_stop = 1 if private_elements else 0
 
     item = my_lib.store.mercari.config.MercariItem(
         id=item_id,
@@ -373,63 +312,58 @@ def _parse_item(
         is_stop=is_stop,
     )
 
-    return item, item_element, elements_cache["link"]
+    return item, link
 
 
-def close_popup(driver: selenium.webdriver.remote.webdriver.WebDriver) -> None:
+def close_popup(page: Page) -> None:
     """ページ上に表示されているポップアップ・ダイアログを閉じる。
 
     既知の閉じるボタンの XPath に加え、ARIA 属性ベースの汎用判定と
     Escape キーのフォールバックを持つ。表示されていない場合は何もしない。
     """
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
     # NOTE: 既知のポップアップ閉じるボタン（互換維持）
     for xpath in _POPUP_CLOSE_XPATHS:
-        for button in driver.find_elements(by_xpath, xpath):
+        for button in page.find_all(Xpath(xpath)):
             with contextlib.suppress(Exception):
-                if button.is_displayed():
+                if button.is_visible():
                     button.click()
                     time.sleep(0.5)
 
     # NOTE: 汎用パターン: role=dialog かつ aria-modal=true なモーダルを汎用的に閉じる。
     # メルカリは React のスタイル付きコンポーネントで class 名がハッシュ化されるため、
     # ARIA 属性ベースで判定することで将来のキャンペーン用ダイアログにも追従できる。
-    for dialog in driver.find_elements(by_xpath, _DIALOG_XPATH):
-        if not dialog.is_displayed():
+    for dialog in page.find_all(Xpath(_DIALOG_XPATH)):
+        if not dialog.is_visible():
             continue
-        _close_dialog(driver, dialog)
+        _close_dialog(page, dialog)
 
 
-def _close_dialog(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    dialog: selenium.webdriver.remote.webelement.WebElement,
-) -> None:
-    by_xpath = selenium.webdriver.common.by.By.XPATH
-
-    close_buttons: list[selenium.webdriver.remote.webelement.WebElement] = dialog.find_elements(
-        by_xpath,
-        './/button[@aria-label="閉じる" or @aria-label="close" or @aria-label="Close"]',
+def _close_dialog(page: Page, dialog: Element) -> None:
+    close_buttons = list(
+        dialog.find_all(
+            Xpath('.//button[@aria-label="閉じる" or @aria-label="close" or @aria-label="Close"]')
+        )
     )
 
     # NOTE: aria-labelledby が指す要素のテキストで「閉じる」を判定（メルカリは
     # 非表示 span で閉じるラベルを提供し aria-labelledby で参照する実装が多い）。
     if not close_buttons:
-        for button in dialog.find_elements(by_xpath, ".//button[@aria-labelledby]"):
-            labelledby = button.get_attribute("aria-labelledby")
+        for button in dialog.find_all(Xpath(".//button[@aria-labelledby]")):
+            labelledby = button.attr("aria-labelledby")
             if not labelledby:
                 continue
-            label_elements = driver.find_elements(by_xpath, f'//*[@id="{labelledby}"]')
+            label_elements = page.find_all(Xpath(f'//*[@id="{labelledby}"]'))
             if not label_elements:
                 continue
-            label_text = label_elements[0].get_attribute("textContent") or ""
+            # NOTE: 非表示要素のテキストなので textContent で読む（text は可視テキストのみ）
+            label_text = str(label_elements[0].evaluate("(el) => el.textContent") or "")
             if "閉じる" in label_text or "Close" in label_text:
                 close_buttons.append(button)
                 break
 
     for button in close_buttons:
         with contextlib.suppress(Exception):
-            if button.is_displayed():
+            if button.is_visible():
                 logging.info("ダイアログの閉じるボタンをクリックします。")
                 button.click()
                 time.sleep(0.5)
@@ -439,18 +373,15 @@ def _close_dialog(
     # 閉じるボタンが特定できなかった場合の最終手段。
     with contextlib.suppress(Exception):
         logging.info("ダイアログを Escape キーで閉じます。")
-        dialog.send_keys(selenium.webdriver.common.keys.Keys.ESCAPE)
+        dialog.press("Escape")
         time.sleep(0.5)
 
 
-def _click_account_button_with_retry(
-    driver: selenium.webdriver.remote.webdriver.WebDriver,
-    wait: selenium.webdriver.support.wait.WebDriverWait,
-) -> None:
+def _click_account_button_with_retry(page: Page) -> None:
     try:
-        my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
-    except selenium.common.exceptions.ElementClickInterceptedException:
+        page.wait_clickable(Xpath(_ACCOUNT_BUTTON_XPATH)).click()
+    except Exception:  # NOTE: クリック遮断はバックエンド固有の例外で届くため広く捕捉する
         logging.warning("account-button のクリックが遮断されました。ポップアップを閉じてリトライします。")
-        close_popup(driver)
+        close_popup(page)
         time.sleep(0.5)
-        my_lib.selenium_util.click_xpath(driver, _ACCOUNT_BUTTON_XPATH, wait)
+        page.wait_clickable(Xpath(_ACCOUNT_BUTTON_XPATH)).click()

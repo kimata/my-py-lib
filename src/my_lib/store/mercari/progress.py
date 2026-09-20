@@ -29,7 +29,7 @@ class ProgressObserver(Protocol):
                 print(f"Completed {index}/{total}")
 
         observer = MyProgressDisplay()
-        iter_items_on_display(driver, wait, debug_mode, [handler], progress_observer=observer)
+        iter_items_on_display(page, debug_mode, [handler], progress_observer=observer)
 
     """
 
