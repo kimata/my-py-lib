@@ -228,3 +228,41 @@ class TestCloseDialog:
             mercari_scrape._close_dialog(page, dialog)
 
         button.click.assert_called_once()
+
+
+class TestClosePopupCoachMark:
+    """role=dialog を持たないコーチマーク型ポップアップも閉じる."""
+
+    @staticmethod
+    def _page(button: MagicMock, label_text: str) -> MagicMock:
+        label = MagicMock(name="label")
+        label.evaluate.return_value = label_text
+        page = MagicMock(name="page")
+        page.find_all.side_effect = lambda locator: (
+            [button]
+            if locator.value == "//button[@aria-labelledby]"
+            else [label]
+            if locator.value == '//*[@id="_r_d_"]'
+            else []
+        )
+        return page
+
+    def test_clicks_labelledby_close_button_outside_dialog(self) -> None:
+        button = MagicMock(name="close")
+        button.is_visible.return_value = True
+        button.attr.return_value = "_r_d_"
+
+        with patch.object(mercari_scrape.time, "sleep"):
+            mercari_scrape.close_popup(self._page(button, "閉じる"))
+
+        button.click.assert_called_once()
+
+    def test_ignores_labelledby_button_with_other_label(self) -> None:
+        button = MagicMock(name="button")
+        button.is_visible.return_value = True
+        button.attr.return_value = "_r_d_"
+
+        with patch.object(mercari_scrape.time, "sleep"):
+            mercari_scrape.close_popup(self._page(button, "次へ"))
+
+        button.click.assert_not_called()

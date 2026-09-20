@@ -337,6 +337,32 @@ def close_popup(page: Page) -> None:
             continue
         _close_dialog(page, dialog)
 
+    # NOTE: コーチマーク型のポップアップ（「¥300オークションで注目を集めませんか？」等）は
+    # role=dialog を持たず、全画面のオーバーレイでクリックを遮る。閉じるボタンは
+    # aria-labelledby で非表示 span「閉じる」を参照する実装なので、ページ全体から探す。
+    for button in page.find_all(Xpath("//button[@aria-labelledby]")):
+        with contextlib.suppress(Exception):
+            if button.is_visible() and _is_close_button(page, button):
+                logging.info("ポップアップの閉じるボタンをクリックします。")
+                button.click()
+                time.sleep(0.5)
+
+
+def _is_close_button(page: Page, button: Element) -> bool:
+    """aria-labelledby が指す要素のテキストが「閉じる」/「Close」なら True。
+
+    メルカリは非表示 span で閉じるラベルを提供し aria-labelledby で参照する実装が多い。
+    非表示要素のテキストなので textContent で読む（text は可視テキストのみ）。
+    """
+    labelledby = button.attr("aria-labelledby")
+    if not labelledby:
+        return False
+    label_elements = page.find_all(Xpath(f'//*[@id="{labelledby}"]'))
+    if not label_elements:
+        return False
+    label_text = str(label_elements[0].evaluate("(el) => el.textContent") or "")
+    return "閉じる" in label_text or "Close" in label_text
+
 
 def _close_dialog(page: Page, dialog: Element) -> None:
     close_buttons = list(
@@ -345,19 +371,9 @@ def _close_dialog(page: Page, dialog: Element) -> None:
         )
     )
 
-    # NOTE: aria-labelledby が指す要素のテキストで「閉じる」を判定（メルカリは
-    # 非表示 span で閉じるラベルを提供し aria-labelledby で参照する実装が多い）。
     if not close_buttons:
         for button in dialog.find_all(Xpath(".//button[@aria-labelledby]")):
-            labelledby = button.attr("aria-labelledby")
-            if not labelledby:
-                continue
-            label_elements = page.find_all(Xpath(f'//*[@id="{labelledby}"]'))
-            if not label_elements:
-                continue
-            # NOTE: 非表示要素のテキストなので textContent で読む（text は可視テキストのみ）
-            label_text = str(label_elements[0].evaluate("(el) => el.textContent") or "")
-            if "閉じる" in label_text or "Close" in label_text:
+            if _is_close_button(page, button):
                 close_buttons.append(button)
                 break
 
