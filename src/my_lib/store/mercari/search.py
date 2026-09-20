@@ -472,45 +472,44 @@ if __name__ == "__main__":
 
     _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
     _manager = my_lib.browser.BrowserManager(_profile)
-    _page = _manager.get_page()
-
     try:
-        results = search(_page, condition, max_items=max_count, scroll_to_load=scroll_to_load)
+        with _manager.page() as _page:
+            results = search(_page, condition, max_items=max_count, scroll_to_load=scroll_to_load)
 
-        # ダンプパスが指定された場合は、検索結果ページをダンプ
-        if dump_path:
-            dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
-            logging.info("ページをダンプしました: %s", dump_path)
+            # ダンプパスが指定された場合は、検索結果ページをダンプ
+            if dump_path:
+                dump_path.mkdir(parents=True, exist_ok=True)
+                my_lib.browser.helpers.dump_page(_page, 0, dump_path)
+                logging.info("ページをダンプしました: %s", dump_path)
 
-            # 最初の商品のHTMLを個別にダンプ
-            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
-            if item_elements:
-                first_item_html = item_elements[0].attr("outerHTML")
-                item_html_path = dump_path / "first_item.html"
-                with item_html_path.open("w", encoding="utf-8") as f:
-                    f.write(first_item_html if first_item_html else "")
-                logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
+                # 最初の商品のHTMLを個別にダンプ
+                item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
+                if item_elements:
+                    first_item_html = item_elements[0].attr("outerHTML")
+                    item_html_path = dump_path / "first_item.html"
+                    with item_html_path.open("w", encoding="utf-8") as f:
+                        f.write(first_item_html if first_item_html else "")
+                    logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
 
-            # 画像をダウンロード
-            img_dir = dump_path / "images"
-            img_dir.mkdir(parents=True, exist_ok=True)
+                # 画像をダウンロード
+                img_dir = dump_path / "images"
+                img_dir.mkdir(parents=True, exist_ok=True)
+                for i, result in enumerate(results, 1):
+                    if result.thumb_url:
+                        ext = my_lib.store.flea_market.get_image_extension(result.thumb_url)
+                        img_path = img_dir / f"{i:03d}{ext}"
+                        if my_lib.store.flea_market.download_image(result.thumb_url, img_path):
+                            logging.info("画像を保存しました: %s", img_path)
+
+            logging.info("=" * 60)
+            logging.info("検索結果: %d 件", len(results))
+            logging.info("=" * 60)
+
             for i, result in enumerate(results, 1):
+                logging.info("[%d] %s", i, result.name)
+                logging.info("    価格: ¥%s", f"{result.price:,}")
+                logging.info("    URL: %s", result.url)
                 if result.thumb_url:
-                    ext = my_lib.store.flea_market.get_image_extension(result.thumb_url)
-                    img_path = img_dir / f"{i:03d}{ext}"
-                    if my_lib.store.flea_market.download_image(result.thumb_url, img_path):
-                        logging.info("画像を保存しました: %s", img_path)
-
-        logging.info("=" * 60)
-        logging.info("検索結果: %d 件", len(results))
-        logging.info("=" * 60)
-
-        for i, result in enumerate(results, 1):
-            logging.info("[%d] %s", i, result.name)
-            logging.info("    価格: ¥%s", f"{result.price:,}")
-            logging.info("    URL: %s", result.url)
-            if result.thumb_url:
-                logging.info("    画像: %s", result.thumb_url)
+                    logging.info("    画像: %s", result.thumb_url)
     finally:
         _manager.quit()

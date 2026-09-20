@@ -309,7 +309,8 @@ my-py-lib/
 
 ### Browser
 
-- `my_lib.browser_manager.BrowserManager`
+- `my_lib.browser.BrowserManager`（`page()` / `tab()` スコープ内でのみ Page を提供。with を抜けるとタブごと閉じ、タブに紐づくリソースを解放）
+- `my_lib.browser_manager.BrowserManager`（旧 Selenium 用）
 - `my_lib.selenium_util.create_driver`
 - `my_lib.selenium_util.quit_driver_gracefully`
 - `my_lib.selenium_util.clear_cache`

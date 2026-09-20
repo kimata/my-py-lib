@@ -438,7 +438,7 @@ class TestElementHandleLifecycle:
         self._set_items(pw_page, 20)
         baseline = self._object_count(pw_page)
 
-        # Browser.pages() のようにラッパーが都度生成されても台帳は共有される
+        # 同じ Page に対してラッパーが複数生成されても台帳は共有される
         kept = PatchrightPage(pw_page).find_all(Xpath('//div[@class="item"]'))
         assert len(kept) == 20
         PatchrightPage(pw_page).refresh()

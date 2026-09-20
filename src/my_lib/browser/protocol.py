@@ -3,12 +3,12 @@
 `Browser` / `Page` / `Element` / `Maintenance` はバックエンド非依存の抽象で、
 `selenium.*` / `patchright.*` の型を一切露出しない。待機は auto-wait 前提の
 意味メソッド（`wait_visible` 等）に集約し、EC オブジェクトの値渡しは行わない。
-iframe / タブはステートレスなスコープ（context manager）として表現する。
+iframe / タブはスコープ（context manager）として表現し、Page はスコープ内でのみ存在する。
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from typing import Protocol, runtime_checkable
 
@@ -208,18 +208,19 @@ class Maintenance(Protocol):
 
 @runtime_checkable
 class Browser(Protocol):
-    """ブラウザ（1 つのコンテキスト）。複数タブを束ねる。"""
+    """ブラウザ（1 つのコンテキスト）。
 
-    def new_page(self) -> Page:
-        """新しいページ（タブ）を開いて返す。"""
+    Page はスコープ（`page()` / `tab()`）の中でしか得られない。with を抜けるとタブは
+    閉じられ、タブに紐づくリソース（CDP セッション・Frame・Dispatcher・Route）が
+    まとめて解放される。スコープの単位は「1 つの作業」（1 商品・1 注文・1 検索）。
+    """
+
+    def page(self) -> AbstractContextManager[Page]:
+        """新しいタブを開いて返し、with を抜けると閉じる。"""
         ...
 
     def tab(self, url: str) -> AbstractContextManager[Page]:
-        """新しいタブで URL を開き、with を抜けると閉じて元のタブへ戻る。"""
-        ...
-
-    def pages(self) -> Sequence[Page]:
-        """現在開いている全ページ。"""
+        """新しいタブで URL を開いて返し、with を抜けると閉じる。"""
         ...
 
     @property
@@ -230,26 +231,3 @@ class Browser(Protocol):
     def close(self) -> None:
         """ブラウザを終了する。"""
         ...
-
-
-@runtime_checkable
-class BrowserSession(Protocol):
-    """`(driver, wait)` タプルに代わる、呼び出し側が受け取るセッション。
-
-    store 層・各プロジェクトはこの `BrowserSession` を受け取り、`session.page` を操作する。
-    """
-
-    @property
-    def browser(self) -> Browser:
-        """ブラウザ本体。"""
-        ...
-
-    @property
-    def page(self) -> Page:
-        """既定ページ（最初のタブ）。"""
-        ...
-
-
-def iter_pages(browser: Browser) -> Iterator[Page]:
-    """全ページを走査するユーティリティ。"""
-    yield from browser.pages()

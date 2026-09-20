@@ -301,8 +301,6 @@ if __name__ == "__main__":
 
     _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
     _manager = my_lib.browser.BrowserManager(_profile)
-    _page = _manager.get_page()
-
     item = {
         "name": "Raspberry Pi 5 / 8GB (switch-science)",
         "url": "https://www.switch-science.com/products/9250",
@@ -312,6 +310,7 @@ if __name__ == "__main__":
     }
 
     try:
-        logging.info(fetch_price(_page, item, dump_path=pathlib.Path(data_path)))
+        with _manager.page() as _page:
+            logging.info(fetch_price(_page, item, dump_path=pathlib.Path(data_path)))
     finally:
         _manager.quit()

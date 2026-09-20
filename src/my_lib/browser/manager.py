@@ -3,12 +3,23 @@
 `(driver, wait)` タプルに代わり、`BrowserManager` が `Browser` / `Page` を提供する。
 遅延起動・プロファイル管理・セッションリトライ（`SessionError` 捕捉時のクリーン再起動）を担う。
 バックエンド固有の型には一切依存しない。
+
+Page はスコープ内でのみ存在する::
+
+    with manager.page() as page:
+        page.goto(url)
+        ...
+    # ここでタブは閉じられ、タブに紐づくリソースは全て解放される
+
+スコープの単位は「1 つの作業」（1 商品・1 注文・1 検索）とし、巡回全体を 1 つの
+スコープで包まないこと。タブの寿命を作業単位に限定することがリーク対策の本体である。
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TypeVar
 
 import my_lib.chrome_util
@@ -45,10 +56,17 @@ class BrowserManager:
             self._browser = factory.launch(self._profile, self._backend)
         return self._browser
 
-    def get_page(self) -> Page:
-        """既定ページを取得する。"""
-        browser = self.get_browser()
-        return browser.new_page() if not browser.pages() else browser.pages()[0]
+    @contextlib.contextmanager
+    def page(self) -> Iterator[Page]:
+        """新しいタブを開いて返し、with を抜けると閉じる（未起動ならブラウザを起動する）。"""
+        with self.get_browser().page() as page:
+            yield page
+
+    @contextlib.contextmanager
+    def tab(self, url: str) -> Iterator[Page]:
+        """新しいタブで URL を開いて返し、with を抜けると閉じる。"""
+        with self.get_browser().tab(url) as page:
+            yield page
 
     def quit(self) -> None:
         """ブラウザを終了する。"""
@@ -74,7 +92,11 @@ class BrowserManager:
         clear_profile_on_error: bool = True,
         on_retry: Callable[[int, int], None] | None = None,
     ) -> T:
-        """`SessionError` 発生時にクリーン再起動してリトライする。"""
+        """`SessionError` 発生時にクリーン再起動してリトライする。
+
+        `func` は内部で `page()` スコープを開くこと（再起動後は新しいブラウザで
+        スコープを開き直す必要があるため、Page を外から渡す形にはしない）。
+        """
         attempt = 0
         while True:
             try:

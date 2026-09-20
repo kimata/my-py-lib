@@ -357,7 +357,6 @@ if __name__ == "__main__":
 
     profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(config["data"]["selenium"]))
     manager = my_lib.browser.BrowserManager(profile)
-    page = manager.get_page()
 
     if "slack" not in config:
         raise ValueError("slack 設定がありません")
@@ -369,15 +368,16 @@ if __name__ == "__main__":
         raise ValueError("slack 設定に captcha の設定がありません")
     slack_config: my_lib.notify.slack.HasCaptchaConfig = slack_config_parsed
 
-    try:
-        execute(page, login_config, slack_config)
-    except Exception:
-        logging.exception("URL: %s", page.url)
+    with manager.page() as page:
+        try:
+            execute(page, login_config, slack_config)
+        except Exception:
+            logging.exception("URL: %s", page.url)
 
-        my_lib.browser.helpers.dump_page(
-            page,
-            random.randint(0, 99),  # noqa: S311
-            login_config.dump_path,
-        )
+            my_lib.browser.helpers.dump_page(
+                page,
+                random.randint(0, 99),  # noqa: S311
+                login_config.dump_path,
+            )
 
     manager.quit()

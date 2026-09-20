@@ -10,9 +10,13 @@
 
     profile = my_lib.browser.BrowserProfile(name="Merhist", data_dir=data_dir)
     manager = my_lib.browser.BrowserManager(profile)
-    page = manager.get_page()
-    page.goto("https://jp.mercari.com")
-    page.wait_visible(my_lib.browser.Xpath('//button[contains(text(), "ログイン")]')).click()
+    with manager.page() as page:
+        page.goto("https://jp.mercari.com")
+        page.wait_visible(my_lib.browser.Xpath('//button[contains(text(), "ログイン")]')).click()
+    # with を抜けるとタブは閉じられ、タブに紐づくリソースは全て解放される
+
+Page は `page()` / `tab()` のスコープ内でのみ存在する。スコープの単位は「1 つの作業」
+（1 商品・1 注文・1 検索）とし、巡回全体を 1 つのスコープで包まないこと。
 """
 
 from typing import Any
@@ -29,7 +33,6 @@ from my_lib.browser.locator import Css, Locator, Xpath
 from my_lib.browser.manager import BrowserManager
 from my_lib.browser.protocol import (
     Browser,
-    BrowserSession,
     Element,
     FrameScope,
     Maintenance,
@@ -62,7 +65,6 @@ __all__ = [
     "BrowserError",
     "BrowserManager",
     "BrowserProfile",
-    "BrowserSession",
     "Css",
     "Element",
     "ElementNotFoundError",

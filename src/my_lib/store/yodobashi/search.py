@@ -343,32 +343,31 @@ if __name__ == "__main__":
         stealth=True,
     )
     _manager = my_lib.browser.BrowserManager(_profile)
-    _page = _manager.get_page()
-
     try:
-        results = search(_page, keyword, max_items=max_count)
+        with _manager.page() as _page:
+            results = search(_page, keyword, max_items=max_count)
 
-        if dump_path:
-            dump_path.mkdir(parents=True, exist_ok=True)
-            my_lib.browser.helpers.dump_page(_page, 0, dump_path)
-            logging.info("ページをダンプしました: %s", dump_path)
+            if dump_path:
+                dump_path.mkdir(parents=True, exist_ok=True)
+                my_lib.browser.helpers.dump_page(_page, 0, dump_path)
+                logging.info("ページをダンプしました: %s", dump_path)
 
-            item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
-            if item_elements:
-                first_item_html = item_elements[0].attr("outerHTML")
-                item_html_path = dump_path / "first_item.html"
-                with item_html_path.open("w", encoding="utf-8") as f:
-                    f.write(first_item_html if first_item_html else "")
-                logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
+                item_elements = _page.find_all(Xpath(_ITEM_LIST_XPATH))
+                if item_elements:
+                    first_item_html = item_elements[0].attr("outerHTML")
+                    item_html_path = dump_path / "first_item.html"
+                    with item_html_path.open("w", encoding="utf-8") as f:
+                        f.write(first_item_html if first_item_html else "")
+                    logging.info("最初の商品のHTMLをダンプしました: %s", item_html_path)
 
-        logging.info("=" * 60)
-        logging.info("検索結果: %d 件", len(results))
-        logging.info("=" * 60)
+            logging.info("=" * 60)
+            logging.info("検索結果: %d 件", len(results))
+            logging.info("=" * 60)
 
-        for i, result in enumerate(results, 1):
-            logging.info("[%d] %s", i, result.name)
-            if result.price:
-                logging.info("    価格: ¥%s", f"{result.price:,}")
-            logging.info("    URL: %s", result.url)
+            for i, result in enumerate(results, 1):
+                logging.info("[%d] %s", i, result.name)
+                if result.price:
+                    logging.info("    価格: ¥%s", f"{result.price:,}")
+                logging.info("    URL: %s", result.url)
     finally:
         _manager.quit()

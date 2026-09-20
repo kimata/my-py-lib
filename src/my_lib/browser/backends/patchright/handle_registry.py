@@ -39,7 +39,7 @@ _page_registries_lock = threading.Lock()
 def registry_for(pw_page: PwPage) -> HandleRegistry:
     """Playwright Page に紐づく台帳を返す（同じ Page には常に同じ台帳）。
 
-    PatchrightPage ラッパーは Browser.pages() 等で都度生成されるため、台帳は
+    PatchrightPage ラッパーは Frame スコープ等で複数生成され得るため、台帳は
     ラッパーではなく生の Page に紐づける。Page が解放されれば台帳も解放される。
     """
     with _page_registries_lock:

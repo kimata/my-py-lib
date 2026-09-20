@@ -2,6 +2,16 @@
 
 素の Chrome を Patchright（自動化痕跡除去済み Playwright）で起動する。
 bot 検出回避のため既定は headful（Xvfb 上での実行を想定）。stealth は Patchright 内蔵。
+
+タブの寿命について:
+    Playwright は CDP セッション・iframe の Frame・Dispatcher・Route といったリソースを
+    タブ（Page）単位で解放する。1 つのタブを長期間使い回すと、Patchright の RouteImpl が
+    リクエストごとに登録して解除しない ``Fetch.requestPaused`` リスナーや、detach 済み
+    iframe の Frame が溜まり続け、全操作が時間とともに遅くなる（price-watch で 1 巡回が
+    36 分 → 80 分に劣化した実障害）。
+    そのため Page は ``page()`` / ``tab()`` のスコープ内でのみ存在させ、with を抜けた時点で
+    タブごと閉じる。コンテキスト起動時の初期タブは番人として保持し外へは出さない
+    （全タブを閉じると Chrome 自体が終了するため）。
 """
 
 from __future__ import annotations
@@ -20,6 +30,7 @@ from my_lib.browser.types import BrowserProfile
 
 if TYPE_CHECKING:
     from patchright.sync_api import BrowserContext as PwContext
+    from patchright.sync_api import CDPSession as PwCDPSession
     from patchright.sync_api import Page as PwPage
 
 
@@ -74,64 +85,63 @@ class PatchrightBrowser:
         self._context = context
         self._profile = profile
         self._closed = False
+        # NOTE: 起動時の初期タブ（about:blank）は番人として保持し、作業には使わない。
         pages = context.pages
-        pw_page = pages[0] if pages else context.new_page()
-        self._apply_stealth_ua(pw_page)
-        self._default_page = PatchrightPage(pw_page)
+        self._keeper = pages[0] if pages else context.new_page()
 
-    def _apply_stealth_ua(self, pw_page: PwPage) -> None:
+    def _apply_stealth_ua(self, pw_page: PwPage) -> PwCDPSession | None:
         """headless 時に UA から "HeadlessChrome" 痕跡を除去する。
 
         Patchright は headless で navigator.userAgent に "HeadlessChrome" を残す。
         ヨドバシ等の anti-bot はこれを検知して接続を拒否する（ERR_HTTP2_PROTOCOL_ERROR）。
         明示 UA 未指定のページ生成ごとに CDP で "HeadlessChrome"→"Chrome" 補正した UA を
-        適用する（ページ生成経路が限られるため context の page イベントに頼らず明示的に呼ぶ）。
-        headful では UA に痕跡が無いため no-op。
+        適用する。headful では UA に痕跡が無いため no-op。
+
+        Returns:
+            上書きに使った CDP セッション。上書きはセッションが生きている間だけ有効なので、
+            呼び出し側（Page）が所有してタブと共に閉じる。
+
         """
         if self._profile.user_agent is not None:
             # 明示指定 UA は launch 時に context 全体へ適用済み。
-            return
+            return None
         try:
             ua = pw_page.evaluate("() => navigator.userAgent")
         except Exception:
             logging.debug("Failed to read UA for stealth override")
-            return
+            return None
         if not isinstance(ua, str) or "HeadlessChrome" not in ua:
-            return
+            return None
         modified = ua.replace("HeadlessChrome", "Chrome")
         try:
             cdp = self._context.new_cdp_session(pw_page)
             cdp.send("Network.setUserAgentOverride", {"userAgent": modified})
         except Exception:
             logging.debug("Failed to override UA via CDP")
+            return None
+        return cdp
 
-    @property
-    def default_page(self) -> PatchrightPage:
-        return self._default_page
-
-    def new_page(self) -> PatchrightPage:
+    def _open(self) -> PatchrightPage:
         pw_page = self._context.new_page()
-        self._apply_stealth_ua(pw_page)
-        return PatchrightPage(pw_page)
+        return PatchrightPage(pw_page, ua_session=self._apply_stealth_ua(pw_page))
+
+    @contextlib.contextmanager
+    def page(self) -> Iterator[PatchrightPage]:
+        page = self._open()
+        try:
+            yield page
+        finally:
+            page.close()
 
     @contextlib.contextmanager
     def tab(self, url: str) -> Iterator[PatchrightPage]:
-        pw_page = self._context.new_page()
-        self._apply_stealth_ua(pw_page)
-        page = PatchrightPage(pw_page)
-        try:
+        with self.page() as page:
             page.goto(url)
             yield page
-        finally:
-            with contextlib.suppress(Exception):
-                pw_page.close()
-
-    def pages(self) -> list[PatchrightPage]:
-        return [PatchrightPage(p) for p in self._context.pages]
 
     @property
     def maintenance(self) -> PatchrightMaintenance:
-        return PatchrightMaintenance(self._context, self._default_page.raw)
+        return PatchrightMaintenance(self._context, self._keeper)
 
     def close(self) -> None:
         if self._closed:

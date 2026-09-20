@@ -1,8 +1,14 @@
-"""Patchright バックエンドの Page 実装。"""
+"""Patchright バックエンドの Page 実装。
+
+Page は Browser の ``page()`` / ``tab()`` スコープ内でのみ存在し、スコープ終了時に
+``close()`` でタブごと閉じられる。タブに紐づくリソース（CDP セッション・Frame・
+Dispatcher・Route・ElementHandle）は Playwright がタブ単位で解放する。
+"""
 
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
@@ -14,25 +20,51 @@ from my_lib.browser.locator import Locator
 from my_lib.browser.types import ScreenshotSpec
 
 if TYPE_CHECKING:
+    from patchright.sync_api import CDPSession as PwCDPSession
     from patchright.sync_api import Page as PwPage
+
+# 1 タブでこの回数を超えてナビゲーションしたら警告する。
+# タブの寿命は「1 つの作業」に限定する設計なので、超過はスコープが広すぎる兆候。
+NAVIGATION_WARN_THRESHOLD = 200
 
 
 class PatchrightPage:
     """Playwright Page をラップした Page 実装。"""
 
-    def __init__(self, pw_page: PwPage) -> None:
+    def __init__(self, pw_page: PwPage, *, ua_session: PwCDPSession | None = None) -> None:
         self._page = pw_page
-        # NOTE: 台帳は生の Page に紐づく（このラッパーは都度生成されるため）。
+        # NOTE: 台帳は生の Page に紐づく（Frame スコープ等でラッパーが複数生成されるため）。
         self._registry = registry_for(pw_page)
+        # NOTE: UA 上書きはこの CDP セッションが生きている間だけ有効なので、タブと共に閉じる。
+        self._ua_session = ua_session
+        self._navigation_count = 0
 
     @property
     def raw(self) -> PwPage:
-        """内部の Playwright Page（保守操作・タブ管理から参照する）。"""
+        """内部の Playwright Page（テスト・診断用）。"""
         return self._page
+
+    def close(self) -> None:
+        """タブを閉じ、タブに紐づくリソースを解放する（Browser のスコープ終了時に呼ばれる）。"""
+        with contextlib.suppress(Exception):
+            self._registry.dispose_all()
+        if self._ua_session is not None:
+            with contextlib.suppress(Exception):
+                self._ua_session.detach()
+            self._ua_session = None
+        with contextlib.suppress(Exception):
+            self._page.close()
 
     def goto(self, url: str) -> None:
         # ナビゲーション後のハンドルは使えないので、実行コンテキストが生きている間に全て解放する。
         self._registry.dispose_all()
+        self._navigation_count += 1
+        if self._navigation_count == NAVIGATION_WARN_THRESHOLD:
+            logging.warning(
+                "同じタブで %d 回ナビゲーションしています。page() のスコープが広すぎる可能性があります: %s",
+                self._navigation_count,
+                url,
+            )
         try:
             self._page.goto(url, wait_until="domcontentloaded")
         except Exception as e:

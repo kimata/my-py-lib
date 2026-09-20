@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -21,26 +22,27 @@ class PatchrightMaintenance:
         self._context = context
         self._page = page
 
-    def _cdp(self):
-        return self._context.new_cdp_session(self._page)
+    def _send(self, method: str, failure_message: str) -> None:
+        # NOTE: 一時セッションは送信後に detach する。attach したままだと
+        #       Node ドライバ側に CDPSession が呼び出しごとに残る。
+        try:
+            cdp = self._context.new_cdp_session(self._page)
+        except Exception:
+            logging.warning(failure_message)
+            return
+        try:
+            cdp.send(method)
+        except Exception:
+            logging.warning(failure_message)
+        finally:
+            with contextlib.suppress(Exception):
+                cdp.detach()
 
     def clear_cache(self) -> None:
-        try:
-            cdp = self._cdp()
-            cdp.send("Network.clearBrowserCache")
-        except Exception:
-            logging.warning("Failed to clear cache")
+        self._send("Network.clearBrowserCache", "Failed to clear cache")
 
     def clear_history(self) -> None:
-        try:
-            cdp = self._cdp()
-            cdp.send("Page.resetNavigationHistory")
-        except Exception:
-            logging.warning("Failed to clear navigation history")
+        self._send("Page.resetNavigationHistory", "Failed to clear navigation history")
 
     def collect_garbage(self) -> None:
-        try:
-            cdp = self._cdp()
-            cdp.send("HeapProfiler.collectGarbage")
-        except Exception:
-            logging.warning("Failed to collect garbage")
+        self._send("HeapProfiler.collectGarbage", "Failed to collect garbage")

@@ -307,8 +307,6 @@ if __name__ == "__main__":
 
     _profile = my_lib.browser.BrowserProfile(name="Test", data_dir=pathlib.Path(data_path))
     _manager = my_lib.browser.BrowserManager(_profile)
-    _page = _manager.get_page()
-
     slack_config_parsed = my_lib.notify.slack.SlackConfig.parse(config.get("slack", {}))
     slack_config: my_lib.notify.slack.HasErrorConfig | my_lib.notify.slack.SlackEmptyConfig = (
         slack_config_parsed
@@ -326,7 +324,8 @@ if __name__ == "__main__":
     )
 
     try:
-        item = AmazonItem.from_asin(asin)
-        logging.info(my_lib.pretty.format(fetch_price(_page, item, slack_config, dump_path).to_dict()))
+        with _manager.page() as _page:
+            item = AmazonItem.from_asin(asin)
+            logging.info(my_lib.pretty.format(fetch_price(_page, item, slack_config, dump_path).to_dict()))
     finally:
         _manager.quit()

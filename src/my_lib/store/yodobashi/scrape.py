@@ -185,20 +185,19 @@ if __name__ == "__main__":
         stealth=True,
     )
     _manager = my_lib.browser.BrowserManager(_profile)
-    _page = _manager.get_page()
-
     try:
-        result = scrape(_page, url)
+        with _manager.page() as _page:
+            result = scrape(_page, url)
 
-        logging.info("=" * 60)
-        logging.info("取得結果")
-        logging.info("=" * 60)
-        logging.info("タイトル: %s", result.title)
-        if result.price:
-            logging.info("価格: ¥%s", f"{result.price:,}")
-        else:
-            logging.info("価格: 取得失敗")
-        logging.info("サムネイルURL: %s", result.thumbnail_url or "取得失敗")
-        logging.info("在庫: %s", "あり" if result.in_stock else "なし")
+            logging.info("=" * 60)
+            logging.info("取得結果")
+            logging.info("=" * 60)
+            logging.info("タイトル: %s", result.title)
+            if result.price:
+                logging.info("価格: ¥%s", f"{result.price:,}")
+            else:
+                logging.info("価格: 取得失敗")
+            logging.info("サムネイルURL: %s", result.thumbnail_url or "取得失敗")
+            logging.info("在庫: %s", "あり" if result.in_stock else "なし")
     finally:
         _manager.quit()

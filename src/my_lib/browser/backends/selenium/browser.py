@@ -23,27 +23,21 @@ if TYPE_CHECKING:
 
 
 class SeleniumBrowser:
-    """単一の WebDriver を束ねる Browser 実装。"""
+    """単一の WebDriver を束ねる Browser 実装。
+
+    Selenium は「カレントウィンドウ」を 1 つ持つモデルなので、`page()` は新しいウィンドウを
+    開いてカレントに切り替え、with を抜けると閉じて元のウィンドウ（番人）へ戻す。
+    """
 
     def __init__(self, driver: WebDriver) -> None:
         self._driver = driver
-        self._default_page = SeleniumPage(driver)
-
-    @property
-    def default_page(self) -> SeleniumPage:
-        return self._default_page
-
-    def new_page(self) -> SeleniumPage:
-        # NOTE: Selenium は 1 ドライバ = 1 ページのモデル。追加ページが要る場合は tab() を使う。
-        return self._default_page
 
     @contextlib.contextmanager
-    def tab(self, url: str) -> Iterator[SeleniumPage]:
+    def page(self) -> Iterator[SeleniumPage]:
         original = self._driver.current_window_handle
         self._driver.execute_script("window.open('');")
         self._driver.switch_to.window(self._driver.window_handles[-1])
         try:
-            self._driver.get(url)
             yield SeleniumPage(self._driver)
         finally:
             with contextlib.suppress(Exception):
@@ -53,8 +47,11 @@ class SeleniumBrowser:
                 self._driver.switch_to.window(original)
                 time.sleep(0.1)
 
-    def pages(self) -> list[SeleniumPage]:
-        return [self._default_page]
+    @contextlib.contextmanager
+    def tab(self, url: str) -> Iterator[SeleniumPage]:
+        with self.page() as page:
+            page.goto(url)
+            yield page
 
     @property
     def maintenance(self) -> SeleniumMaintenance:
