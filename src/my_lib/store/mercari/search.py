@@ -40,8 +40,12 @@ from my_lib.browser.protocol import Element, Page
 _SEARCH_BASE_URL: str = "https://jp.mercari.com/search"
 _TARGET_DOMAIN: str = "mercari.com"
 _SEARCH_KEYWORD: str = "メルカリ"
-# item-grid 内のアイテムのみを取得（関連商品やおすすめ商品を除外）
-_ITEM_LIST_XPATH: str = '//div[@id="item-grid"]//li[@data-testid="item-cell"]'
+# 検索結果グリッド内のアイテムのみを取得（関連商品やおすすめ商品を除外）
+# 2026-09 のリニューアルでコンテナが div#item-grid から
+# div[data-testid="search-item-grid"] に変わったため、両方を受け付ける
+_ITEM_LIST_XPATH: str = (
+    '//div[@id="item-grid" or @data-testid="search-item-grid"]//li[@data-testid="item-cell"]'
+)
 
 
 def _find(scope: Page | Element, xpath: str) -> Element:
@@ -250,8 +254,9 @@ def _parse_search_item(
 
         # タイトルを取得
         # 商品名は data-testid="thumbnail-item-name" から取得するのが最も安定
+        # （旧 UI は span、新 UI は p なのでタグは限定しない）
         title: str | None = None
-        title_elements = item_element.find_all(Xpath('.//span[@data-testid="thumbnail-item-name"]'))
+        title_elements = item_element.find_all(Xpath('.//*[@data-testid="thumbnail-item-name"]'))
         if title_elements and title_elements[0].text:
             title = title_elements[0].text
         else:
@@ -263,15 +268,25 @@ def _parse_search_item(
         # 価格を取得
         price: int | None = None
 
-        # 方法1: span.number__xxxxx クラスから取得
-        price_number_elements = item_element.find_all(Xpath(".//span[contains(@class, 'number__')]"))
-        if price_number_elements and price_number_elements[0].text:
-            price_text = price_number_elements[0].text
-            price_str = price_text.replace("¥", "").replace(",", "").strip()
-            with contextlib.suppress(ValueError):
-                price = int(price_str)
+        # 方法1: 新 UI の data-testid="item-tile-price" から取得
+        # （"¥" と数値が別 span に分かれているため、数値部分を抽出する）
+        price_tile_elements = item_element.find_all(Xpath('.//span[@data-testid="item-tile-price"]'))
+        if price_tile_elements and price_tile_elements[0].text:
+            price_match = re.search(r"([\d,]+)", price_tile_elements[0].text)
+            if price_match:
+                with contextlib.suppress(ValueError):
+                    price = int(price_match.group(1).replace(",", ""))
 
-        # 方法2: aria-label 属性から価格とタイトルを取得（lazy loading 対策）
+        # 方法2: 旧 UI の span.number__xxxxx クラスから取得
+        if price is None:
+            price_number_elements = item_element.find_all(Xpath(".//span[contains(@class, 'number__')]"))
+            if price_number_elements and price_number_elements[0].text:
+                price_text = price_number_elements[0].text
+                price_str = price_text.replace("¥", "").replace(",", "").strip()
+                with contextlib.suppress(ValueError):
+                    price = int(price_str)
+
+        # 方法3: aria-label 属性から価格とタイトルを取得（lazy loading 対策）
         if price is None or title is None:
             # div[@role="img"] の aria-label から取得
             # 例: "iPad（第9世代）10.2インチ Wi-Fiモデル 64GB スペースグレイの画像 30,000円"

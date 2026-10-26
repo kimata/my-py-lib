@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import lxml.html
+
+import my_lib.browser
 import my_lib.store.flea_market
 import my_lib.store.mercari.search as mercari_search
 
@@ -102,3 +105,90 @@ def test_search_returns_empty_when_no_results() -> None:
         results = mercari_search.search(page, condition)
 
     assert results == []
+
+
+# --- _parse_search_item (新旧 UI の DOM 構造) --------------------------------
+
+
+class _FakeElement:
+    """lxml ノードを my_lib.browser.protocol.Element 風に包む最小実装."""
+
+    def __init__(self, node: lxml.html.HtmlElement) -> None:
+        self._node = node
+
+    @property
+    def text(self) -> str:
+        return "".join(self._node.itertext()).strip()
+
+    def attr(self, name: str) -> str | None:
+        return self._node.get(name)
+
+    def find_all(self, locator: my_lib.browser.Locator) -> list[_FakeElement]:
+        return [_FakeElement(n) for n in self._node.xpath(locator.value)]
+
+
+def _make_item(html: str) -> _FakeElement:
+    return _FakeElement(lxml.html.fragment_fromstring(html))
+
+
+_NEW_UI_ITEM = """
+<li data-testid="item-cell"><div><div><div>
+  <a data-testid="thumbnail-link" href="/item/m20977984540">
+    <span><picture><img alt="美品 SONY FE 24-70mm F2.8 GM IIのサムネイル 売り切れ"
+        src="https://static.mercdn.net/thumb/item/webp/m20977984540_1.jpg"/></picture>
+      <div><span data-testid="item-tile-price"><span><span>¥</span><span>255,000</span></span></span></div>
+    </span>
+    <div><div><p data-testid="thumbnail-item-name">美品 SONY FE 24-70mm F2.8 GM II SEL2470GM2</p></div></div>
+  </a>
+</div></div></div></li>
+"""
+
+_OLD_UI_ITEM = """
+<li data-testid="item-cell">
+  <a href="/item/m111">
+    <div role="img" aria-label="旧UI商品の画像 12,345円"></div>
+    <span data-testid="thumbnail-item-name">旧UI商品</span>
+    <span class="number__6b270ca7">12,345</span>
+    <img srcset="https://example.com/a_240.jpg 240w, https://example.com/a_480.jpg 480w"/>
+  </a>
+</li>
+"""
+
+
+def test_parse_search_item_new_ui() -> None:
+    """2026-09 リニューアル後の DOM（p タグ名 + item-tile-price）をパースできる."""
+    result = mercari_search._parse_search_item(_make_item(_NEW_UI_ITEM))  # type: ignore[arg-type]
+
+    assert result is not None
+    assert result.name == "美品 SONY FE 24-70mm F2.8 GM II SEL2470GM2"
+    assert result.price == 255000
+    assert result.url == "https://jp.mercari.com/item/m20977984540"
+    assert result.thumb_url == "https://static.mercdn.net/thumb/item/webp/m20977984540_1.jpg"
+
+
+def test_parse_search_item_old_ui() -> None:
+    """リニューアル前の DOM（span タグ名 + number__ クラス）も引き続きパースできる."""
+    result = mercari_search._parse_search_item(_make_item(_OLD_UI_ITEM))  # type: ignore[arg-type]
+
+    assert result is not None
+    assert result.name == "旧UI商品"
+    assert result.price == 12345
+    assert result.url == "https://jp.mercari.com/item/m111"
+    assert result.thumb_url == "https://example.com/a_480.jpg"
+
+
+def test_parse_search_item_skips_pr() -> None:
+    """PR（広告）アイテムは None を返す."""
+    html = '<li data-testid="item-cell"><a href="/item/m1"><p class="merText">PR</p></a></li>'
+    assert mercari_search._parse_search_item(_make_item(html)) is None  # type: ignore[arg-type]
+
+
+def test_item_list_xpath_accepts_both_containers() -> None:
+    """アイテム一覧の XPath は新旧どちらのコンテナにもマッチする."""
+    doc = lxml.html.fromstring(
+        '<main><div id="item-grid"><ul><li data-testid="item-cell">old</li></ul></div>'
+        '<div data-testid="search-item-grid"><ul><li data-testid="item-cell">new</li></ul></div>'
+        '<div data-testid="recommend"><ul><li data-testid="item-cell">other</li></ul></div></main>'
+    )
+    matched = [n.text for n in doc.xpath(mercari_search._ITEM_LIST_XPATH)]
+    assert matched == ["old", "new"]
